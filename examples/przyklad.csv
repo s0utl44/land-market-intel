@@ -1,0 +1,5 @@
+source_listing_id,observed_at,municipality_teryt,municipality_name,parcel_id,lat,lon,area_m2,price_pln,land_use,url,title
+OG-1001,2026-09-07,9900011,Syntetyczna Rozwojowa,990001_1.0003.125/2,52.1043,21.2117,1250,325000,budowlana,https://example.invalid/OG-1001,Działka budowlana 1250 m²
+OG-1002,2026-09-07,9900011,Syntetyczna Rozwojowa,,52.0911,21.1874,980,249000,budowlana,https://example.invalid/OG-1002,Działka 980 m²
+OG-1003,2026-09-07,9900011,Syntetyczna Rozwojowa,,,,3000,180000,rolna,,Działka rolna 30 ar
+OG-1001,2026-09-14,9900011,Syntetyczna Rozwojowa,990001_1.0003.125/2,52.1043,21.2117,1250,309000,budowlana,https://example.invalid/OG-1001,Działka budowlana 1250 m² - OBNIŻKA

@@ -1,0 +1,171 @@
+"""Metryki tygodniowe per gmina, liczone w DuckDB na zdeduplikowanych nieruchomościach.
+
+Wejście:
+  observations — kolumny jak core.listing_observations (min. source_id, source_listing_id,
+                 observed_at, municipality_teryt, municipality_name, area_m2, price_pln)
+  links        — source_id, source_listing_id, property_key
+Definicje: docs/metrics.md
+"""
+from __future__ import annotations
+
+import duckdb
+import pandas as pd
+
+WEEKLY_SQL = """
+WITH obs AS (
+    SELECT o.*, l.property_key,
+           CAST(date_trunc('week', o.observed_at) AS DATE) AS week_start
+    FROM observations o
+    JOIN links l USING (source_id, source_listing_id)
+),
+-- cena nieruchomości w tygodniu = mediana cen z wszystkich jej ogłoszeń w tym tygodniu
+prop_week AS (
+    SELECT property_key, week_start,
+           any_value(municipality_teryt) AS municipality_teryt,
+           any_value(municipality_name)  AS municipality_name,
+           median(price_pln)             AS price_pln,
+           median(price_pln / area_m2)   AS price_per_m2
+    FROM obs
+    GROUP BY property_key, week_start
+),
+prop AS (
+    SELECT property_key,
+           any_value(municipality_teryt) AS municipality_teryt,
+           min(week_start)  AS first_week,
+           max(week_start)  AS last_week,
+           min(observed_at) AS first_seen,
+           max(observed_at) AS last_seen,
+           arg_min(price_pln, observed_at) AS initial_price
+    FROM obs
+    GROUP BY property_key
+),
+bounds AS (
+    SELECT min(week_start) AS min_week, max(week_start) AS max_week FROM obs
+),
+munis AS (
+    SELECT municipality_teryt, any_value(municipality_name) AS municipality_name
+    FROM obs GROUP BY municipality_teryt
+),
+grid AS (
+    SELECT m.municipality_teryt, m.municipality_name, CAST(w.week_start AS DATE) AS week_start
+    FROM munis m
+    CROSS JOIN bounds b
+    CROSS JOIN generate_series(b.min_week, b.max_week, INTERVAL 7 DAY) AS w(week_start)
+),
+-- nieruchomość jest aktywna od pierwszego do ostatniego tygodnia, w którym ją widziano
+-- (luka w scrapowaniu nie powoduje "zniknięcia")
+active AS (
+    SELECT g.municipality_teryt, g.week_start, p.property_key, p.initial_price
+    FROM grid g
+    JOIN prop p ON p.municipality_teryt = g.municipality_teryt
+               AND g.week_start BETWEEN p.first_week AND p.last_week
+),
+-- ostatnia znana cena na dany tydzień
+active_priced AS (
+    SELECT a.*, pw.price_pln, pw.price_per_m2
+    FROM active a
+    ASOF JOIN prop_week pw
+      ON a.property_key = pw.property_key AND a.week_start >= pw.week_start
+),
+supply AS (
+    SELECT municipality_teryt, week_start,
+           count(*)                                       AS active_supply,
+           median(price_per_m2)                           AS median_price_per_m2,
+           avg(CASE WHEN price_pln < initial_price * 0.99 THEN 1.0 ELSE 0.0 END) AS discounted_share
+    FROM active_priced
+    GROUP BY municipality_teryt, week_start
+),
+new_l AS (
+    SELECT municipality_teryt, first_week AS week_start, count(*) AS new_listings
+    FROM prop GROUP BY 1, 2
+),
+-- zniknięcie liczymy w tygodniu PO ostatnim tygodniu widoczności (jeśli mieści się w danych)
+gone AS (
+    SELECT p.municipality_teryt,
+           CAST(p.last_week + INTERVAL 7 DAY AS DATE) AS week_start,
+           count(*) AS disappeared_listings,
+           -- nieruchomości widoczne od pierwszego tygodnia danych są cenzurowane z lewej:
+           -- nie znamy ich prawdziwego początku, więc nie wchodzą do mediany czasu
+           median(CASE WHEN p.first_week > b.min_week
+                       THEN date_diff('day', p.first_seen, p.last_seen) END) AS median_days_to_disappear
+    FROM prop p CROSS JOIN bounds b
+    WHERE p.last_week < b.max_week
+    GROUP BY 1, 2
+)
+SELECT g.municipality_teryt,
+       g.municipality_name,
+       g.week_start,
+       coalesce(s.active_supply, 0)        AS active_supply,
+       coalesce(n.new_listings, 0)         AS new_listings,
+       coalesce(d.disappeared_listings, 0) AS disappeared_listings,
+       round(s.median_price_per_m2, 2)     AS median_price_per_m2,
+       round(d.median_days_to_disappear, 1) AS median_days_to_disappear,
+       round(s.discounted_share, 4)        AS discounted_share,
+       round(coalesce(d.disappeared_listings, 0)
+             / nullif(lag(s.active_supply) OVER (PARTITION BY g.municipality_teryt ORDER BY g.week_start), 0),
+             4)                            AS absorption_rate
+FROM grid g
+LEFT JOIN supply s USING (municipality_teryt, week_start)
+LEFT JOIN new_l  n USING (municipality_teryt, week_start)
+LEFT JOIN gone   d USING (municipality_teryt, week_start)
+ORDER BY g.municipality_teryt, g.week_start
+"""
+
+SCORES_SQL = """
+WITH w AS (
+    SELECT *, row_number() OVER (PARTITION BY municipality_teryt ORDER BY week_start) AS n,
+              count(*)     OVER (PARTITION BY municipality_teryt)                     AS total
+    FROM weekly
+),
+agg AS (
+    SELECT municipality_teryt,
+           any_value(municipality_name) AS municipality_name,
+           count(*) AS weeks_observed,
+           -- pierwszy tydzień pomijamy: cała podaż wygląda wtedy na "nową"
+           avg(absorption_rate) FILTER (WHERE n > 1)             AS avg_absorption_rate,
+           avg(median_price_per_m2) FILTER (WHERE n <= 4)        AS price_start,
+           avg(median_price_per_m2) FILTER (WHERE n > total - 4) AS price_end,
+           avg(discounted_share) FILTER (WHERE n > 1)            AS avg_discounted_share,
+           median(median_days_to_disappear)                      AS median_days_to_disappear
+    FROM w GROUP BY municipality_teryt
+),
+feat AS (
+    SELECT *, price_end / price_start - 1 AS price_trend_pct FROM agg
+),
+z AS (
+    SELECT *,
+        coalesce((avg_absorption_rate - avg(avg_absorption_rate) OVER ()) / nullif(stddev_pop(avg_absorption_rate) OVER (), 0), 0) AS z_abs,
+        coalesce((price_trend_pct - avg(price_trend_pct) OVER ()) / nullif(stddev_pop(price_trend_pct) OVER (), 0), 0) AS z_trend,
+        coalesce((avg_discounted_share - avg(avg_discounted_share) OVER ()) / nullif(stddev_pop(avg_discounted_share) OVER (), 0), 0) AS z_disc,
+        coalesce((median_days_to_disappear - avg(median_days_to_disappear) OVER ()) / nullif(stddev_pop(median_days_to_disappear) OVER (), 0), 0) AS z_days
+    FROM feat
+)
+SELECT municipality_teryt, municipality_name, weeks_observed,
+       round(avg_absorption_rate, 4)  AS avg_absorption_rate,
+       round(price_trend_pct, 4)      AS price_trend_pct,
+       round(avg_discounted_share, 4) AS avg_discounted_share,
+       round(median_days_to_disappear, 1) AS median_days_to_disappear,
+       round((z_abs + z_trend - z_disc - z_days) / 4, 3) AS opportunity_score,
+       CAST(rank() OVER (ORDER BY (z_abs + z_trend - z_disc - z_days) DESC) AS INTEGER) AS rank
+FROM z
+ORDER BY rank
+"""
+
+
+def weekly_region_metrics(observations: pd.DataFrame, links: pd.DataFrame) -> pd.DataFrame:
+    con = duckdb.connect()
+    obs = observations.copy()
+    obs["observed_at"] = pd.to_datetime(obs["observed_at"]).dt.date
+    obs["area_m2"] = obs["area_m2"].astype(float)
+    obs["price_pln"] = obs["price_pln"].astype(float)
+    con.register("observations", obs)
+    con.register("links", links[["source_id", "source_listing_id", "property_key"]])
+    return con.execute(WEEKLY_SQL).df()
+
+
+def region_scores(weekly: pd.DataFrame) -> pd.DataFrame:
+    """Ranking gmin. Wynik to średnia z-score'ów — ma sens tylko do porównania gmin
+    w tym samym zbiorze danych, nie jako wartość bezwzględna."""
+    con = duckdb.connect()
+    con.register("weekly", weekly)
+    return con.execute(SCORES_SQL).df()
