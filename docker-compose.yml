@@ -28,6 +28,20 @@ services:
     volumes:
       - ./data:/app/data
 
+  # Strona Radar Działek (API + frontend). Z internetu dostępna tylko przez Traefika (docker-compose.web.yml).
+  web:
+    build: .
+    entrypoint: ["lmi-web"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LMI_DATABASE_URL: postgresql://lmi:${LMI_DB_PASSWORD:-lmi}@db:5432/lmi
+      TZ: Europe/Warsaw
+    ports:
+      - "127.0.0.1:8080:8080"
+
   metabase:
     image: metabase/metabase:v0.50.36
     depends_on:

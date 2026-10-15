@@ -33,6 +33,12 @@ Na serwerze uruchamia się codziennie o 8:00. Wdrożenie: [deploy/README.md](dep
 - Między zapytaniami do Otodom są przerwy 2–4 s. Odpowiedź 403 przerywa przebieg bez ponawiania.
 - OLX odpowiada 403 na ruch z serwera, więc nie jest pobierany.
 
+## Strona Radar Działek
+
+`src/lmi/web.py` (FastAPI) i `src/lmi/web_static/index.html`: ranking gmin, wykresy gminy na tle
+mediany województwa i lista aktywnych ofert z filtrami i linkami do ogłoszeń. Barwy WRE Nieruchomości.
+Lokalnie: `uvicorn lmi.web:app --port 8080`. Na serwerze działa pod domeną za hasłem (deploy/README.md, punkt 7).
+
 ## Praca z własnymi plikami CSV
 
 ```bash
@@ -75,6 +81,7 @@ src/lmi/metrics.py         metryki tygodniowe i ranking (DuckDB)
 src/lmi/db.py              import, zapis wyników do PostgreSQL
 src/lmi/synthetic.py       generator danych testowych
 src/lmi/scrapers/          scraper Otodom, klient HTTP, ULDK (gminy)
+src/lmi/web.py             strona Radar Działek (API) + web_static/ (frontend)
 src/lmi/daily.py           codzienny przebieg (scraping -> import -> dedup -> metryki)
 src/lmi/cli.py             komendy `python -m lmi ...`
 deploy/                    systemd (8:00) + instrukcja wdrożenia

@@ -1,19 +1,38 @@
-# Publikacja dashboardu pod domeną przez istniejący na serwerze Traefik (HTTPS + hasło na wejściu).
+# Publikacja pod domeną przez istniejący na serwerze Traefik (HTTPS + hasło na wejściu).
+#   https://LMI_DOMAIN/          -> strona Radar Działek (usługa web)
+#   https://LMI_DOMAIN/metabase  -> Metabase (własne analizy)
 # Włączane przez COMPOSE_FILE w .env: COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
-# Wymagane w .env: LMI_DOMAIN, LMI_BASIC_AUTH (skrót hasła z htpasswd, w pojedynczych cudzysłowach).
+# Wymagane w .env: LMI_DOMAIN, LMI_BASIC_AUTH (login:skrót z `openssl passwd -apr1`, w pojedynczych
+# cudzysłowach; kilka osób oddziela się przecinkiem).
 services:
-  metabase:
-    environment:
-      MB_SITE_URL: https://${LMI_DOMAIN:?ustaw LMI_DOMAIN w .env}
+  web:
     labels:
       - traefik.enable=true
-      - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN}`)
+      - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN:?ustaw LMI_DOMAIN w .env}`)
       - traefik.http.routers.lmi.entrypoints=websecure
       - traefik.http.routers.lmi.tls.certresolver=letsencrypt
       - traefik.http.routers.lmi.middlewares=lmi-auth,lmi-headers
+      - traefik.http.routers.lmi.service=lmi-web
+      - traefik.http.services.lmi-web.loadbalancer.server.port=8080
       - traefik.http.middlewares.lmi-auth.basicauth.users=${LMI_BASIC_AUTH:?ustaw LMI_BASIC_AUTH w .env}
       - traefik.http.middlewares.lmi-headers.headers.stsSeconds=31536000
       - traefik.http.middlewares.lmi-headers.headers.frameDeny=true
       - traefik.http.middlewares.lmi-headers.headers.contentTypeNosniff=true
       - traefik.http.middlewares.lmi-headers.headers.customResponseHeaders.X-Robots-Tag=noindex, nofollow
-      - traefik.http.services.lmi.loadbalancer.server.port=3000
+
+  metabase:
+    environment:
+      MB_SITE_URL: https://${LMI_DOMAIN}/metabase
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lmi-mb.rule=Host(`${LMI_DOMAIN}`) && PathPrefix(`/metabase`)
+      - traefik.http.routers.lmi-mb.entrypoints=websecure
+      - traefik.http.routers.lmi-mb.tls.certresolver=letsencrypt
+      # lmi-auth i lmi-headers są zdefiniowane na usłudze web
+      - traefik.http.routers.lmi-mb.middlewares=lmi-auth,lmi-headers,lmi-mb-slash,lmi-mb-strip
+      - traefik.http.routers.lmi-mb.service=lmi-mb
+      - traefik.http.services.lmi-mb.loadbalancer.server.port=3000
+      # /metabase -> /metabase/ (bez ukośnika Metabase gubi ścieżki zasobów)
+      - traefik.http.middlewares.lmi-mb-slash.redirectregex.regex=^(https?://[^/]+/metabase)$$
+      - traefik.http.middlewares.lmi-mb-slash.redirectregex.replacement=$${1}/
+      - traefik.http.middlewares.lmi-mb-strip.stripprefix.prefixes=/metabase

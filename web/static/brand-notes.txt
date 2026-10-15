@@ -1,7 +1,0 @@
-# arkusze:
-# zmienne CSS:
-# najczęstsze kolory:
-# fonty:
-# kolory w logo:
-      1 fill="#1A1A1A"
-      2 fill="#d2a436"

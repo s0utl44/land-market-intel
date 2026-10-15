@@ -37,6 +37,7 @@ def pg_conn():
         admin.execute(f'CREATE DATABASE "{name}"')
     test_url = url.rsplit("/", 1)[0] + "/" + name
     conn = psycopg.connect(test_url)
+    conn.test_url = test_url  # dla testów, które łączą się same (np. strona)
     db.apply_schema(conn)
     try:
         yield conn

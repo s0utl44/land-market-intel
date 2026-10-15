@@ -50,8 +50,30 @@ def _offset(center: tuple[float, float], dx_m: float, dy_m: float) -> tuple[floa
     return lat, lon
 
 
+def make_regions(n: int, seed: int = 0) -> tuple[Region, ...]:
+    """Więcej fikcyjnych gmin o losowej dynamice (do podglądu strony). Część jest celowo mała."""
+    rng = random.Random(seed)
+    out = []
+    for i in range(n):
+        heat = rng.random()  # 0 = zastój, 1 = gorący rynek
+        small = rng.random() < 0.3
+        out.append(Region(
+            teryt=f"99{i + 1:04d}{rng.choice('123')}",
+            name=f"Gmina Przykładowa {i + 1}",
+            center=(50.6 + rng.random() * 1.2, 15.2 + rng.random() * 2.6),
+            radius_km=rng.uniform(3, 8),
+            initial_stock=rng.randint(2, 8) if small else rng.randint(30, 250),
+            arrivals_per_week=rng.uniform(0.2, 1) if small else rng.uniform(2, 10),
+            weekly_sale_hazard=0.01 + 0.09 * heat,
+            weekly_price_drift=-0.002 + 0.006 * heat,
+            weekly_cut_prob=0.07 - 0.06 * heat,
+            base_price_per_m2=rng.uniform(60, 420),
+        ))
+    return tuple(out)
+
+
 def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
-             start: date = date(2026, 1, 5)) -> dict[str, Path]:
+             start: date = date(2026, 1, 5), regions: tuple[Region, ...] = REGIONS) -> dict[str, Path]:
     """Zapisuje portal_*.csv oraz ground_truth.csv. Zwraca ścieżki plików."""
     rng = random.Random(seed)
     out = Path(out_dir)
@@ -60,8 +82,10 @@ def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
     truth: list[dict] = []
     listing_counter = {s: 0 for s in SOURCES}
     prop_counter = 0
+    # jeden dzień pobrania na tydzień, wspólny dla wszystkich gmin (jak w prawdziwym przebiegu)
+    scrape_days = [start + timedelta(weeks=w, days=random.Random(seed + w).randint(0, 1)) for w in range(weeks)]
 
-    for region in REGIONS:
+    for region in regions:
 
         def new_property(week: int) -> dict:
             nonlocal prop_counter
@@ -107,7 +131,7 @@ def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
             if week > 0:
                 for _ in range(_poisson(rng, region.arrivals_per_week)):
                     active.append(new_property(week))
-            observed_at = start + timedelta(weeks=week, days=rng.randint(0, 1))
+            observed_at = scrape_days[week]
             still_active = []
             for prop in active:
                 # ceny ofertowe zmieniają się skokowo (obniżki); trend rynku widać

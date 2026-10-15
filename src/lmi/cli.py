@@ -52,6 +52,8 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("demo", help="pełny pipeline na danych syntetycznych")
     s.add_argument("--out-dir", default="data/synthetic")
+    s.add_argument("--regions", type=int, default=0, help="liczba losowych gmin zamiast 3 domyślnych")
+    s.add_argument("--weeks", type=int, default=26)
 
     args = p.parse_args(argv)
 
@@ -103,18 +105,19 @@ def main(argv: list[str] | None = None) -> int:
 
                 return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix)
             elif args.cmd == "demo":
-                return _demo(conn, args.out_dir)
+                return _demo(conn, args.out_dir, args.regions, args.weeks)
         except db.ImportRejected as exc:
             print(f"ODRZUCONO: {exc}", file=sys.stderr)
             return 2
     return 0
 
 
-def _demo(conn, out_dir: str) -> int:
+def _demo(conn, out_dir: str, n_regions: int = 0, weeks: int = 26) -> int:
     from . import db
 
     db.apply_schema(conn)
-    paths = synthetic.generate(out_dir)
+    regions = synthetic.make_regions(n_regions) if n_regions else synthetic.REGIONS
+    paths = synthetic.generate(out_dir, weeks=weeks, regions=regions)
     for source_id in synthetic.SOURCES:
         db.add_source(conn, source_id, f"Syntetyczny {source_id}")
         db.approve_source(conn, source_id, "dane syntetyczne (generator)", "demo")

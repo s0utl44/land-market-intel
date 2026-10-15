@@ -126,29 +126,48 @@ agg AS (
            avg(median_price_per_m2) FILTER (WHERE n <= 4)        AS price_start,
            avg(median_price_per_m2) FILTER (WHERE n > total - 4) AS price_end,
            avg(discounted_share) FILTER (WHERE n > 1)            AS avg_discounted_share,
-           median(median_days_to_disappear)                      AS median_days_to_disappear
+           median(median_days_to_disappear)                      AS median_days_to_disappear,
+           avg(active_supply)                                    AS avg_active_supply,
+           arg_max(active_supply, week_start)                    AS latest_active_supply,
+           arg_max(median_price_per_m2, week_start)              AS latest_median_price_per_m2
     FROM w GROUP BY municipality_teryt
 ),
 feat AS (
-    SELECT *, price_end / price_start - 1 AS price_trend_pct FROM agg
+    SELECT *, price_end / price_start - 1 AS price_trend_pct,
+           avg_active_supply >= $min_supply AS rated
+    FROM agg
+),
+-- średnie i odchylenia liczymy tylko z gmin ocenianych: gminy z kilkoma ofertami
+-- mają przypadkowe wskaźniki i zaburzyłyby skalę
+stats AS (
+    SELECT avg(avg_absorption_rate) AS m_abs, stddev_pop(avg_absorption_rate) AS s_abs,
+           avg(price_trend_pct) AS m_trend, stddev_pop(price_trend_pct) AS s_trend,
+           avg(avg_discounted_share) AS m_disc, stddev_pop(avg_discounted_share) AS s_disc,
+           avg(median_days_to_disappear) AS m_days, stddev_pop(median_days_to_disappear) AS s_days
+    FROM feat WHERE rated
 ),
 z AS (
-    SELECT *,
-        coalesce((avg_absorption_rate - avg(avg_absorption_rate) OVER ()) / nullif(stddev_pop(avg_absorption_rate) OVER (), 0), 0) AS z_abs,
-        coalesce((price_trend_pct - avg(price_trend_pct) OVER ()) / nullif(stddev_pop(price_trend_pct) OVER (), 0), 0) AS z_trend,
-        coalesce((avg_discounted_share - avg(avg_discounted_share) OVER ()) / nullif(stddev_pop(avg_discounted_share) OVER (), 0), 0) AS z_disc,
-        coalesce((median_days_to_disappear - avg(median_days_to_disappear) OVER ()) / nullif(stddev_pop(median_days_to_disappear) OVER (), 0), 0) AS z_days
-    FROM feat
+    SELECT f.*,
+        CASE WHEN rated THEN
+            ( coalesce((avg_absorption_rate - m_abs) / nullif(s_abs, 0), 0)
+            + coalesce((price_trend_pct - m_trend) / nullif(s_trend, 0), 0)
+            - coalesce((avg_discounted_share - m_disc) / nullif(s_disc, 0), 0)
+            - coalesce((median_days_to_disappear - m_days) / nullif(s_days, 0), 0)) / 4
+        END AS score
+    FROM feat f CROSS JOIN stats
 )
 SELECT municipality_teryt, municipality_name, weeks_observed,
        round(avg_absorption_rate, 4)  AS avg_absorption_rate,
        round(price_trend_pct, 4)      AS price_trend_pct,
        round(avg_discounted_share, 4) AS avg_discounted_share,
        round(median_days_to_disappear, 1) AS median_days_to_disappear,
-       round((z_abs + z_trend - z_disc - z_days) / 4, 3) AS opportunity_score,
-       CAST(rank() OVER (ORDER BY (z_abs + z_trend - z_disc - z_days) DESC) AS INTEGER) AS rank
+       round(score, 3) AS opportunity_score,
+       CAST(CASE WHEN rated THEN rank() OVER (ORDER BY score DESC NULLS LAST) END AS INTEGER) AS rank,
+       round(avg_active_supply, 1)    AS avg_active_supply,
+       CAST(latest_active_supply AS INTEGER) AS latest_active_supply,
+       round(latest_median_price_per_m2, 2) AS latest_median_price_per_m2
 FROM z
-ORDER BY rank
+ORDER BY rank NULLS LAST, latest_active_supply DESC
 """
 
 
@@ -163,9 +182,15 @@ def weekly_region_metrics(observations: pd.DataFrame, links: pd.DataFrame) -> pd
     return con.execute(WEEKLY_SQL).df()
 
 
-def region_scores(weekly: pd.DataFrame) -> pd.DataFrame:
+MIN_SUPPLY_FOR_RANK = 10
+
+
+def region_scores(weekly: pd.DataFrame, min_supply: float = MIN_SUPPLY_FOR_RANK) -> pd.DataFrame:
     """Ranking gmin. Wynik to średnia z-score'ów — ma sens tylko do porównania gmin
-    w tym samym zbiorze danych, nie jako wartość bezwzględna."""
+    w tym samym zbiorze danych, nie jako wartość bezwzględna.
+
+    Gminy ze średnio mniej niż `min_supply` aktywnymi ofertami nie dostają oceny ani
+    miejsca (NULL), ale zostają w tabeli z liczbą ofert i ceną."""
     con = duckdb.connect()
     con.register("weekly", weekly)
-    return con.execute(SCORES_SQL).df()
+    return con.execute(SCORES_SQL, {"min_supply": min_supply}).df()

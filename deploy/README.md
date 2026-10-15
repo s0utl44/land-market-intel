@@ -61,7 +61,10 @@ systemctl list-timers lmi-daily.timer     # pokazuje następne uruchomienie
 
 Kolejne przebiegi trwają kilka minut: 58 stron wyników plus szczegóły tylko nowych ofert.
 
-## 7. Dashboard pod domeną (HTTPS + hasło)
+## 7. Strona pod domeną (HTTPS + hasło)
+
+- `https://pracawre.com/`: Radar Działek (usługa `web`)
+- `https://pracawre.com/metabase/`: Metabase do własnych analiz
 
 Wymaga Traefika działającego na serwerze (entrypoint `websecure`, resolver `letsencrypt`)
 i rekordu DNS A domeny wskazującego na IP serwera. Konfiguracja: `docker-compose.web.yml`.
@@ -71,7 +74,8 @@ cd /opt/lmi && git pull
 getent hosts pracawre.com                       # musi pokazać IP serwera
 read -p "Login do strony: " U && H=$(openssl passwd -apr1) && \
 printf "LMI_DOMAIN=pracawre.com\nLMI_BASIC_AUTH='%s:%s'\nCOMPOSE_FILE=docker-compose.yml:docker-compose.web.yml\n" "$U" "$H" >> .env
-docker compose up -d metabase
+docker compose build web
+docker compose up -d web metabase
 ```
 
 `openssl` dwa razy zapyta o hasło (nie zostaje w historii poleceń). Wejście na stronę wymaga
@@ -95,6 +99,19 @@ docker compose run --rm --entrypoint python -e MB_URL=http://metabase:3000 \
   -v "$PWD/metabase:/app/metabase" app metabase/setup_dashboard.py
 ```
 
+### Dostęp dla kolejnej osoby z zespołu
+
+Każda osoba ma własny login do bramki. Dodanie osoby (pyta o login i dwa razy o hasło):
+
+```bash
+cd /opt/lmi
+read -p "Login: " U && H=$(openssl passwd -apr1) && \
+sed -i "s|^LMI_BASIC_AUTH='\(.*\)'|LMI_BASIC_AUTH='\1,$U:$H'|" .env && docker compose up -d web metabase
+```
+
+Usunięcie osoby: otwórz `.env` (`nano .env`), w linii `LMI_BASIC_AUTH` usuń fragment `,login:skrót`
+tej osoby i uruchom `docker compose up -d web metabase`.
+
 ## Monitoring
 
 | Kod wyjścia `lmi daily` | Znaczenie |
@@ -117,5 +134,5 @@ Hermes może co rano sprawdzać `systemctl is-failed lmi-daily` i dać znać, gd
 ## Aktualizacja kodu
 
 ```bash
-cd /opt/lmi && git pull && docker compose build app
+cd /opt/lmi && git pull && docker compose build app web && docker compose up -d web
 ```

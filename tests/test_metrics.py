@@ -95,3 +95,25 @@ def test_region_scores_rank_synthetic_regions(synthetic_data):
     assert scores["opportunity_score"].sum() == pytest.approx(0, abs=0.01)  # średnia z-score'ów
     rozw = scores.iloc[0]
     assert rozw.avg_absorption_rate > 0.07 and rozw.avg_discounted_share < 0.1
+
+
+def test_small_municipalities_are_not_ranked(synthetic_data):
+    rows = list(synthetic_data["rows"])
+    # dokładamy gminę z 2 ofertami: ma być w tabeli, ale bez oceny i miejsca
+    for lid in ("x1", "x2"):
+        for d in (date(2026, 1, 5), date(2026, 1, 12), date(2026, 1, 19)):
+            rows.append({**obs("portal_a", lid, d, 50_000, muni="9900044"), "municipality_name": "Mała"})
+    links = dedup.deduplicate(dedup.listings_from_observations(rows))
+    weekly = metrics.weekly_region_metrics(pd.DataFrame(rows), pd.DataFrame([l.__dict__ for l in links]))
+    scores = metrics.region_scores(weekly).set_index("municipality_teryt")
+    small = scores.loc["9900044"]
+    assert pd.isna(small["rank"]) and pd.isna(small["opportunity_score"])
+    assert small["latest_active_supply"] == 0 or small["latest_active_supply"] <= 2
+    assert sorted(scores["rank"].dropna().astype(int)) == [1, 2, 3]
+    # skala ocen nie zależy od małej gminy
+    base = metrics.region_scores(metrics.weekly_region_metrics(
+        pd.DataFrame(synthetic_data["rows"]),
+        pd.DataFrame([l.__dict__ for l in dedup.deduplicate(dedup.listings_from_observations(synthetic_data["rows"]))])))
+    # DuckDB sumuje równolegle, więc ostatnia cyfra po zaokrągleniu może się różnić
+    assert list(base["opportunity_score"]) == pytest.approx(
+        list(scores.dropna(subset=["rank"]).sort_values("rank")["opportunity_score"]), abs=0.002)
