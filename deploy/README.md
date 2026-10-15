@@ -68,9 +68,9 @@ i rekordu DNS A domeny wskazującego na IP serwera. Konfiguracja: `docker-compos
 
 ```bash
 cd /opt/lmi && git pull
-getent hosts pracawre.pl                       # musi pokazać IP serwera
+getent hosts pracawre.com                       # musi pokazać IP serwera
 read -p "Login do strony: " U && H=$(openssl passwd -apr1) && \
-printf "LMI_DOMAIN=pracawre.pl\nLMI_BASIC_AUTH='%s:%s'\nCOMPOSE_FILE=docker-compose.yml:docker-compose.web.yml\n" "$U" "$H" >> .env
+printf "LMI_DOMAIN=pracawre.com\nLMI_BASIC_AUTH='%s:%s'\nCOMPOSE_FILE=docker-compose.yml:docker-compose.web.yml\n" "$U" "$H" >> .env
 docker compose up -d metabase
 ```
 
