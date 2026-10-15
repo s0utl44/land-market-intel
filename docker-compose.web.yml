@@ -1,0 +1,19 @@
+# Publikacja dashboardu pod domeną przez istniejący na serwerze Traefik (HTTPS + hasło na wejściu).
+# Włączane przez COMPOSE_FILE w .env: COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml
+# Wymagane w .env: LMI_DOMAIN, LMI_BASIC_AUTH (skrót hasła z htpasswd, w pojedynczych cudzysłowach).
+services:
+  metabase:
+    environment:
+      MB_SITE_URL: https://${LMI_DOMAIN:?ustaw LMI_DOMAIN w .env}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN}`)
+      - traefik.http.routers.lmi.entrypoints=websecure
+      - traefik.http.routers.lmi.tls.certresolver=letsencrypt
+      - traefik.http.routers.lmi.middlewares=lmi-auth,lmi-headers
+      - traefik.http.middlewares.lmi-auth.basicauth.users=${LMI_BASIC_AUTH:?ustaw LMI_BASIC_AUTH w .env}
+      - traefik.http.middlewares.lmi-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.lmi-headers.headers.frameDeny=true
+      - traefik.http.middlewares.lmi-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.lmi-headers.headers.customResponseHeaders.X-Robots-Tag=noindex, nofollow
+      - traefik.http.services.lmi.loadbalancer.server.port=3000

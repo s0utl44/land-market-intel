@@ -61,9 +61,26 @@ systemctl list-timers lmi-daily.timer     # pokazuje następne uruchomienie
 
 Kolejne przebiegi trwają kilka minut: 58 stron wyników plus szczegóły tylko nowych ofert.
 
-## 7. Dashboard
+## 7. Dashboard pod domeną (HTTPS + hasło)
 
-Metabase nasłuchuje tylko na `localhost` serwera. Z własnego komputera łączysz się tunelem SSH:
+Wymaga Traefika działającego na serwerze (entrypoint `websecure`, resolver `letsencrypt`)
+i rekordu DNS A domeny wskazującego na IP serwera. Konfiguracja: `docker-compose.web.yml`.
+
+```bash
+cd /opt/lmi && git pull
+getent hosts pracawre.pl                       # musi pokazać IP serwera
+read -p "Login do strony: " U && H=$(openssl passwd -apr1) && \
+printf "LMI_DOMAIN=pracawre.pl\nLMI_BASIC_AUTH='%s:%s'\nCOMPOSE_FILE=docker-compose.yml:docker-compose.web.yml\n" "$U" "$H" >> .env
+docker compose up -d metabase
+```
+
+`openssl` dwa razy zapyta o hasło (nie zostaje w historii poleceń). Wejście na stronę wymaga
+tego loginu i hasła, a potem osobnego logowania do Metabase. Certyfikat HTTPS Traefik pobiera
+sam przy pierwszym wejściu (do minuty).
+
+### Bez domeny: tunel SSH
+
+Metabase nasłuchuje też na `localhost` serwera. Z własnego komputera łączysz się tunelem SSH:
 
 ```bash
 ssh -L 3000:localhost:3000 root@<IP-serwera>
