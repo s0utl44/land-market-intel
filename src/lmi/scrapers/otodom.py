@@ -213,6 +213,7 @@ def scrape(
     stats.unique_ads = len(ads)
     log.info("otodom: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
 
+    priced = sum(1 for a in ads.values() if a.price_pln is not None)
     names: dict[str, str] = {}
     rows = []
     for it in ads.values():
@@ -233,6 +234,9 @@ def scrape(
                 continue
             stats.details_fetched += 1
             cache.put_detail(it.ad_id, it.slug, detail)
+            if stats.details_fetched % 100 == 0:
+                log.info("otodom: pobrano szczegóły %d nowych ofert (ogłoszeń z ceną: %d)",
+                         stats.details_fetched, priced)
 
         area = it.area_m2 or detail.get("area_m2")
         if area is None:
