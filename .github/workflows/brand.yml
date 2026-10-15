@@ -1,0 +1,34 @@
+name: brand-fetch
+# Jednorazowo: pobiera publiczne logo WRE i wyciąga kolory/fonty z arkuszy stylów strony.
+on:
+  push:
+    branches: [brand-fetch]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pobierz logo i paletę
+        run: |
+          mkdir -p web/static
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/129.0 Safari/537.36"
+          curl -fsSL -A "$UA" -o web/static/logo-wre.svg https://wrenieruchomosci.pl/wp-content/themes/wre2025/assets/images/logo.svg
+          curl -fsSL -A "$UA" -o /tmp/home.html https://wrenieruchomosci.pl/
+          grep -oE 'href="[^"]+\.css[^"]*"' /tmp/home.html | sed 's/href="//;s/"$//' | grep -i "wre2025\|fonts.googleapis" | head -8 > /tmp/css.txt || true
+          : > /tmp/all.css
+          while read u; do curl -fsSL -A "$UA" "$u" >> /tmp/all.css || true; done < /tmp/css.txt
+          grep -oE '<style[^>]*>[^<]*' /tmp/home.html >> /tmp/all.css || true
+          {
+            echo "# arkusze:"; cat /tmp/css.txt
+            echo "# zmienne CSS:"; grep -oE -- '--[a-zA-Z0-9-]+:\s*#[0-9a-fA-F]{3,8}' /tmp/all.css | sort | uniq -c | sort -rn | head -30
+            echo "# najczęstsze kolory:"; grep -oiE '#[0-9a-f]{6}\b|#[0-9a-f]{3}\b' /tmp/all.css | tr A-F a-f | sort | uniq -c | sort -rn | head -25
+            echo "# fonty:"; grep -oE "font-family:[^;}]+" /tmp/all.css | sort | uniq -c | sort -rn | head -10
+            echo "# kolory w logo:"; grep -oiE '#[0-9a-f]{3,6}\b|fill="[^"]+"|rgb\([^)]+\)' web/static/logo-wre.svg | sort | uniq -c
+          } > web/static/brand-notes.txt
+          wc -c web/static/*
+      - name: Zapisz
+        run: |
+          git config user.name "brand-bot"; git config user.email "brand@users.noreply.github.com"
+          git add web/static && git commit -m "Logo WRE i notatki o palecie (pobrane z wrenieruchomosci.pl)" && git push
