@@ -1,0 +1,74 @@
+name: probe-sources
+# Jednorazowy zwiad: pobiera kilka przykładowych odpowiedzi, żeby napisać parsery na prawdziwych danych.
+# To NIE jest produkcyjny scraping (ten działa na VPS).
+on:
+  push:
+    branches: [scrapers]
+    paths: [.github/workflows/probe.yml]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz próbki
+        run: |
+          mkdir -p probe && cd probe
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+          get() { echo "== $1 -> $2"; curl -sS -L -m 40 -A "$UA" -H "Accept-Language: pl-PL,pl;q=0.9" -o "$2" -w "%{http_code} %{size_download}B %{url_effective}\n" "$1" || true; sleep 3; }
+          get "https://www.otodom.pl/robots.txt" otodom_robots.txt
+          get "https://www.olx.pl/robots.txt" olx_robots.txt
+          get "https://www.otodom.pl/pl/wyniki/sprzedaz/dzialka/dolnoslaskie?limit=72&page=1" otodom_search_p1.html
+          get "https://www.otodom.pl/pl/wyniki/sprzedaz/dzialka/dolnoslaskie?limit=72&page=2" otodom_search_p2.html
+          get "https://www.olx.pl/nieruchomosci/dzialki/sprzedaz/dolnoslaskie/" olx_search_p1.html
+          get "https://www.olx.pl/nieruchomosci/dzialki/sprzedaz/dolnoslaskie/?page=2" olx_search_p2.html
+          get "https://www.olx.pl/api/v1/friendly-links/query-params/nieruchomosci,dzialki,sprzedaz,dolnoslaskie" olx_friendly.json
+          get "https://uldk.gugik.gov.pl/?request=GetCommuneByXY&xy=17.0385,51.1079,4326&result=teryt,name" uldk_commune.txt
+          # pierwszy link do ogłoszenia z wyników -> strona szczegółów
+          OTO=$(grep -oE '/pl/oferta/[a-zA-Z0-9_-]+' otodom_search_p1.html | head -1)
+          [ -n "$OTO" ] && get "https://www.otodom.pl$OTO" otodom_detail.html
+          OLX=$(grep -oE 'https://www\.olx\.pl/d/oferta/[a-zA-Z0-9_-]+\.html' olx_search_p1.html | head -1)
+          [ -n "$OLX" ] && get "$OLX" olx_detail.html
+          ls -la
+      - name: Ustal ID kategorii/regionu OLX i odpytaj API
+        run: |
+          cd probe
+          python3 - <<'PY'
+          import json, re, subprocess
+          html = open("olx_search_p1.html", encoding="utf-8", errors="replace").read()
+          m = re.search(r'window\.__PRERENDERED_STATE__\s*=\s*(".*?");\s*\n', html, re.S)
+          ids = {}
+          if m:
+              state = json.loads(json.loads(m.group(1)))
+              json.dump(state, open("olx_state_p1.json", "w"), ensure_ascii=False, indent=1)
+              s = json.dumps(state)
+              for k in ("categoryId", "category_id", "regionId", "region_id"):
+                  ids[k] = sorted(set(re.findall(r'"%s":\s*"?(\d+)' % k, s)))[:10]
+          print(ids)
+          json.dump(ids, open("olx_ids.json", "w"))
+          PY
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+          CAT=$(python3 -c "import json;d=json.load(open('olx_ids.json'));v=d.get('categoryId') or d.get('category_id') or [''];print(v[0])")
+          REG=$(python3 -c "import json;d=json.load(open('olx_ids.json'));v=d.get('regionId') or d.get('region_id') or [''];print(v[0])")
+          echo "cat=$CAT reg=$REG"
+          curl -sS -m 40 -A "$UA" -o olx_api.json -w "%{http_code} %{size_download}B\n" "https://www.olx.pl/api/v1/offers/?offset=0&limit=40&category_id=$CAT&region_id=$REG" || true
+          curl -sS -m 40 -A "$UA" -o olx_api_offset1000.json -w "%{http_code} %{size_download}B\n" "https://www.olx.pl/api/v1/offers/?offset=1000&limit=40&category_id=$CAT&region_id=$REG" || true
+          # wyciągnij __NEXT_DATA__ z Otodomu do osobnych plików JSON
+          python3 - <<'PY'
+          import json, re
+          for name in ("otodom_search_p1", "otodom_detail"):
+              try:
+                  html = open(name + ".html", encoding="utf-8", errors="replace").read()
+              except FileNotFoundError:
+                  continue
+              m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+              print(name, "NEXT_DATA:", bool(m), len(html))
+              if m:
+                  json.dump(json.loads(m.group(1)), open(name + ".json", "w"), ensure_ascii=False, indent=1)
+          PY
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: probe/
+          retention-days: 3
