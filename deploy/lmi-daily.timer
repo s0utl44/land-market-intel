@@ -1,0 +1,10 @@
+[Unit]
+Description=LMI: codziennie o 8:00 czasu polskiego
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 Europe/Warsaw
+# jeśli serwer był wyłączony o 8:00, uruchom po starcie
+Persistent=true
+
+[Install]
+WantedBy=timers.target

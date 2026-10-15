@@ -23,7 +23,17 @@ docker compose up -d metabase                # http://localhost:3000
 MB_ADMIN_EMAIL=ty@example.com MB_ADMIN_PASSWORD='mocne-haslo' python metabase/setup_dashboard.py
 ```
 
-## Praca z prawdziwymi danymi
+## Źródło: Otodom (działki, dolnośląskie)
+
+`lmi daily` przegląda wszystkie strony wyników Otodom, raz pobiera szczegóły każdej nowej oferty
+(współrzędne, typ działki), ustala gminę przez ULDK (GUGiK), zapisuje CSV i przelicza metryki.
+Na serwerze uruchamia się codziennie o 8:00. Wdrożenie: [deploy/README.md](deploy/README.md).
+
+- Dane sprzedających nie są odczytywane ani zapisywane.
+- Między zapytaniami do Otodom są przerwy 2–4 s. Odpowiedź 403 przerywa przebieg bez ponawiania.
+- OLX odpowiada 403 na ruch z serwera, więc nie jest pobierany.
+
+## Praca z własnymi plikami CSV
 
 ```bash
 python -m lmi add-source portal_x "Portal X"
@@ -64,13 +74,18 @@ src/lmi/dedup.py           deduplikacja ogłoszeń
 src/lmi/metrics.py         metryki tygodniowe i ranking (DuckDB)
 src/lmi/db.py              import, zapis wyników do PostgreSQL
 src/lmi/synthetic.py       generator danych testowych
+src/lmi/scrapers/          scraper Otodom, klient HTTP, ULDK (gminy)
+src/lmi/daily.py           codzienny przebieg (scraping -> import -> dedup -> metryki)
 src/lmi/cli.py             komendy `python -m lmi ...`
+deploy/                    systemd (8:00) + instrukcja wdrożenia
+scripts/probe_sources.py   zwiad źródeł (struktura danych bez treści)
 metabase/                  automatyczna konfiguracja dashboardu
 ```
 
 ## Status
 
-PoC przetestowany end-to-end na danych syntetycznych. Przed produkcją trzeba:
-1. pozyskać legalne źródło danych (checklista),
+Pipeline przetestowany end-to-end na danych syntetycznych. Scraper Otodom jest napisany pod strukturę
+sprawdzoną z serwera (zwiad 2026-10) i przetestowany na odtworzonych stronach. Do zrobienia:
+1. pierwsze pełne pobranie na VPS,
 2. skalibrować deduplikację na ręcznie oznaczonej próbce prawdziwych ogłoszeń,
-3. wdrożyć na VPS (Docker Compose + Caddy dla HTTPS); Metabase nie może być wystawiony bez HTTPS i silnego hasła.
+3. wiarygodny ranking pojawi się po kilku tygodniach codziennych przebiegów.

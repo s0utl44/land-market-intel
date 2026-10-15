@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from . import csv_import, dedup, synthetic
 
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="lmi", description="Land Market Intelligence — PoC")
     p.add_argument("--dsn", help="adres bazy (domyślnie zmienna LMI_DATABASE_URL)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -39,6 +41,15 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--seed", type=int, default=42)
     s.add_argument("--weeks", type=int, default=26)
 
+    s = sub.add_parser("daily", help="codzienny przebieg: scraping Otodom + import + dedup + metryki")
+    s.add_argument("--out-dir", default="data/raw")
+    s.add_argument("--max-details", type=int, help="limit nowych stron ofert w jednym przebiegu")
+    s.add_argument("--region", default="dolnoslaskie", help="slug województwa w adresie Otodom")
+    s.add_argument("--teryt-prefix", default="02", help="kod TERYT województwa (filtr gmin)")
+
+    s = sub.add_parser("check-otodom", help="szybki test scrapera bez bazy (wypisuje tylko liczby)")
+    s.add_argument("--region", default="dolnoslaskie")
+
     s = sub.add_parser("demo", help="pełny pipeline na danych syntetycznych")
     s.add_argument("--out-dir", default="data/synthetic")
 
@@ -50,6 +61,11 @@ def main(argv: list[str] | None = None) -> int:
         for e in r.errors[:50]:
             print("  " + e)
         return 0 if r.ok else 1
+
+    if args.cmd == "check-otodom":
+        from .daily import check_otodom
+
+        return check_otodom(args.region)
 
     if args.cmd == "generate-synthetic":
         paths = synthetic.generate(args.out_dir, weeks=args.weeks, seed=args.seed)
@@ -82,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
                 weekly, scores = db.run_metrics(conn)
                 print(f"Zapisano {len(weekly)} wierszy tygodniowych.\n")
                 print(scores.to_string(index=False))
+            elif args.cmd == "daily":
+                from .daily import run_daily
+
+                return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix)
             elif args.cmd == "demo":
                 return _demo(conn, args.out_dir)
         except db.ImportRejected as exc:

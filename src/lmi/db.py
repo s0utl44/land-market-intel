@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,15 +13,32 @@ import psycopg
 from . import csv_import, dedup, metrics
 
 DEFAULT_DSN = "postgresql://lmi:lmi@localhost:5432/lmi"
-SCHEMA_SQL = Path(__file__).resolve().parents[2] / "db" / "init" / "001_schema.sql"
+# W repo: <repo>/db/init. W obrazie Dockera: LMI_SCHEMA_DIR=/app/db/init.
+SCHEMA_DIR = Path(os.environ.get("LMI_SCHEMA_DIR", Path(__file__).resolve().parents[2] / "db" / "init"))
 
 
 def connect(dsn: str | None = None) -> psycopg.Connection:
     return psycopg.connect(dsn or os.environ.get("LMI_DATABASE_URL", DEFAULT_DSN))
 
 
-def apply_schema(conn: psycopg.Connection, path: Path = SCHEMA_SQL) -> None:
-    conn.execute(path.read_text(encoding="utf-8"))
+def apply_schema(conn: psycopg.Connection, schema_dir: Path = SCHEMA_DIR) -> None:
+    files = sorted(Path(schema_dir).glob("*.sql"))
+    if not files:
+        raise FileNotFoundError(f"Brak plików schematu w {schema_dir} (ustaw LMI_SCHEMA_DIR)")
+    for path in files:
+        conn.execute(path.read_text(encoding="utf-8"))
+    conn.commit()
+
+
+@contextmanager
+def _committed(conn):
+    """Transakcja zatwierdzana na końcu bloku.
+
+    Samo conn.transaction() wewnątrz już otwartej (niejawnej) transakcji tworzy tylko
+    savepoint — zmiany przepadłyby przy późniejszym rollbacku.
+    """
+    with conn.transaction():
+        yield
     conn.commit()
 
 
@@ -79,7 +97,7 @@ def import_csv(conn, source_id: str, path: str | Path, allow_partial: bool = Fal
     if exists:
         raise ImportRejected(f"Ten plik był już zaimportowany (batch {exists[0]})")
 
-    with conn.transaction():
+    with _committed(conn):
         # import_batches jest append-only, więc liczniki muszą być znane przed INSERT:
         # najpierw liczymy wiersze, które już są w bazie
         keys = [(o.source_listing_id, o.observed_at) for o in parsed.observations]
@@ -135,7 +153,7 @@ def run_dedup(conn, params: dedup.DedupParams | None = None) -> tuple[int, list[
     obs = load_observations(conn)
     records = obs.astype(object).where(obs.notna(), None).to_dict("records")
     links = dedup.deduplicate(dedup.listings_from_observations(records), params)
-    with conn.transaction():
+    with _committed(conn):
         run_id = conn.execute(
             "INSERT INTO core.dedup_runs (algorithm_version, params) VALUES (%s, %s) RETURNING run_id",
             (dedup.ALGORITHM_VERSION, json.dumps(params.as_dict())),
@@ -177,7 +195,7 @@ def run_metrics(conn, run_id: int | None = None) -> tuple[pd.DataFrame, pd.DataF
 
         return [tuple(py(v) for v in r) + (run_id,) for r in df.itertuples(index=False)]
 
-    with conn.transaction():
+    with _committed(conn):
         conn.execute("DELETE FROM mart.weekly_region_metrics")
         conn.execute("DELETE FROM mart.region_scores")
         with conn.cursor() as c:

@@ -24,5 +24,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 markers = ["integration: wymaga PostgreSQL+PostGIS (LMI_TEST_DATABASE_URL)"]

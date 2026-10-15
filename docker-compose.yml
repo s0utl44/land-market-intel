@@ -15,6 +15,19 @@ services:
       interval: 5s
       retries: 20
 
+  # Uruchamiany na żądanie (timer systemd / ręcznie): docker compose run --rm app daily
+  app:
+    build: .
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LMI_DATABASE_URL: postgresql://lmi:${LMI_DB_PASSWORD:-lmi}@db:5432/lmi
+      TZ: Europe/Warsaw
+    volumes:
+      - ./data:/app/data
+
   metabase:
     image: metabase/metabase:v0.50.36
     depends_on:

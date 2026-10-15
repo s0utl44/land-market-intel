@@ -26,6 +26,16 @@ lub nowym uruchomieniem deduplikacji, a nie edycją. Dzięki temu każdą liczb�
 
 `lmi metrics` czyści i przelicza obie tabele z najnowszego `dedup_run`. Kolumna `dedup_run_id` mówi, z którego.
 
+## `scrape`: stan scraperów (zmienny)
+
+| Tabela | Zawartość |
+|---|---|
+| `scrape.otodom_details` | szczegóły oferty Otodom pobrane raz: współrzędne, dokładność pinezki, typ działki |
+| `scrape.uldk_communes` | gmina (TERYT) dla punktu, z ULDK (GUGiK) |
+| `scrape.runs` | dziennik codziennych przebiegów: status, liczba wierszy, statystyki |
+
+To cache, a nie dane źródłowe. Można go wyczyścić; kolejny przebieg pobierze dane ponownie.
+
 ## Przepływ
 
 ```
