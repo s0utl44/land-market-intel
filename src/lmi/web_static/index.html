@@ -282,7 +282,10 @@ function renderSummary(){
   $('#k-weeks').textContent=nf(OV.weeks_of_data);
   $('#k-weeks-note').textContent=OV.weeks_of_data===1?'tydzień':(OV.weeks_of_data<5?'tygodnie':'tygodni');
   const w=OV.weeks_of_data||0, early=$('#early');
-  if(w<4){
+  if(w===0){
+    early.hidden=false;
+    early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Trwa pierwsze pobieranie ofert.</b> Pierwsze pełne pobranie wszystkich działek w dolnośląskim trwa kilka godzin. Ranking i oferty pojawią się tutaj, gdy się zakończy. Potem dane odświeżają się codziennie o 8:00.</div>`;
+  }else if(w<4){
     early.hidden=false;
     early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Ranking wstępny: dane z ${w} ${w===1?'tygodnia':'tygodni'}.</b> Liczba ofert i ceny są już wiarygodne. Tempo znikania ofert, trend cen i czas na rynku potrzebują kilku tygodni historii, więc ranking zacznie mieć sens po ok. 4 tygodniach, a stabilny będzie po 2–3 miesiącach.</div>`;
   }
@@ -309,7 +312,7 @@ function marketPill(r){
 function renderRank(){
   const rows=rankRows(), max=Math.max(0.01,...RANK.map(r=>Math.abs(r.score||0)));
   const body=$('#rank-body');
-  if(!rows.length){body.innerHTML='<tr><td class="l" colspan="10"><div class="empty">Żadna gmina nie pasuje do wyszukiwania.</div></td></tr>';$('#rank-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="10"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
   body.innerHTML=rows.slice(0,rankLimit).map(r=>{
     const sc=r.score, w=sc==null?0:Math.abs(sc)/max*50;
     return `<tr data-t="${r.teryt}" tabindex="0" aria-selected="${r.teryt===selected}">
