@@ -62,3 +62,9 @@ def test_offers_rejects_bad_input(client):
     assert client.get("/api/municipality/abc/offers").status_code == 400
     assert client.get("/api/municipality/9900011/offers", params={"sort": "price; DROP TABLE x"}).status_code == 400
     assert client.get("/api/municipality/9900011/offers", params={"limit": 5000}).status_code == 422
+
+
+def test_me_reads_identity_from_proxy_header(client):
+    assert client.get("/api/me").json() == {"email": None, "logout_url": None}
+    d = client.get("/api/me", headers={"X-Auth-Request-Email": "jan@wrenieruchomosci.pl"}).json()
+    assert d["email"] == "jan@wrenieruchomosci.pl" and d["logout_url"].startswith("/oauth2/sign_out")

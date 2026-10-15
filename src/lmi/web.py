@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 import psycopg
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
@@ -41,6 +41,14 @@ def index():
 def healthz():
     _rows("SELECT 1")
     return {"ok": True}
+
+
+@app.get("/api/me")
+def me(request: Request):
+    """Kto jest zalogowany. Nagłówek ustawia Traefik z odpowiedzi oauth2-proxy (logowanie Google);
+    przy bramce z hasłem go nie ma."""
+    email = request.headers.get("x-auth-request-email") or request.headers.get("x-auth-request-user")
+    return {"email": email, "logout_url": "/oauth2/sign_out?rd=%2F" if email else None}
 
 
 @app.get("/api/overview")

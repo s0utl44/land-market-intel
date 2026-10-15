@@ -99,7 +99,37 @@ docker compose run --rm --entrypoint python -e MB_URL=http://metabase:3000 \
   -v "$PWD/metabase:/app/metabase" app metabase/setup_dashboard.py
 ```
 
-### Dostęp dla kolejnej osoby z zespołu
+### Logowanie kontem Google (zamiast hasła w okienku)
+
+Wpuszcza tylko konta z domeny firmy (`wrenieruchomosci.pl`, zmiana: `LMI_EMAIL_DOMAIN` w `.env`).
+Konfiguracja: `docker-compose.google.yml`, polskie ekrany logowania: `deploy/oauth2/templates/`.
+
+**1. Google Cloud (jednorazowo, ok. 10 minut)**, zalogowany kontem administratora Google Workspace firmy:
+
+1. Wejdź na https://console.cloud.google.com i utwórz projekt, np. „Radar Dzialek”.
+2. Menu → **Google Auth Platform** (dawniej „Ekran zgody OAuth”) → **Rozpocznij**:
+   nazwa aplikacji „Radar Działek”, e-mail pomocy, **Odbiorcy: Wewnętrzni** (tylko konta firmy), e-mail kontaktowy.
+3. **Klienci** → **Utwórz klienta** → typ **Aplikacja internetowa**, nazwa „pracawre.com”,
+   **Autoryzowane identyfikatory URI przekierowania**: `https://pracawre.com/oauth2/callback` → **Utwórz**.
+4. Skopiuj **Identyfikator klienta** i **Tajny klucz klienta**.
+
+**2. Serwer:**
+
+```bash
+cd /opt/lmi && git pull && docker compose build web
+read -p "Identyfikator klienta: " CID && read -s -p "Tajny klucz klienta: " CS && echo && \
+printf "GOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\nOAUTH2_COOKIE_SECRET=%s\n" "$CID" "$CS" "$(openssl rand -base64 32 | tr -- '+/' '-_')" >> .env
+sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml:docker-compose.google.yml|' .env
+docker compose up -d web metabase oauth2-proxy
+```
+
+Powrót do hasła w okienku: w `.env` ustaw z powrotem
+`COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml`, potem
+`docker compose up -d web metabase --remove-orphans`.
+
+Metabase (`/metabase`) ma dodatkowo własne konto, niezależne od logowania Google.
+
+### Dostęp dla kolejnej osoby z zespołu (tryb hasła w okienku)
 
 Każda osoba ma własny login do bramki. Dodanie osoby (pyta o login i dwa razy o hasło):
 

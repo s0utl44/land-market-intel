@@ -1,0 +1,51 @@
+# Logowanie kontem Google (tylko adresy z domeny firmy) zamiast hasła w okienku przeglądarki.
+# Włączane przez COMPOSE_FILE w .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml:docker-compose.google.yml
+# Wymagane w .env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OAUTH2_COOKIE_SECRET (instrukcja: deploy/README.md).
+# Zakłada Traefika w trybie sieci host (jak na serwerze): forwardAuth idzie na 127.0.0.1:4180.
+services:
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: google
+      OAUTH2_PROXY_CLIENT_ID: ${GOOGLE_CLIENT_ID:?ustaw GOOGLE_CLIENT_ID w .env}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?ustaw GOOGLE_CLIENT_SECRET w .env}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET:?ustaw OAUTH2_COOKIE_SECRET w .env}
+      OAUTH2_PROXY_EMAIL_DOMAINS: ${LMI_EMAIL_DOMAIN:-wrenieruchomosci.pl}
+      OAUTH2_PROXY_REDIRECT_URL: https://${LMI_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_WHITELIST_DOMAINS: ${LMI_DOMAIN}
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      # tryb forwardAuth: oauth2-proxy tylko sprawdza sesję (202) albo pokazuje stronę logowania
+      OAUTH2_PROXY_UPSTREAMS: static://202
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _radar_auth
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_EXPIRE: 168h
+      OAUTH2_PROXY_COOKIE_REFRESH: 1h
+      OAUTH2_PROXY_CUSTOM_TEMPLATES_DIR: /templates
+      OAUTH2_PROXY_FOOTER: "-"
+    volumes:
+      - ./deploy/oauth2/templates:/templates:ro
+    ports:
+      - "127.0.0.1:4180:4180"
+    labels:
+      - traefik.enable=true
+      # ścieżki logowania (/oauth2/start, /oauth2/callback, /oauth2/sign_out) idą prosto do oauth2-proxy
+      - traefik.http.routers.lmi-oauth.rule=Host(`${LMI_DOMAIN}`) && PathPrefix(`/oauth2`)
+      - traefik.http.routers.lmi-oauth.entrypoints=websecure
+      - traefik.http.routers.lmi-oauth.tls.certresolver=letsencrypt
+      - traefik.http.routers.lmi-oauth.service=lmi-oauth
+      - traefik.http.services.lmi-oauth.loadbalancer.server.port=4180
+      - traefik.http.middlewares.lmi-google.forwardauth.address=http://127.0.0.1:4180/
+      - traefik.http.middlewares.lmi-google.forwardauth.trustForwardHeader=true
+      - traefik.http.middlewares.lmi-google.forwardauth.authResponseHeaders=X-Auth-Request-Email,X-Auth-Request-User
+
+  web:
+    labels:
+      - traefik.http.routers.lmi.middlewares=lmi-google,lmi-headers
+
+  metabase:
+    labels:
+      - traefik.http.routers.lmi-mb.middlewares=lmi-google,lmi-headers,lmi-mb-slash,lmi-mb-strip

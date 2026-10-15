@@ -50,6 +50,7 @@ button,input,select{font:inherit}
 .brand h1 span{color:var(--gold-ink)}
 .status{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--ink-2);font-size:.86rem}
 .status a{font-weight:700;text-decoration:none}
+.status .user{color:var(--muted);border-left:1px solid var(--line-2);padding-left:16px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:1px}
 .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
 
@@ -244,7 +245,12 @@ const pct=(v,d=1)=>v==null?'–':nf(v*100,d)+'%';
 const sgn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+nf(Math.abs(v*100),1)+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dPL=s=>s?new Date(s+(s.length===10?'T00:00:00':'')).toLocaleDateString('pl-PL',{day:'numeric',month:'short'}):'–';
-async function api(u){const r=await fetch(u,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error((await r.text())||r.status);return r.json()}
+async function api(u){
+  const r=await fetch(u,{headers:{Accept:'application/json'},credentials:'same-origin'});
+  // sesja logowania wygasła: odśwież stronę, żeby pokazać ekran logowania
+  if(r.status===401||r.status===403){location.reload();throw new Error('sesja wygasła')}
+  if(!r.ok)throw new Error((await r.text())||r.status);
+  return r.json()}
 
 let OV=null, RANK=[], sortK='rank', sortDir=1, selected=null, showAll=false;
 const PAGE=40; let rankLimit=PAGE;
@@ -258,6 +264,7 @@ async function load(){
     return;
   }
   renderStatus(); renderSummary(); renderRank();
+  api('/api/me').then(m=>{if(m.email){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email)}</span><a href="${m.logout_url}">Wyloguj</a>`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
