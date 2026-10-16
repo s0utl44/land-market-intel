@@ -22,7 +22,12 @@ from .otodom import LayoutChanged, ScrapeStats, classify_land_use
 log = logging.getLogger(__name__)
 
 BASE = "https://gratka.pl"
-SEARCH_URL = BASE + "/nieruchomosci/dzialki-grunty/{region}?page={page}"
+LIST_URL = BASE + "/nieruchomosci/dzialki-grunty/{region}"
+
+
+def search_url(region: str, page: int) -> str:
+    """Strona 1 istnieje tylko bez parametru: "?page=1" zwraca 404."""
+    return LIST_URL.format(region=region) + ("" if page <= 1 else f"?page={page}")
 MAX_PAGES = 300
 
 
@@ -162,7 +167,14 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     ads: dict[str, GratkaItem] = {}
     page, total_pages = 1, 1
     while page <= min(total_pages, max_pages):
-        items, total_pages = parse_search_page(get(SEARCH_URL.format(region=region_slug, page=page)))
+        try:
+            html = get(search_url(region_slug, page))
+        except FetchError:
+            if page == 1:
+                raise
+            log.warning("gratka: strona %d niedostępna, kończę listę", page)  # np. liczba ofert spadła w trakcie
+            break
+        items, total_pages = parse_search_page(html)
         stats.pages += 1
         stats.items_seen += len(items)
         if not items:
@@ -245,7 +257,7 @@ def check(region_slug: str = "dolnoslaskie", details: int = 3) -> int:
     from .http import PoliteClient
 
     client = PoliteClient()
-    html = client.get(SEARCH_URL.format(region=region_slug, page=1))
+    html = client.get(search_url(region_slug, 1))
     items, pages = parse_search_page(html)
     node = (_listing(nuxt_data(html)).get("nodes") or [{}])[0]
     print("Pola oferty na liście:", sorted(k for k in node if k != "contact"))

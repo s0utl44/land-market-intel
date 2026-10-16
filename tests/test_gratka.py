@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from lmi.scrapers import gratka, otodom
+from lmi.scrapers.http import FetchError
 from lmi.scrapers.nuxt import unflatten
 
 from fixtures_gratka import detail_page, flatten, node, search_page
@@ -46,7 +47,11 @@ class Web:
     def get(self, url):
         self.calls.append(url)
         if "dzialki-grunty" in url:
-            return self.pages[int(url.rsplit("page=", 1)[1]) - 1]
+            assert "page=1" not in url  # Gratka zwraca 404 dla ?page=1
+            n = int(url.rsplit("page=", 1)[1]) if "page=" in url else 1
+            if n > len(self.pages):
+                raise FetchError("404")
+            return self.pages[n - 1]
         if "/ob/" in url:
             return self.details[url.rsplit("/", 1)[1]]
         if "uldk" in url:
@@ -75,3 +80,15 @@ def test_scrape_end_to_end():
     web.calls.clear()
     gratka.scrape(web.get, cache, date(2026, 10, 18))
     assert all("dzialki-grunty" in c for c in web.calls)
+
+
+def test_search_url():
+    assert gratka.search_url("dolnoslaskie", 1) == "https://gratka.pl/nieruchomosci/dzialki-grunty/dolnoslaskie"
+    assert gratka.search_url("dolnoslaskie", 3).endswith("dolnoslaskie?page=3")
+
+
+def test_missing_later_page_ends_listing():
+    web = Web(pages=[search_page([node(1)], total=5)], details={"1": detail_page()},
+              communes={"16.155000,51.285100": "0\n020905_2|Miłkowice"})
+    rows, stats = gratka.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
+    assert stats.pages == 1 and len(rows) == 1
