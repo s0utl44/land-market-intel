@@ -81,8 +81,9 @@ def test_parse_detail_page():
     assert d["land_use"] is None
 
 
-def test_approximate_location_is_not_precise():
-    assert nonline.parse_detail_page(detail_page(approximate=True))["precise"] is False
+def test_precise_pin_vs_town_center():
+    assert nonline.parse_detail_page(detail_page(lat="51.3310744", lon="17.6462986"))["precise"] is True
+    assert nonline.parse_detail_page(detail_page(lat="51.013", lon="17.1724"))["precise"] is False
 
 
 class Web:
@@ -106,9 +107,9 @@ def test_scrape_end_to_end():
     web = Web(
         pages=[search_page([offer(1), offer(2)], pages=(2,)), search_page([offer(3)], pages=(1, 3)),
                search_page([offer(4, price=None)], pages=(2, 3, 4))],
-        details={"2670001": detail_page(), "2670002": detail_page(approximate=True),
+        details={"2670001": detail_page(), "2670002": detail_page(lat="51.1429", lon="16.8266"),
                  "2670003": detail_page(lat="52.4", lon="16.9")},
-        communes={"16.826552,51.142864": "0\n026401_1|Wrocław", "16.900000,52.400000": "0\n306401_1|Poznań"},
+        communes={"16.826552,51.142864": "0\n026401_1|Wrocław", "16.826600,51.142900": "0\n026401_1|Wrocław", "16.900000,52.400000": "0\n306401_1|Poznań"},
     )
     cache = otodom.MemoryCache()
     rows, stats = nonline.scrape(web.get, cache, date(2026, 10, 17))

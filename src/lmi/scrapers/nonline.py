@@ -23,7 +23,10 @@ log = logging.getLogger(__name__)
 
 LIST_URL = "https://{region}.nieruchomosci-online.pl/dzialki,sprzedaz/"
 MAX_PAGES = 400
-APPROXIMATE = re.compile(r"lokalizacja\s+przybli", re.I)
+
+
+def _decimals(v) -> int:
+    return len(str(v).split(".")[1]) if "." in str(v) else 0
 
 
 def search_url(region: str, page: int) -> str:
@@ -110,8 +113,10 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
                  if isinstance(p, dict) and re.search(r"m²|m2", str(p.get("value") or ""))), None)
     return {
         "lat": lat, "lon": lon,
-        # portal sam oznacza pinezkę jako przybliżoną: wtedy nie łączymy duplikatów po położeniu
-        "precise": lat is not None and lon is not None and not APPROXIMATE.search(html),
+        # napis "Lokalizacja przybliżona" jest przy każdej mapie, więc o dokładności mówi sam zapis:
+        # pinezka działki ma 6+ miejsc po przecinku, środek miejscowości 3–4 (jak na Gratce)
+        "precise": lat is not None and lon is not None and min(
+            _decimals(geo.get("latitude")), _decimals(geo.get("longitude"))) >= 6,
         "land_use": land_use, "land_use_source": source,
         "area_m2": area,
         "listed_at": posted.isoformat() if posted else None,
