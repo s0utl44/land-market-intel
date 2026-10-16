@@ -10,6 +10,7 @@ Kody wyjścia (dla crona / alertów; przy kilku źródłach najwyższy):
 from __future__ import annotations
 
 import csv
+import fcntl
 import json
 import logging
 import os
@@ -70,6 +71,33 @@ def already_done_today(conn, today: date, source: str = "otodom") -> bool:
     return row is not None
 
 
+class _SourceLock:
+    """Blokada pliku per źródło: to samo źródło nie biegnie dwa razy naraz
+    (np. długie pierwsze pobieranie i ponowna próba o 14:00). Działa między kontenerami,
+    bo katalog data/ jest wspólny."""
+
+    def __init__(self, out_dir: str | Path, source: str):
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        self.path = Path(out_dir) / f".{source}.lock"
+        self.f = None
+
+    def acquire(self) -> bool:
+        self.f = self.path.open("w")
+        try:
+            fcntl.flock(self.f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            self.f.close()
+            self.f = None
+            return False
+
+    def release(self) -> None:
+        if self.f:
+            fcntl.flock(self.f, fcntl.LOCK_UN)
+            self.f.close()
+            self.f = None
+
+
 def configured_sources() -> tuple[str, ...]:
     raw = os.environ.get("LMI_SOURCES")
     return tuple(x.strip() for x in raw.split(",") if x.strip()) if raw else DEFAULT_SOURCES
@@ -96,6 +124,10 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
         if if_needed and already_done_today(conn, observed_at, source):
             print(f"{SOURCE_NAMES[source]}: dzisiejsze pobieranie już się udało.")
             continue
+        lock = _SourceLock(out_dir, source)
+        if not lock.acquire():
+            print(f"{SOURCE_NAMES[source]}: inny przebieg tego źródła jeszcze trwa, pomijam.")
+            continue
         started = datetime.now(timezone.utc)
         try:
             code, did_import = _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix,
@@ -106,6 +138,8 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
             print(f"{SOURCE_NAMES[source]}: BŁĄD {type(exc).__name__}: {exc}")
             first_error = first_error or exc
             code, did_import = 1, False
+        finally:
+            lock.release()
         codes.append(code)
         imported = imported or did_import
 

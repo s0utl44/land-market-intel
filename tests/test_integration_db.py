@@ -239,3 +239,21 @@ def test_blocked_source_does_not_stop_others(pg_conn, tmp_path):
     assert pg_conn.execute("SELECT count(*) FROM core.listing_observations WHERE source_id='gratka'").fetchone()[0] == 2
     assert pg_conn.execute("SELECT count(*) FROM core.dedup_runs").fetchone()[0] == 1
     assert pg_conn.execute("SELECT count(*) FROM scrape.portal_details WHERE source_id='gratka'").fetchone()[0] == 2
+
+
+def test_source_already_running_is_skipped(pg_conn, tmp_path):
+    from datetime import date
+
+    from lmi.daily import _SourceLock, run_daily
+    from test_otodom import make_web
+
+    db.add_source(pg_conn, "otodom", "Otodom")
+    db.approve_source(pg_conn, "otodom", "test", "pytest")
+    held = _SourceLock(tmp_path, "otodom")
+    assert held.acquire()
+    web = make_web()
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 0
+    assert web.calls == []  # nic nie pobrano
+    held.release()
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 0
+    assert web.calls
