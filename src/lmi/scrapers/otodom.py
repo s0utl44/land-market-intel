@@ -15,7 +15,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Callable, Protocol
 
 from . import uldk
@@ -71,6 +71,18 @@ class SearchItem:
     slug: str
     price_pln: float | None
     area_m2: float | None
+    listed_at: date | None = None      # pierwsze dodanie oferty na Otodom (createdAtFirst)
+    pushed_up_at: date | None = None   # ostatnie płatne podbicie ogłoszenia
+
+
+def _date(v) -> date | None:
+    """'2026-10-16T01:50:19+00:00', '...Z' albo '2026-10-01 10:00:00' -> date."""
+    if not v or not isinstance(v, str):
+        return None
+    try:
+        return datetime.fromisoformat(v.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
 
 
 def parse_search_page(html: str) -> tuple[list[SearchItem], int]:
@@ -90,7 +102,8 @@ def parse_search_page(html: str) -> tuple[list[SearchItem], int]:
             continue
         price = None if it.get("hidePrice") else _num(it.get("totalPrice"))
         area = _num(it.get("areaInSquareMeters")) or _num(it.get("terrainAreaInSquareMeters"))
-        items.append(SearchItem(str(it["id"]), it["slug"], price, area))
+        listed = _date(it.get("createdAtFirst")) or _date(it.get("dateCreated"))
+        items.append(SearchItem(str(it["id"]), it["slug"], price, area, listed, _date(it.get("pushedUpAt"))))
     return items, total_pages
 
 
@@ -283,6 +296,8 @@ def scrape(
             "land_use": detail.get("land_use") or "",
             "url": DETAIL_URL.format(slug=it.slug),
             "title": "",
+            "listed_at": it.listed_at.isoformat() if it.listed_at else "",
+            "pushed_up_at": it.pushed_up_at.isoformat() if it.pushed_up_at else "",
         })
     stats.rows = len(rows)
     return rows, stats

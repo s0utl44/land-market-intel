@@ -123,6 +123,8 @@ th.l,td.l{text-align:left}
 .filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding:12px 14px;border-bottom:1px solid var(--line)}
 .filters label{display:flex;flex-direction:column;gap:3px}
 .ar{color:var(--muted);font-size:.78rem}
+.sub2{display:block;color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:2px}
+td.two-line{white-space:normal;min-width:120px}
 .ext{font-weight:700;text-decoration:none}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
@@ -187,6 +189,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
             <th data-k="price_trend" aria-sort="none"><button type="button">Trend cen</button></th>
             <th data-k="discounted" aria-sort="none"><button type="button">Z obniżką</button></th>
             <th data-k="days" aria-sort="none"><button type="button">Dni do zniknięcia</button></th>
+            <th data-k="age" aria-sort="none"><button type="button">Wiek ofert</button></th>
             <th class="l">Rynek</th>
           </tr></thead>
           <tbody id="rank-body"></tbody>
@@ -207,7 +210,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 
     <div class="head" style="margin-top:12px">
       <div><h2>Aktywne oferty</h2>
-        <p>Ta sama działka z kilku ogłoszeń liczy się raz. „Na rynku” to czas od pierwszego zauważenia.</p></div>
+        <p>Ta sama działka z kilku ogłoszeń liczy się raz. „Na rynku” liczymy od daty wystawienia na Otodom; „≥” oznacza ofertę sprzed zbierania tej daty. Najedź na zmianę ceny, żeby zobaczyć historię.</p></div>
     </div>
     <div class="panel">
       <div class="filters">
@@ -216,8 +219,10 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
         <label><span class="label">Metraż od (m²)</span><input type="number" id="f-min" min="0" step="100" inputmode="numeric"></label>
         <label><span class="label">Metraż do (m²)</span><input type="number" id="f-max" min="0" step="100" inputmode="numeric"></label>
         <label><span class="label">Maks. zł/m²</span><input type="number" id="f-ppm2" min="0" step="10" inputmode="numeric"></label>
+        <label><span class="label">Na rynku dłużej niż</span>
+          <select id="f-age"><option value="">dowolnie</option><option value="90">3 miesiące</option><option value="180">6 miesięcy</option><option value="365">rok</option><option value="730">2 lata</option></select></label>
         <label><span class="label">Sortuj</span>
-          <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option></select></label>
+          <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option><option value="pushed">ostatnio podbite</option></select></label>
       </div>
       <div class="scroll">
         <table>
@@ -244,6 +249,8 @@ const nf=(v,d=0)=>v==null||isNaN(v)?'–':Number(v).toLocaleString('pl-PL',{mini
 const pct=(v,d=1)=>v==null?'–':nf(v*100,d)+'%';
 const sgn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+nf(Math.abs(v*100),1)+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const age=d=>d==null?'–':d<60?`${d} dni`:`${Math.round(d/30.44)} mies.`;
+const dFull=s=>s?new Date(s+'T00:00:00').toLocaleDateString('pl-PL',{day:'numeric',month:'numeric',year:'numeric'}):'–';
 const dPL=s=>s?new Date(s+(s.length===10?'T00:00:00':'')).toLocaleDateString('pl-PL',{day:'numeric',month:'short'}):'–';
 async function api(u){
   const r=await fetch(u,{headers:{Accept:'application/json'},credentials:'same-origin'});
@@ -260,7 +267,7 @@ async function load(){
     [OV,RANK]=await Promise.all([api('/api/overview'),api('/api/ranking')]);
   }catch(e){
     $('#status').innerHTML='<span><i class="dot bad"></i>Nie udało się pobrać danych. Odśwież stronę za chwilę.</span>';
-    $('#rank-body').innerHTML='<tr><td class="l" colspan="10"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
+    $('#rank-body').innerHTML='<tr><td class="l" colspan="11"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
   renderStatus(); renderSummary(); renderRank();
@@ -319,7 +326,7 @@ function marketPill(r){
 function renderRank(){
   const rows=rankRows(), max=Math.max(0.01,...RANK.map(r=>Math.abs(r.score||0)));
   const body=$('#rank-body');
-  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="10"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="11"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
   body.innerHTML=rows.slice(0,rankLimit).map(r=>{
     const sc=r.score, w=sc==null?0:Math.abs(sc)/max*50;
     return `<tr data-t="${r.teryt}" tabindex="0" aria-selected="${r.teryt===selected}">
@@ -332,6 +339,7 @@ function renderRank(){
       <td>${sgn(r.price_trend)}</td>
       <td>${pct(r.discounted,0)}</td>
       <td>${nf(r.days)}</td>
+      <td title="mediana: jak długo wiszą aktywne oferty">${age(r.age==null?null:Math.round(r.age))}</td>
       <td class="l">${marketPill(r)}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
@@ -356,7 +364,8 @@ async function select(teryt,scroll){
   $('#gm-name').textContent=r?r.name:teryt; $('#gm-teryt').textContent='TERYT '+teryt;
   $('#gm-facts').innerHTML=r?[
     r.rank!=null?`<span class="pill info">miejsce ${r.rank} z ${RANK.filter(x=>x.rank!=null).length}</span>`:'',
-    marketPill(r),`<span class="pill mute">${nf(r.supply)} ofert</span>`,`<span class="pill mute">mediana ${nf(r.ppm2)} zł/m²</span>`].join(''):'';
+    marketPill(r),`<span class="pill mute">${nf(r.supply)} ofert</span>`,`<span class="pill mute">mediana ${nf(r.ppm2)} zł/m²</span>`,
+    r.age!=null?`<span class="pill mute">oferty wiszą średnio ${age(Math.round(r.age))}</span>`:''].join(''):'';
   if(scroll)sec.scrollIntoView({block:'start'});
   $('#charts').innerHTML='<div class="panel empty">Ładowanie wykresów…</div>';
   try{ drawCharts(await api(`/api/municipality/${teryt}/weekly`)); }
@@ -412,7 +421,7 @@ function drawCharts(data){
 
 /* ---------- oferty ---------- */
 let offersTimer=null, offersReq=0;
-['#f-use','#f-sort'].forEach(s=>$(s).onchange=loadOffers);
+['#f-use','#f-sort','#f-age'].forEach(s=>$(s).onchange=loadOffers);
 ['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(loadOffers,350)});
 async function loadOffers(){
   if(!selected)return;
@@ -421,6 +430,7 @@ async function loadOffers(){
   if($('#f-min').value)p.set('min_area',$('#f-min').value);
   if($('#f-max').value)p.set('max_area',$('#f-max').value);
   if($('#f-ppm2').value)p.set('max_ppm2',$('#f-ppm2').value);
+  if($('#f-age').value)p.set('min_age_days',$('#f-age').value);
   const id=++offersReq, body=$('#offers-body');
   body.innerHTML='<tr><td colspan="8" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
   let rows;
@@ -429,15 +439,18 @@ async function loadOffers(){
   if(!rows.length){body.innerHTML='<tr><td colspan="8" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
   const lastDay=OV.last_observed;
   body.innerHTML=rows.map(r=>{
-    const fresh=r.first_seen&&lastDay&&(new Date(lastDay)-new Date(r.first_seen))/864e5<=7;
+    const fresh=r.start_date&&lastDay&&(new Date(lastDay)-new Date(r.start_date))/864e5<=7;
+    const pushedDays=r.pushed_up_at&&lastDay?Math.round((new Date(lastDay)-new Date(r.pushed_up_at))/864e5):null;
+    const hist=(r.history||[]);
+    const histTxt=hist.length>1?hist.map(h=>`${dFull(h.date)}: ${nf(h.price)} zł`).join('\n'):'';
     return `<tr>
     <td class="l">${esc(r.land_use||'–')}${fresh?' <span class="pill good">nowa</span>':''}</td>
     <td>${nf(r.area)} m² <span class="ar">(${nf(r.area/100,1)} ar)</span></td>
     <td>${nf(r.price)} zł</td>
     <td><b>${nf(r.ppm2)}</b></td>
-    <td>${r.days_listed} dni</td>
+    <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
     <td>${r.portals}</td>
-    <td class="l">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}</td>
+    <td class="l two-line" title="${esc(histTxt)}">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}${hist.length>1?`<span class="sub2">${nf(hist[0].price)} → ${nf(hist[hist.length-1].price)} zł</span>`:''}</td>
     <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Otodom ↗</a>`:'–'}</td></tr>`}).join('');
   $('#offers-more').innerHTML=`<span>${rows.length===300?'Pierwsze 300 ofert. Zawęź filtry, żeby zobaczyć resztę.':`Ofert: ${rows.length}`}</span>`;
 }

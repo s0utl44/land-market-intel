@@ -20,7 +20,7 @@ REQUIRED_COLUMNS = (
     "area_m2",
     "price_pln",
 )
-OPTIONAL_COLUMNS = ("parcel_id", "lat", "lon", "land_use", "url", "title")
+OPTIONAL_COLUMNS = ("parcel_id", "lat", "lon", "land_use", "url", "title", "listed_at", "pushed_up_at")
 
 # Przybliżony prostokąt otaczający Polskę — odsiewa zamienione lat/lon i śmieci.
 LAT_RANGE = (49.0, 55.0)
@@ -41,6 +41,8 @@ class Observation:
     land_use: str | None = None
     url: str | None = None
     title: str | None = None
+    listed_at: date | None = None      # data pierwszego dodania oferty w źródle
+    pushed_up_at: date | None = None   # data ostatniego podbicia ogłoszenia
 
 
 @dataclass
@@ -116,6 +118,19 @@ def parse_file(path: str | Path) -> ParseResult:
     return parse_bytes(Path(path).read_bytes())
 
 
+def _opt_date(row: dict, name: str, observed_at: date) -> date | None:
+    value = _opt(row.get(name))
+    if value is None:
+        return None
+    try:
+        d = date.fromisoformat(value[:10])
+    except ValueError:
+        raise ValueError(f"{name} musi być w formacie RRRR-MM-DD, jest {value!r}")
+    if d > observed_at:
+        raise ValueError(f"{name} ({d}) jest późniejsza niż observed_at ({observed_at})")
+    return d
+
+
 def _parse_row(row: dict[str, str | None]) -> Observation:
     def req(name: str) -> str:
         value = _opt(row.get(name))
@@ -173,4 +188,6 @@ def _parse_row(row: dict[str, str | None]) -> Observation:
         land_use=_opt(row.get("land_use")),
         url=_opt(row.get("url")),
         title=_opt(row.get("title")),
+        listed_at=_opt_date(row, "listed_at", observed_at),
+        pushed_up_at=_opt_date(row, "pushed_up_at", observed_at),
     )

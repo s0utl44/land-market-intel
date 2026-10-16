@@ -117,3 +117,22 @@ def test_small_municipalities_are_not_ranked(synthetic_data):
     # DuckDB sumuje równolegle, więc ostatnia cyfra po zaokrągleniu może się różnić
     assert list(base["opportunity_score"]) == pytest.approx(
         list(scores.dropna(subset=["rank"]).sort_values("rank")["opportunity_score"]), abs=0.002)
+
+
+def test_listing_dates_remove_left_censoring():
+    # P1 widoczna od pierwszego tygodnia, ale wystawiona 1 lutego -> znamy prawdziwy początek
+    rows = [
+        {**obs("a", "1", W0, 1e5), "listed_at": date(2026, 2, 1)},
+        {**obs("a", "1", W1, 1e5), "listed_at": date(2026, 2, 1)},
+        {**obs("a", "2", W0, 1e5), "listed_at": None},   # bez daty: jak dotąd, cenzurowana
+        {**obs("a", "2", W1, 1e5), "listed_at": None},
+        {**obs("a", "3", W2, 1e5), "listed_at": date(2026, 3, 16)},
+    ]
+    links = pd.DataFrame([{"source_id": "a", "source_listing_id": i, "property_key": f"P{i}"} for i in "123"])
+    w = metrics.weekly_region_metrics(pd.DataFrame(rows), links).set_index("week_start")
+    # W2: znikają P1 i P2; tylko P1 ma znany początek: 1.02 -> 9.03 = 36 dni
+    assert w["median_days_to_disappear"].iloc[2] == 36
+    # wiek ofert w W0 liczony tylko dla P1: 1.02 -> 2.03 = 29 dni
+    assert w["median_listing_age_days"].iloc[0] == 29
+    # W2: P3 wystawiona w dniu obserwacji -> 0 dni
+    assert w["median_listing_age_days"].iloc[2] == 0

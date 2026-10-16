@@ -68,3 +68,21 @@ def test_me_reads_identity_from_proxy_header(client):
     assert client.get("/api/me").json() == {"email": None, "logout_url": None}
     d = client.get("/api/me", headers={"X-Auth-Request-Email": "jan@wrenieruchomosci.pl"}).json()
     assert d["email"] == "jan@wrenieruchomosci.pl" and d["logout_url"].startswith("/oauth2/sign_out")
+
+
+def test_offers_have_listing_age_and_price_history(client):
+    rows = client.get("/api/municipality/9900033/offers", params={"sort": "cut"}).json()
+    assert all(r["listed_at"] and r["age_days"] >= 0 for r in rows)
+    cut = rows[0]
+    assert cut["price_change"] <= -1
+    hist = cut["history"]
+    assert len(hist) >= 2 and hist[-1]["price"] == cut["price"]
+    assert all(a["price"] != b["price"] for a, b in zip(hist, hist[1:]))
+    old = client.get("/api/municipality/9900033/offers", params={"min_age_days": 180, "sort": "longest"}).json()
+    assert old and all(r["age_days"] >= 180 for r in old)
+    assert [r["start_date"] for r in old] == sorted(r["start_date"] for r in old)
+
+
+def test_ranking_has_listing_age(client):
+    rows = client.get("/api/ranking").json()
+    assert all(r["age"] is not None for r in rows)

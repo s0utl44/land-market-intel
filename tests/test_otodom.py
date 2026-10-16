@@ -15,7 +15,7 @@ def test_parse_search_page():
         total_pages=58))
     assert pages == 58
     assert [i.ad_id for i in items] == ["1", "2", "3"]  # mieszkanie odrzucone
-    assert items[0] == otodom.SearchItem("1", "dzialka-1-ID1", 329000.0, 1636.0)
+    assert items[0] == otodom.SearchItem("1", "dzialka-1-ID1", 329000.0, 1636.0, date(2025, 3, 14), None)
     assert items[1].price_pln is None and items[2].price_pln is None
 
 
@@ -148,3 +148,20 @@ def test_blocked_propagates():
         raise Blocked("403")
     with pytest.raises(Blocked):
         otodom.scrape(get, otodom.MemoryCache(), date(2026, 10, 16))
+
+
+def test_listing_dates_from_search():
+    items, _ = otodom.parse_search_page(search_page([
+        search_item(1, pushed_up="2026-10-10T07:00:00Z"),
+        search_item(2, created_first=None),            # brak createdAtFirst -> dateCreated
+        search_item(3, created_first="bzdura"),
+    ]))
+    assert items[0].listed_at == date(2025, 3, 14) and items[0].pushed_up_at == date(2026, 10, 10)
+    assert items[1].listed_at == date(2026, 10, 1)
+    assert items[2].listed_at == date(2026, 10, 1)
+
+
+def test_rows_carry_listing_dates():
+    rows, _ = otodom.scrape(make_web().get, otodom.MemoryCache(), date(2026, 10, 16))
+    assert {r["listed_at"] for r in rows} == {"2025-03-14"}
+    assert {r["pushed_up_at"] for r in rows} == {""}

@@ -41,6 +41,7 @@ SOURCES = {"portal_a": 0.8, "portal_b": 0.5, "portal_c": 0.3}
 CSV_COLUMNS = [
     "source_listing_id", "observed_at", "municipality_teryt", "municipality_name",
     "parcel_id", "lat", "lon", "area_m2", "price_pln", "land_use", "url", "title",
+    "listed_at", "pushed_up_at",
 ]
 
 
@@ -84,6 +85,8 @@ def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
     prop_counter = 0
     # jeden dzień pobrania na tydzień, wspólny dla wszystkich gmin (jak w prawdziwym przebiegu)
     scrape_days = [start + timedelta(weeks=w, days=random.Random(seed + w).randint(0, 1)) for w in range(weeks)]
+    # daty dodania / podbicia z osobnego generatora, żeby nie zmieniać reszty danych
+    date_rng = random.Random(seed + 7919)
 
     for region in regions:
 
@@ -106,6 +109,15 @@ def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
                 "land_use": rng.choice(["budowlana", "budowlana", "budowlana", "rolna", "rekreacyjna"]),
                 "listings": {},
             }
+            if week == 0:  # oferty sprzed startu obserwacji: wiek z rozkładu wykładniczego
+                age_days = int(date_rng.expovariate(region.weekly_sale_hazard) * 7)
+                prop["listed"] = scrape_days[0] - timedelta(days=age_days)
+            else:
+                prop["listed"] = scrape_days[week] - timedelta(days=date_rng.randint(0, 6))
+            prop["pushed"] = None
+            if date_rng.random() < 0.15:
+                pw = week + date_rng.randint(2, 10)
+                prop["pushed"] = scrape_days[pw] if pw < weeks else None
             for src, p in SOURCES.items():
                 if rng.random() < p:
                     prop["listings"][src] = None
@@ -157,6 +169,9 @@ def generate(out_dir: str | Path, weeks: int = 26, seed: int = 42,
                         "land_use": prop["land_use"],
                         "url": f"https://example.invalid/{src}/{lst['id']}",
                         "title": f"Działka {prop['land_use']} {area} m²",
+                        "listed_at": prop["listed"].isoformat(),
+                        "pushed_up_at": prop["pushed"].isoformat()
+                        if prop["pushed"] and prop["pushed"] <= observed_at else "",
                     })
                 if rng.random() >= region.weekly_sale_hazard:
                     still_active.append(prop)

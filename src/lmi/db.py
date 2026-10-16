@@ -123,13 +123,14 @@ def import_csv(conn, source_id: str, path: str | Path, allow_partial: bool = Fal
             cur.executemany(
                 """INSERT INTO core.listing_observations
                        (batch_id, source_id, source_listing_id, observed_at, municipality_teryt,
-                        municipality_name, parcel_id, lat, lon, area_m2, price_pln, land_use, url, title)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        municipality_name, parcel_id, lat, lon, area_m2, price_pln, land_use, url, title,
+                        listed_at, pushed_up_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (source_id, source_listing_id, observed_at) DO NOTHING""",
                 [
                     (batch_id, source_id, o.source_listing_id, o.observed_at, o.municipality_teryt,
                      o.municipality_name, o.parcel_id, o.lat, o.lon, o.area_m2, o.price_pln,
-                     o.land_use, o.url, o.title)
+                     o.land_use, o.url, o.title, o.listed_at, o.pushed_up_at)
                     for o in parsed.observations
                 ],
             )
@@ -137,7 +138,7 @@ def import_csv(conn, source_id: str, path: str | Path, allow_partial: bool = Fal
 
 
 OBS_COLUMNS = ("source_id", "source_listing_id", "observed_at", "municipality_teryt",
-               "municipality_name", "parcel_id", "lat", "lon", "area_m2", "price_pln")
+               "municipality_name", "parcel_id", "lat", "lon", "area_m2", "price_pln", "listed_at")
 
 
 def load_observations(conn) -> pd.DataFrame:

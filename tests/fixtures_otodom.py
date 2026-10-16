@@ -7,7 +7,8 @@ def _wrap(next_data: dict) -> str:
             + json.dumps(next_data) + "</script></body></html>")
 
 
-def search_item(ad_id, price=329000, area=1636, hide_price=False, estate="TERRAIN"):
+def search_item(ad_id, price=329000, area=1636, hide_price=False, estate="TERRAIN",
+                created_first="2025-03-14T09:12:00+00:00", pushed_up=None):
     return {
         "id": ad_id, "title": "Działka", "slug": f"dzialka-{ad_id}-ID{ad_id}", "estate": estate,
         "transaction": "SELL", "agency": None, "areaInSquareMeters": area,
@@ -17,7 +18,9 @@ def search_item(ad_id, price=329000, area=1636, hide_price=False, estate="TERRAI
         "location": {"mapDetails": {"radius": 0}, "address": {"street": {"name": "x", "number": None},
                                                               "city": None, "province": None}},
         "advertOwner": {"name": "Jan", "contacts": [{"name": "Jan"}]},
-        "dateCreated": "2026-10-01 10:00:00",
+        "dateCreated": "2026-10-01T10:00:00Z",
+        "createdAtFirst": created_first,
+        "pushedUpAt": pushed_up,
     }
 
 

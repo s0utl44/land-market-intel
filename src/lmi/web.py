@@ -82,7 +82,8 @@ def ranking():
         SELECT municipality_teryt AS teryt, municipality_name AS name, rank, opportunity_score AS score,
                avg_absorption_rate AS absorption, price_trend_pct AS price_trend,
                avg_discounted_share AS discounted, median_days_to_disappear AS days,
-               latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks
+               latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks,
+               latest_median_listing_age_days AS age
         FROM mart.region_scores
         ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""")
 
@@ -113,9 +114,10 @@ SORTS = {
     "ppm2": "ppm2 ASC",
     "price": "price ASC",
     "area": "area DESC",
-    "newest": "first_seen DESC",
-    "longest": "first_seen ASC",
+    "newest": "start_date DESC",
+    "longest": "start_date ASC",
     "cut": "price_change ASC",
+    "pushed": "pushed_up_at DESC NULLS LAST",
 }
 
 
@@ -126,6 +128,7 @@ def municipality_offers(
     min_area: float | None = Query(None, ge=0),
     max_area: float | None = Query(None, ge=0),
     max_ppm2: float | None = Query(None, ge=0),
+    min_age_days: int | None = Query(None, ge=0),
     sort: str = "ppm2",
     limit: int = Query(300, ge=1, le=1000),
 ):
@@ -146,6 +149,9 @@ def municipality_offers(
     if max_ppm2 is not None:
         where.append("ppm2 <= %(max_ppm2)s")
         params["max_ppm2"] = max_ppm2
+    if min_age_days is not None:
+        where.append("age_days >= %(min_age)s")
+        params["min_age"] = min_age_days
     rows = _rows(f"""
         WITH links AS (
             SELECT source_id, source_listing_id, property_key FROM core.listing_property_links
@@ -172,17 +178,31 @@ def municipality_offers(
                    (array_agg(land_use ORDER BY observed_at DESC))[1]   AS land_use,
                    (array_agg(url ORDER BY observed_at DESC))[1]        AS url,
                    bool_or(lat IS NOT NULL)                             AS precise,
-                   bool_or(in_latest)                                   AS active
+                   bool_or(in_latest)                                   AS active,
+                   min(listed_at)                                       AS listed_at,
+                   max(pushed_up_at)                                    AS pushed_up_at
             FROM o GROUP BY property_key
         ),
+        -- historia ceny: dni, w których cena (najniższa z portali) się zmieniła
+        daily AS (
+            SELECT property_key, observed_at, min(price_pln) AS price FROM o GROUP BY 1, 2
+        ),
+        changes AS (
+            SELECT property_key,
+                   json_agg(json_build_object('date', observed_at, 'price', price) ORDER BY observed_at) AS history
+            FROM (SELECT *, lag(price) OVER (PARTITION BY property_key ORDER BY observed_at) AS prev FROM daily) d
+            WHERE prev IS NULL OR price <> prev
+            GROUP BY property_key
+        ),
         f AS (
-            SELECT *, round(price / area, 1) AS ppm2,
+            SELECT p.*, c.history, round(price / area, 1) AS ppm2,
                    round((price / first_price - 1) * 100, 1) AS price_change,
-                   last_seen - first_seen AS days_listed
-            FROM p
+                   least(first_seen, coalesce(listed_at, first_seen)) AS start_date,
+                   last_seen - least(first_seen, coalesce(listed_at, first_seen)) AS age_days
+            FROM p LEFT JOIN changes c USING (property_key)
         )
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise,
-               first_seen, days_listed, price_change
+               first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history
         FROM f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)

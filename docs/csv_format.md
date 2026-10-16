@@ -15,6 +15,8 @@ nie ma go w pliku. Jeden wiersz to jedno ogłoszenie widziane danego dnia. Przyk
 | `lat`, `lon` | nie | współrzędne WGS84 | obie albo żadna; muszą wypaść w granicach Polski |
 | `land_use` | nie | przeznaczenie (budowlana, rolna, …) | — |
 | `url`, `title` | nie | link i tytuł ogłoszenia | — |
+| `listed_at` | nie | data pierwszego wystawienia oferty w źródle | `RRRR-MM-DD` (może mieć część z godziną), nie późniejsza niż `observed_at` |
+| `pushed_up_at` | nie | data ostatniego płatnego podbicia ogłoszenia | jak wyżej |
 
 - Separator: `,` `;` albo tabulator (wykrywany automatycznie). Kodowanie UTF-8 (z BOM lub bez).
 - Liczby można zapisać po polsku: `1 234,50`.

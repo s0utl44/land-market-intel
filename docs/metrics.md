@@ -11,7 +11,8 @@ Tydzień zaczyna się w poniedziałek.
 | `median_price_per_m2` | mediana zł/m² aktywnych nieruchomości, wg ostatniej znanej ceny |
 | `discounted_share` | odsetek aktywnych nieruchomości, których bieżąca cena jest ≥ 1% niższa od ceny początkowej |
 | `absorption_rate` | `disappeared_listings` / `active_supply` z poprzedniego tygodnia |
-| `median_days_to_disappear` | mediana dni od pierwszej do ostatniej obserwacji dla nieruchomości znikniętych w tym tygodniu |
+| `median_days_to_disappear` | mediana dni od wystawienia (`listed_at` ze źródła; jeśli brak, pierwsza obserwacja) do ostatniej obserwacji, dla nieruchomości znikniętych w tym tygodniu |
+| `median_listing_age_days` | mediana wieku aktywnych ofert w tygodniu, liczonego od daty wystawienia |
 
 ## Ranking (`mart.region_scores`)
 
@@ -29,8 +30,9 @@ Score jest **względny**: porównuje gminy w tym samym zbiorze, a nie ocenia ich
 - **Zniknięcie ≠ sprzedaż.** Ogłoszenie mogło zostać wycofane, wygasnąć albo przenieść się na nieobserwowany portal.
   Do weryfikacji potrzebne są transakcje z RCN.
 - **Pierwszy tydzień danych**: cała istniejąca podaż wygląda na „nową”. Ranking pomija pierwszy tydzień.
-- **Cenzurowanie z lewej**: nieruchomości widoczne od pierwszego tygodnia nie wchodzą do `median_days_to_disappear`,
-  bo nie znamy ich prawdziwego początku. Na początku okresu ta metryka jest zaniżona, bo zdążyły zniknąć tylko szybkie oferty.
+- **Cenzurowanie z lewej**: gdy źródło podaje datę wystawienia (Otodom: `createdAtFirst`, zbierane od 2026-10-16),
+  znamy prawdziwy początek oferty i problem znika. Bez tej daty nieruchomości widoczne od pierwszego tygodnia
+  nie wchodzą do `median_days_to_disappear`, bo nie znamy ich prawdziwego początku. Na początku okresu ta metryka jest zaniżona, bo zdążyły zniknąć tylko szybkie oferty.
   Wiarygodna staje się po kilku miesiącach danych.
 - **Trend ceny jest szumny** przy małej liczbie ofert (~100 na gminę) i mieszanych typach działek
   (budowlane i rolne razem). W kolejnej fazie warto liczyć go osobno per `land_use`.
