@@ -29,7 +29,8 @@ log = logging.getLogger(__name__)
 SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka"}
 DEFAULT_SOURCES = ("otodom", "gratka")
 DROP_ALERT_RATIO = 0.5
-HISTORY_BACKFILL_PER_RUN = 600  # ~1 h dziennie; ~4100 ofert uzupełni się w ok. tydzień
+# Mało zapytań dziennie: po blokadzie IP (403) wolimy wolniejsze uzupełnianie niż kolejną blokadę.
+HISTORY_BACKFILL_PER_RUN = 150  # ~300 zapytań API dziennie; ~3300 ofert uzupełni się w ok. 3 tygodnie
 
 
 def _log_run(conn, source, started, status, rows=None, stats=None, message=None):

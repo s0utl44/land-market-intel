@@ -173,8 +173,8 @@ nie loguje, tylko używa ciasteczka skopiowanego z przeglądarki.
    chmod 600 data/otodom-cookie && wc -c < data/otodom-cookie  # powinno być > 4095
    ```
 
-Codzienny przebieg pobiera historię dla nowych ofert i uzupełnia ją dla 600 starszych dziennie
-(`lmi daily --history-backfill N` zmienia limit). Gdy sesja wygaśnie, przebieg działa dalej bez historii,
+Codzienny przebieg pobiera historię dla nowych ofert i uzupełnia ją dla 150 starszych dziennie
+(`lmi daily --history-backfill N` zmienia limit; więcej = szybciej, ale większe ryzyko blokady 403). Gdy sesja wygaśnie, przebieg działa dalej bez historii,
 a na stronie pojawia się ostrzeżenie. Wtedy powtórz kroki 1–2.
 
 ## Monitoring

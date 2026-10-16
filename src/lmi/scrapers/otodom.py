@@ -304,7 +304,7 @@ def scrape(
     geo_get: Callable[[str], str] | None = None,
     api: OtodomApi | None = None,
     history_backfill: int = 0,
-    max_type_refetch: int = 300,
+    max_type_refetch: int = 100,
 ) -> tuple[list[dict], ScrapeStats]:
     """Jeden przebieg: wszystkie strony wyników + brakujące szczegóły + gminy.
 

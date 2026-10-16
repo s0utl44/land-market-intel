@@ -46,8 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--max-details", type=int, help="limit nowych stron ofert w jednym przebiegu")
     s.add_argument("--region", default="dolnoslaskie", help="slug województwa w adresie Otodom")
     s.add_argument("--teryt-prefix", default="02", help="kod TERYT województwa (filtr gmin)")
-    s.add_argument("--history-backfill", type=int, default=600,
-                   help="ile wcześniej pobranych ofert uzupełnić o historię z konta Otodom (domyślnie 600)")
+    s.add_argument("--history-backfill", type=int, default=150,
+                   help="ile wcześniej pobranych ofert uzupełnić o historię z konta Otodom (domyślnie 150)")
     s.add_argument("--sources", help="źródła po przecinku, np. gratka albo otodom,gratka (domyślnie wszystkie)")
     s.add_argument("--if-needed", action="store_true",
                    help="uruchom tylko, jeśli dzisiejsze pobieranie jeszcze się nie udało (ponowna próba)")
