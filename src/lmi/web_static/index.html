@@ -396,12 +396,15 @@ async function select(teryt,scroll){
 const METRICS=[
   {k:'supply',t:'Oferty w sprzedaży',f:v=>nf(v),axis:v=>nf(v),zero:true},
   {k:'ppm2',t:'Mediana ceny za m²',f:v=>nf(v)+' zł',axis:v=>nf(v)},
-  {k:'absorption',t:'Znika tygodniowo',f:v=>pct(v),axis:v=>nf(v*100)+'%',zero:true},
-  {k:'discounted',t:'Oferty z obniżką ceny',f:v=>pct(v,0),axis:v=>nf(v*100)+'%',zero:true},
+  {k:'absorption',t:'Znika tygodniowo',f:v=>pct(v),axis:(v,st)=>nf(v*100,st*100<1?1:0)+'%',zero:true},
+  {k:'discounted',t:'Oferty z obniżką ceny',f:v=>pct(v,1),axis:(v,st)=>nf(v*100,st*100<1?1:0)+'%',zero:true},
 ];
+// metryki są tygodniowe (od poniedziałku): podpis "12–18 paź" zamiast samej daty początku
+const wkPL=s=>{if(!s)return'–';const a=new Date(s+'T00:00:00'),b=new Date(a);b.setDate(a.getDate()+6);const m=d=>d.toLocaleDateString('pl-PL',{month:'short'});return a.getMonth()===b.getMonth()?`${a.getDate()}–${b.getDate()} ${m(b)}`:`${a.getDate()} ${m(a)} – ${b.getDate()} ${m(b)}`};
 function ticks(lo,hi,n=4){const span=hi-lo||Math.abs(hi)||1,s0=span/n,m=10**Math.floor(Math.log10(s0)),e=s0/m;const st=(e>=7.5?10:e>=3.5?5:e>=1.5?2:1)*m;const a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st||st;const t=[];for(let v=a;v<=b+st/2;v+=st)t.push(+v.toFixed(10));return t.length>1?t:[a,a+st]}
 function drawCharts(data){
   const box=$('#charts'); box.innerHTML='';
+  if(data.weeks.length===1)box.insertAdjacentHTML('beforeend','<div class="panel empty" style="grid-column:1/-1">Na razie jest jeden tydzień danych, więc każdy wykres ma jeden punkt. Linie trendu pojawią się od przyszłego tygodnia.</div>');
   const weeks=data.weeks.map(w=>w.week_start);
   const bench=Object.fromEntries(data.benchmark.map(b=>[b.week_start,b]));
   const W=480,H=190,M={l:48,r:14,t:10,b:24};
@@ -415,12 +418,14 @@ function drawCharts(data){
     let lo=Math.min(...vals),hi=Math.max(...vals); if(m.zero)lo=0; else{const pad=(hi-lo)*.15||hi*.05;lo=Math.max(0,lo-pad);hi+=pad}
     const tk=ticks(lo,hi),y0=tk[0],y1=tk[tk.length-1],y=v=>H-M.b-(v-y0)/(y1-y0||1)*(H-M.t-M.b);
     let g='';
-    tk.forEach(v=>g+=`<line x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${M.l-6}" y="${y(v)+3}" text-anchor="end">${m.axis(v)}</text>`);
+    const st=tk.length>1?tk[1]-tk[0]:1;
+    tk.forEach(v=>g+=`<line x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${M.l-6}" y="${y(v)+3}" text-anchor="end">${m.axis(v,st)}</text>`);
     const lab=n<=1?[0]:[...new Set([0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1])];
-    lab.forEach(i=>g+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${dPL(weeks[i])}</text>`);
+    lab.forEach(i=>g+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${wkPL(weeks[i])}</text>`);
     const path=(arr)=>{let d='',pen=false;arr.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);pen=true});return d};
     g+=`<path d="${path(ref)}" fill="none" stroke="var(--bench)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
     g+=`<path d="${path(own)}" fill="none" stroke="var(--gold-line)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`;
+    ref.forEach((v,i)=>{if(v!=null&&ref[i-1]==null&&ref[i+1]==null)g+=`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="var(--surface)" stroke="var(--bench)" stroke-width="1.5" stroke-dasharray="2 2"/>`});
     own.forEach((v,i)=>{if(v!=null&&(n<=3||i===n-1))g+=`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="var(--gold-line)" stroke="var(--surface)" stroke-width="2"/>`});
     g+=`<line class="cross" x1="0" x2="0" y1="${M.t}" y2="${H-M.b}" stroke="var(--line-2)" visibility="hidden"/><rect x="${M.l}" y="${M.t}" width="${W-M.l-M.r}" height="${H-M.t-M.b}" fill="transparent" style="cursor:crosshair"/>`;
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -430,7 +435,7 @@ function drawCharts(data){
     const show=ev=>{const r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W;
       const i=n===1?0:Math.max(0,Math.min(n-1,Math.round((px-M.l)/(W-M.l-M.r)*(n-1))));
       cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
-      tip.innerHTML=`<div class="label" style="margin-bottom:4px">Tydzień od ${dPL(weeks[i])}</div><div class="r"><span>Ta gmina</span><b>${m.f(own[i])}</b></div><div class="r"><span>Mediana gmin</span><b>${m.f(ref[i])}</b></div>`;
+      tip.innerHTML=`<div class="label" style="margin-bottom:4px">Tydzień ${wkPL(weeks[i])}</div><div class="r"><span>Ta gmina</span><b>${m.f(own[i])}</b></div><div class="r"><span>Mediana gmin</span><b>${m.f(ref[i])}</b></div>`;
       tip.hidden=false;const b=el.getBoundingClientRect();let left=ev.clientX-b.left+14;if(left+185>b.width)left=ev.clientX-b.left-195;
       tip.style.left=Math.max(4,left)+'px';tip.style.top=(ev.clientY-b.top+12)+'px'};
     hit.addEventListener('pointermove',show);hit.addEventListener('pointerdown',show);
