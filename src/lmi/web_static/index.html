@@ -213,7 +213,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 
     <div class="head" style="margin-top:12px">
       <div><h2>Aktywne oferty</h2>
-        <p>Ta sama działka z kilku ogłoszeń liczy się raz. „Na rynku” liczymy od daty wystawienia na Otodom; „≥” oznacza ofertę sprzed zbierania tej daty. Najedź na zmianę ceny, żeby zobaczyć historię.</p></div>
+        <p>Ta sama działka z kilku ogłoszeń liczy się raz. „Na rynku” liczymy od daty wystawienia w portalu; „≥” oznacza ofertę sprzed zbierania tej daty. Najedź na zmianę ceny, żeby zobaczyć historię.</p></div>
     </div>
     <div class="panel">
       <div class="filters">
@@ -240,7 +240,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 
 <footer>
   <div class="wrap">
-    <span>Dane: ogłoszenia Otodom (codziennie o 8:00), gminy: GUGiK ULDK. Ceny ofertowe, nie transakcyjne. Zniknięcie oferty nie oznacza sprzedaży.</span>
+    <span>Dane: ogłoszenia Otodom i Gratka (codziennie o 8:00), gminy: GUGiK ULDK. Ceny ofertowe, nie transakcyjne. Zniknięcie oferty nie oznacza sprzedaży.</span>
     <span>Narzędzie wewnętrzne WRE Nieruchomości</span>
   </div>
 </footer>
@@ -254,6 +254,7 @@ const sgn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+nf(Math.abs(v*100),1)+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const lat=n=>{const t=n%10,h=n%100;return n===1?'rok':(t>=2&&t<=4&&(h<12||h>14))?'lata':'lat'};
 // wiek oferty: dni, potem miesiące, od 2 lat pełne lata
+const SRC={otodom:'Otodom',gratka:'Gratka'};
 const age=d=>{if(d==null)return '–';if(d<60)return `${d} dni`;if(d<730)return `${Math.min(23,Math.round(d/30.44))} mies.`;const y=Math.max(2,Math.round(d/365.25));return `${y} ${lat(y)}`};
 const dFull=s=>s?new Date(s+'T00:00:00').toLocaleDateString('pl-PL',{day:'numeric',month:'numeric',year:'numeric'}):'–';
 const dPL=s=>s?new Date(s+(s.length===10?'T00:00:00':'')).toLocaleDateString('pl-PL',{day:'numeric',month:'short'}):'–';
@@ -283,14 +284,17 @@ async function load(){
 }
 
 function renderAttempt(){
-  const a=OV.latest_attempt;
-  if(!a||['ok','warning'].includes(a.status))return;
-  const why={blocked:'Otodom zablokował dostęp z serwera (403). Następna próba odbędzie się automatycznie.',
-    layout_changed:'Otodom zmienił wygląd strony i scraper wymaga poprawki.',
-    error:'Wystąpił błąd: '+(a.message||'nieznany')+'.'}[a.status]||(a.message||a.status);
-  const t=new Date(a.started_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  // każde źródło osobno: pokazujemy te, których ostatnia próba się nie udała
+  const failed=(OV.sources||[]).filter(x=>x.latest&&!['ok','warning'].includes(x.latest.status));
+  if(!failed.length)return;
+  const why=a=>({blocked:'portal zablokował dostęp z serwera (403); następna próba odbędzie się automatycznie',
+    layout_changed:'portal zmienił wygląd strony i scraper wymaga poprawki',
+    error:'błąd: '+(a.message||'nieznany')}[a.status]||(a.message||a.status));
   const n=$('#alert');n.hidden=false;n.classList.add('bad');
-  n.innerHTML=`<span aria-hidden="true">⛔</span><div><b>Pobieranie z ${t} nie powiodło się.</b> ${esc(why)} Na stronie są dane z ostatniego udanego pobrania.</div>`;
+  n.innerHTML=`<span aria-hidden="true">⛔</span><div>${failed.map(x=>{
+    const t=new Date(x.latest.started_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const last=x.last_ok?new Date(x.last_ok).toLocaleString('pl-PL',{day:'numeric',month:'short'}):'nigdy';
+    return `<div><b>${esc(x.name)}: pobieranie z ${t} nie powiodło się</b> (${esc(why(x.latest))}). Oferty z tego portalu są z ${last}.</div>`}).join('')}</div>`;
 }
 function renderStatus(){
   const r=OV.last_run;
@@ -471,9 +475,9 @@ async function loadOffers(){
     <td><b>${nf(r.ppm2)}</b></td>
     <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">wystawiana ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
     <td class="two-line">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${nf(r.saved)} ${r.saved===1?'zapis':'zapisów'}</span>`:'<span class="na">–</span>'}</td>
-    <td>${r.portals}</td>
+    <td title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">${r.portals}</td>
     <td class="l two-line" title="${esc(histTxt)}">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}${hist.length>1&&hist[0].price!==hist[hist.length-1].price?`<span class="sub2">${nf(hist[0].price)} → ${nf(hist[hist.length-1].price)} zł</span>`:''}</td>
-    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Otodom ↗</a>`:'–'}</td></tr>`}).join('');
+    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}</td></tr>`}).join('');
   $('#offers-more').innerHTML=`<span>${rows.length===300?'Pierwsze 300 ofert. Zawęź filtry, żeby zobaczyć resztę.':`Ofert: ${rows.length}`}</span>`;
 }
 

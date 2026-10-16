@@ -39,6 +39,20 @@ docker compose run --rm app approve-source otodom \
   --legal-basis "prywatne narzędzie; regulamin przeczytany, ryzyko przyjęte" --approved-by "<Twoje imię>"
 ```
 
+## 4b. Kolejne portale (Gratka)
+
+Każdy portal to osobne źródło: blokada jednego nie zatrzymuje pozostałych.
+
+```bash
+docker compose run --rm app check-gratka        # test: 1 strona + 3 oferty, tylko liczby
+docker compose run --rm app add-source gratka Gratka
+docker compose run --rm app approve-source gratka \
+  --legal-basis "prywatne narzędzie; regulamin przeczytany, ryzyko przyjęte" --approved-by "<Twoje imię>"
+```
+
+Codzienny przebieg obejmuje wszystkie zatwierdzone portale z listy `LMI_SOURCES`
+(domyślnie `otodom,gratka`). Jeden portal można uruchomić osobno: `lmi daily --sources gratka`.
+
 ## 5. Pierwsze pełne pobranie
 
 Około 4100 ofert. Każdą stronę oferty pobieramy raz, z przerwą 2–4 s. Całość zajmuje około 4 godzin.

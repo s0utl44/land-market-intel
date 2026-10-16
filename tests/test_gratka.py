@@ -92,3 +92,8 @@ def test_missing_later_page_ends_listing():
               communes={"16.155000,51.285100": "0\n020905_2|Miłkowice"})
     rows, stats = gratka.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
     assert stats.pages == 1 and len(rows) == 1
+
+
+def test_precise_pin_vs_town_center():
+    assert gratka.parse_detail_page(detail_page(lat=51.11382622, lon=16.91037529))["precise"] is True
+    assert gratka.parse_detail_page(detail_page(lat=51.2851, lon=16.155))["precise"] is False

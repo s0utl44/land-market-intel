@@ -138,6 +138,9 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
     loc = pd.get("location") or {}
     center = ((loc.get("map") or {}).get("center")) or {}
     lat, lon = _num(center.get("latitude")), _num(center.get("longitude"))
+    # pinezka działki ma zwykle 6+ miejsc po przecinku; środek miejscowości 3–4
+    precise = lat is not None and lon is not None and all(
+        len(repr(float(v)).split(".")[-1]) >= 6 for v in (lat, lon))
 
     land_use, source = _land_use_from_params(pd), "gratka"
     if land_use is None:
@@ -151,7 +154,7 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         source = None
     return {
         "lat": lat, "lon": lon,
-        "precise": False,  # środek mapy, zwykle miejscowość, nie pinezka działki
+        "precise": precise,
         "land_use": land_use, "land_use_source": source,
         "area_m2": _num(pd.get("area")),
         "municipality_hint": loc.get("commune"),
@@ -238,7 +241,9 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
             "municipality_teryt": teryt,
             "municipality_name": name,
             "parcel_id": "",
-            "lat": "", "lon": "",  # środek miejscowości: nie łączymy duplikatów po takim położeniu
+            # środek miejscowości (niedokładny) pomijamy, żeby nie łączyć duplikatów po takim położeniu
+            "lat": f"{detail['lat']:.6f}" if detail.get("precise") else "",
+            "lon": f"{detail['lon']:.6f}" if detail.get("precise") else "",
             "area_m2": f"{area:.2f}",
             "price_pln": f"{it.price_pln:.2f}",
             "land_use": detail.get("land_use") or "",
@@ -265,7 +270,8 @@ def check(region_slug: str = "dolnoslaskie", details: int = 3) -> int:
     print(f"Wyniki: {len(items)} ofert na stronie 1, stron: {pages}, "
           f"z ceną: {sum(1 for i in items if i.price_pln)}, z metrażem: {sum(1 for i in items if i.area_m2)}, "
           f"z datą dodania: {sum(1 for i in items if i.listed_at)}")
-    ok = bool(items) and all(i.price_pln and i.area_m2 for i in items[:10])
+    complete = sum(1 for i in items if i.price_pln and i.area_m2)
+    ok = bool(items) and complete >= 0.9 * len(items)  # pojedyncze oferty bez metrażu się zdarzają
     for it in items[:details]:
         d = parse_detail_page(client.get(it.url), it.title, it.description)
         commune = None

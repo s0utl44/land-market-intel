@@ -1,6 +1,9 @@
-"""Codzienny przebieg: scraping Otodom -> CSV -> import -> deduplikacja -> metryki.
+"""Codzienny przebieg: scraping portali -> CSV -> import -> deduplikacja -> metryki.
 
-Kody wyjścia (dla crona / alertów):
+Każde źródło (Otodom, Gratka, ...) działa osobno: blokada jednego nie zatrzymuje pozostałych.
+Każde ma własny wpis w scrape.runs. Deduplikacja i metryki liczone raz, po wszystkich źródłach.
+
+Kody wyjścia (dla crona / alertów; przy kilku źródłach najwyższy):
   0 ok, 1 błąd ogólny, 2 źródło niezatwierdzone, 3 blokada (403), 4 zmiana struktury strony,
   5 podejrzanie mało ogłoszeń w porównaniu z poprzednim przebiegiem.
 """
@@ -9,46 +12,48 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 from . import db
-from .scrapers import otodom
+from .scrapers import gratka, otodom
 from .scrapers.http import Blocked, PoliteClient
 from .scrapers.otodom_api import OtodomApi, load_cookie
 from .scrapers.pg_cache import PgCache
 from .synthetic import CSV_COLUMNS
 
 log = logging.getLogger(__name__)
-SOURCE_ID = "otodom"
+SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka"}
+DEFAULT_SOURCES = ("otodom", "gratka")
 DROP_ALERT_RATIO = 0.5
 HISTORY_BACKFILL_PER_RUN = 600  # ~1 h dziennie; ~4100 ofert uzupełni się w ok. tydzień
 
 
-def _log_run(conn, started, status, rows=None, stats=None, message=None):
+def _log_run(conn, source, started, status, rows=None, stats=None, message=None):
     conn.execute(
         """INSERT INTO scrape.runs (source_id, started_at, status, rows_written, stats, message)
            VALUES (%s, %s, %s, %s, %s, %s)""",
-        (SOURCE_ID, started, status, rows, json.dumps(asdict(stats)) if stats else None, message),
+        (source, started, status, rows, json.dumps(asdict(stats)) if stats else None, message),
     )
     conn.commit()
 
 
-def _previous_rows(conn) -> int | None:
+def _previous_rows(conn, source) -> int | None:
     row = conn.execute(
         """SELECT rows_written FROM scrape.runs WHERE source_id = %s AND status IN ('ok', 'warning')
            ORDER BY run_id DESC LIMIT 1""",
-        (SOURCE_ID,),
+        (source,),
     ).fetchone()
     return row[0] if row else None
 
 
-def write_csv(rows: list[dict], out_dir: Path, observed_at: date) -> Path:
+def write_csv(rows: list[dict], out_dir: Path, observed_at: date, source: str = "otodom") -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{SOURCE_ID}_{observed_at.isoformat()}.csv"
+    path = out_dir / f"{source}_{observed_at.isoformat()}.csv"
     if path.exists():  # drugi przebieg tego samego dnia
-        path = out_dir / f"{SOURCE_ID}_{observed_at.isoformat()}_{datetime.now():%H%M%S}.csv"
+        path = out_dir / f"{source}_{observed_at.isoformat()}_{datetime.now():%H%M%S}.csv"
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         w.writeheader()
@@ -56,101 +61,127 @@ def write_csv(rows: list[dict], out_dir: Path, observed_at: date) -> Path:
     return path
 
 
-def already_done_today(conn, today: date) -> bool:
+def already_done_today(conn, today: date, source: str = "otodom") -> bool:
     row = conn.execute(
         """SELECT 1 FROM scrape.runs WHERE source_id = %s AND status IN ('ok', 'warning')
            AND (started_at AT TIME ZONE 'Europe/Warsaw')::date = %s LIMIT 1""",
-        (SOURCE_ID, today),
+        (source, today),
     ).fetchone()
     return row is not None
+
+
+def configured_sources() -> tuple[str, ...]:
+    raw = os.environ.get("LMI_SOURCES")
+    return tuple(x.strip() for x in raw.split(",") if x.strip()) if raw else DEFAULT_SOURCES
 
 
 def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = None,
               region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
               client: PoliteClient | None = None, observed_at: date | None = None,
               geo_client: PoliteClient | None = None, history_backfill: int = HISTORY_BACKFILL_PER_RUN,
-              api: OtodomApi | None = None, if_needed: bool = False) -> int:
-    started = datetime.now(timezone.utc)
+              api: OtodomApi | None = None, if_needed: bool = False,
+              sources: tuple[str, ...] | None = None) -> int:
     observed_at = observed_at or date.today()
     db.apply_schema(conn)
-    if if_needed and already_done_today(conn, observed_at):
-        print("Dzisiejsze pobieranie już się udało, ponowna próba niepotrzebna.")
-        return 0
-    try:
-        return _run(conn, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
-                    geo_client, history_backfill, api, started)
-    except Exception as exc:  # każdy nieprzewidziany błąd zostaje w dzienniku i na stronie
-        conn.rollback()
-        _log_run(conn, started, "error", message=f"{type(exc).__name__}: {exc}"[:500])
-        raise
-
-
-def _run(conn, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
-         geo_client, history_backfill, api, started) -> int:
-
-    approved = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (SOURCE_ID,)).fetchone()
-    if not approved or not approved[0]:
-        print(f"Źródło '{SOURCE_ID}' nie jest zatwierdzone. Uruchom raz:\n"
-              f"  lmi add-source {SOURCE_ID} Otodom\n"
-              f"  lmi approve-source {SOURCE_ID} --legal-basis '...' --approved-by '...'")
-        return 2
-
     client = client or PoliteClient()
     geo_client = geo_client or (PoliteClient(min_delay=0.3, max_delay=0.6) if isinstance(client, PoliteClient)
                                 else client)
-    if api is None and isinstance(client, PoliteClient):
-        cookie = load_cookie()
-        api = OtodomApi(client.get, cookie) if cookie else None
-    print("Historia ofert z konta Otodom:", "włączona" if api else "wyłączona (brak pliku z ciasteczkiem)")
-    try:
-        rows, stats = otodom.scrape(client.get, PgCache(conn), observed_at, region_slug=region_slug,
-                                    teryt_prefix=teryt_prefix, max_details=max_details,
-                                    geo_get=geo_client.get, api=api, history_backfill=history_backfill)
-    except Blocked as exc:
-        _log_run(conn, started, "blocked", message=str(exc))
-        print(f"BLOKADA: {exc}. Przerwano bez ponawiania.")
-        return 3
-    except otodom.LayoutChanged as exc:
-        _log_run(conn, started, "layout_changed", message=str(exc))
-        print(f"ZMIANA STRUKTURY STRONY: {exc}. Parser wymaga poprawki.")
-        return 4
+    codes, imported = [], False
+    first_error: Exception | None = None
+    for source in sources or configured_sources():
+        if source not in SOURCE_NAMES:
+            print(f"Nieznane źródło: {source}")
+            codes.append(1)
+            continue
+        if if_needed and already_done_today(conn, observed_at, source):
+            print(f"{SOURCE_NAMES[source]}: dzisiejsze pobieranie już się udało.")
+            continue
+        started = datetime.now(timezone.utc)
+        try:
+            code, did_import = _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix,
+                                           client, observed_at, geo_client, history_backfill, api, started)
+        except Exception as exc:  # każdy nieprzewidziany błąd zostaje w dzienniku i na stronie
+            conn.rollback()
+            _log_run(conn, source, started, "error", message=f"{type(exc).__name__}: {exc}"[:500])
+            print(f"{SOURCE_NAMES[source]}: BŁĄD {type(exc).__name__}: {exc}")
+            first_error = first_error or exc
+            code, did_import = 1, False
+        codes.append(code)
+        imported = imported or did_import
 
-    print(f"Otodom: {stats.pages} stron, {stats.unique_ads} ogłoszeń, {stats.rows} wierszy "
+    if imported:
+        run_id, links = db.run_dedup(conn)
+        _, scores = db.run_metrics(conn, run_id)
+        print(f"Deduplikacja: {len(links)} ogłoszeń -> {len({l.property_key for l in links})} nieruchomości. "
+              f"Metryki przeliczone ({len(scores)} gmin).")
+    if first_error is not None and not imported:
+        raise first_error
+    return max(codes, default=0)
+
+
+def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
+                geo_client, history_backfill, api, started) -> tuple[int, bool]:
+    name = SOURCE_NAMES[source]
+    approved = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (source,)).fetchone()
+    if not approved or not approved[0]:
+        print(f"Źródło '{source}' nie jest zatwierdzone. Uruchom raz:\n"
+              f"  lmi add-source {source} {name}\n"
+              f"  lmi approve-source {source} --legal-basis '...' --approved-by '...'")
+        return 2, False
+
+    try:
+        if source == "otodom":
+            if api is None and isinstance(client, PoliteClient):
+                cookie = load_cookie()
+                api = OtodomApi(client.get, cookie) if cookie else None
+            print("Historia ofert z konta Otodom:", "włączona" if api else "wyłączona (brak pliku z ciasteczkiem)")
+            rows, stats = otodom.scrape(client.get, PgCache(conn), observed_at, region_slug=region_slug,
+                                        teryt_prefix=teryt_prefix, max_details=max_details,
+                                        geo_get=geo_client.get, api=api, history_backfill=history_backfill)
+        else:
+            rows, stats = gratka.scrape(client.get, PgCache(conn, source), observed_at, region_slug=region_slug,
+                                        teryt_prefix=teryt_prefix, max_details=max_details, geo_get=geo_client.get)
+    except Blocked as exc:
+        _log_run(conn, source, started, "blocked", message=str(exc))
+        print(f"{name}: BLOKADA: {exc}. Przerwano bez ponawiania.")
+        return 3, False
+    except otodom.LayoutChanged as exc:
+        _log_run(conn, source, started, "layout_changed", message=str(exc))
+        print(f"{name}: ZMIANA STRUKTURY STRONY: {exc}. Parser wymaga poprawki.")
+        return 4, False
+
+    print(f"{name}: {stats.pages} stron, {stats.unique_ads} ogłoszeń, {stats.rows} wierszy "
           f"(nowe szczegóły {stats.details_fetched}, odłożone {stats.details_deferred}, "
           f"bez ceny {stats.skipped_no_price}, bez lokalizacji {stats.skipped_no_location}, "
-          f"poza regionem {stats.skipped_outside_region}); zapytań HTTP: {client.requests_made}")
+          f"poza regionem {stats.skipped_outside_region})")
     if stats.land_use_filled:
         print(f"Rodzaj działki uzupełniony z tytułu/opisu: {stats.land_use_filled} "
               f"(ponownie pobranych stron: {stats.land_use_refetched})")
-    if api is not None:
+    if source == "otodom" and api is not None:
         print(f"Historia: nowe {stats.history_fetched}, uzupełnione {stats.history_backfilled}, "
               f"błędy {stats.history_failed}")
     if not rows:
-        _log_run(conn, started, "error", 0, stats, "0 wierszy")
-        print("BŁĄD: 0 wierszy.")
-        return 1
+        _log_run(conn, source, started, "error", 0, stats, "0 wierszy")
+        print(f"{name}: BŁĄD: 0 wierszy.")
+        return 1, False
 
-    path = write_csv(rows, Path(out_dir) / SOURCE_ID, observed_at)
-    result = db.import_csv(conn, SOURCE_ID, path)
-    print(f"Import: {path} -> dodano {result.rows_inserted}, duplikatów {result.rows_duplicate}")
-    run_id, links = db.run_dedup(conn)
-    _, scores = db.run_metrics(conn, run_id)
-    print(f"Deduplikacja: {len(links)} ogłoszeń -> {len({l.property_key for l in links})} nieruchomości. "
-          f"Metryki przeliczone ({len(scores)} gmin).")
+    path = write_csv(rows, Path(out_dir) / source, observed_at, source)
+    result = db.import_csv(conn, source, path)
+    print(f"{name}: import {path} -> dodano {result.rows_inserted}, duplikatów {result.rows_duplicate}")
 
-    previous = _previous_rows(conn)
+    previous = _previous_rows(conn, source)
     if previous and stats.details_deferred == 0 and len(rows) < DROP_ALERT_RATIO * previous:
         msg = f"liczba wierszy spadła z {previous} do {len(rows)}"
-        _log_run(conn, started, "warning", len(rows), stats, msg)
-        print(f"OSTRZEŻENIE: {msg} — sprawdź, czy parser działa poprawnie.")
-        return 5
+        _log_run(conn, source, started, "warning", len(rows), stats, msg)
+        print(f"{name}: OSTRZEŻENIE: {msg} — sprawdź, czy parser działa poprawnie.")
+        return 5, True
     if stats.session_expired:
         msg = "Sesja konta Otodom wygasła: historia ofert nie jest pobierana. Odśwież ciasteczko (deploy/README.md)."
-        _log_run(conn, started, "warning", len(rows), stats, msg)
+        _log_run(conn, source, started, "warning", len(rows), stats, msg)
         print("OSTRZEŻENIE:", msg)
-        return 0
-    _log_run(conn, started, "ok", len(rows), stats)
-    return 0
+        return 0, True
+    _log_run(conn, source, started, "ok", len(rows), stats)
+    return 0, True
 
 
 def check_otodom(region_slug: str = "dolnoslaskie", details: int = 3) -> int:

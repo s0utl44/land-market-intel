@@ -48,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--teryt-prefix", default="02", help="kod TERYT województwa (filtr gmin)")
     s.add_argument("--history-backfill", type=int, default=600,
                    help="ile wcześniej pobranych ofert uzupełnić o historię z konta Otodom (domyślnie 600)")
+    s.add_argument("--sources", help="źródła po przecinku, np. gratka albo otodom,gratka (domyślnie wszystkie)")
     s.add_argument("--if-needed", action="store_true",
                    help="uruchom tylko, jeśli dzisiejsze pobieranie jeszcze się nie udało (ponowna próba)")
 
@@ -116,7 +117,8 @@ def main(argv: list[str] | None = None) -> int:
                 from .daily import run_daily
 
                 return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix,
-                                 history_backfill=args.history_backfill, if_needed=args.if_needed)
+                                 history_backfill=args.history_backfill, if_needed=args.if_needed,
+                                 sources=tuple(args.sources.split(",")) if args.sources else None)
             elif args.cmd == "demo":
                 return _demo(conn, args.out_dir, args.regions, args.weeks)
         except db.ImportRejected as exc:

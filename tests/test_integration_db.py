@@ -131,7 +131,7 @@ def test_daily_requires_approved_source(pg_conn, tmp_path):
     from lmi.daily import run_daily
     from test_otodom import make_web
 
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(make_web())) == 2
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(make_web())) == 2
 
 
 def test_daily_pipeline_two_days(pg_conn, tmp_path):
@@ -144,8 +144,8 @@ def test_daily_pipeline_two_days(pg_conn, tmp_path):
     db.add_source(pg_conn, "otodom", "Otodom")
     db.approve_source(pg_conn, "otodom", "test", "pytest")
     web = make_web()
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=date(2026, 10, 16)) == 0
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 0
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 16)) == 0
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 0
 
     n_obs = pg_conn.execute("SELECT count(*) FROM core.listing_observations WHERE source_id='otodom'").fetchone()[0]
     assert n_obs == 6  # 3 ogłoszenia x 2 dni
@@ -161,7 +161,7 @@ def test_daily_pipeline_two_days(pg_conn, tmp_path):
         def get(self, url):
             raise Blocked("403")
 
-    assert run_daily(pg_conn, tmp_path, client=Blocking(), observed_at=date(2026, 10, 18)) == 3
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=Blocking(), observed_at=date(2026, 10, 18)) == 3
     assert pg_conn.execute("SELECT status FROM scrape.runs ORDER BY run_id DESC LIMIT 1").fetchone()[0] == "blocked"
 
 
@@ -174,10 +174,10 @@ def test_daily_alerts_on_sudden_drop(pg_conn, tmp_path):
     db.add_source(pg_conn, "otodom", "Otodom")
     db.approve_source(pg_conn, "otodom", "test", "pytest")
     web = make_web()
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=date(2026, 10, 16)) == 0
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 16)) == 0
     from fixtures_otodom import search_item, search_page
     web.pages = [search_page([search_item(1)], total_pages=1)]  # nagle tylko 1 z 3
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 5
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 5
 
 
 def test_daily_if_needed_skips_after_success_and_errors_are_logged(pg_conn, tmp_path):
@@ -197,13 +197,45 @@ def test_daily_if_needed_skips_after_success_and_errors_are_logged(pg_conn, tmp_
             raise RuntimeError("coś nieprzewidzianego")
 
     with pytest.raises(RuntimeError):
-        run_daily(pg_conn, tmp_path, client=Broken(), observed_at=day)
+        run_daily(pg_conn, tmp_path, sources=("otodom",), client=Broken(), observed_at=day)
     status, msg = pg_conn.execute("SELECT status, message FROM scrape.runs ORDER BY run_id DESC LIMIT 1").fetchone()
     assert status == "error" and "nieprzewidzianego" in msg
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(make_web()), observed_at=day, if_needed=True) == 0
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(make_web()), observed_at=day, if_needed=True) == 0
     n = pg_conn.execute("SELECT count(*) FROM scrape.runs WHERE status = 'ok'").fetchone()[0]
     assert n == 1
     # po udanym przebiegu kolejna próba "if needed" nic nie robi
     web = make_web()
-    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=day, if_needed=True) == 0
+    assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=day, if_needed=True) == 0
     assert pg_conn.execute("SELECT count(*) FROM scrape.runs").fetchone()[0] == 2
+
+
+def test_blocked_source_does_not_stop_others(pg_conn, tmp_path):
+    from datetime import date
+
+    from fixtures_gratka import detail_page as g_detail, node, search_page as g_search
+    from lmi.daily import run_daily
+    from lmi.scrapers.http import Blocked
+    from test_gratka import Web as GratkaWeb
+
+    for src, name in (("otodom", "Otodom"), ("gratka", "Gratka")):
+        db.add_source(pg_conn, src, name)
+        db.approve_source(pg_conn, src, "test", "pytest")
+    gweb = GratkaWeb(pages=[g_search([node(1), node(2, area="900")], total=2)],
+                     details={"1": g_detail(), "2": g_detail(title="Działka rolna")},
+                     communes={"16.155000,51.285100": "0\n020905_2|Miłkowice"})
+
+    class Client:
+        requests_made = 0
+
+        def get(self, url):
+            if "otodom.pl" in url:
+                raise Blocked("403")
+            return gweb.get(url)
+
+    code = run_daily(pg_conn, tmp_path, sources=("otodom", "gratka"), client=Client(), observed_at=date(2026, 10, 17))
+    assert code == 3
+    runs = dict(pg_conn.execute("SELECT source_id, status FROM scrape.runs").fetchall())
+    assert runs == {"otodom": "blocked", "gratka": "ok"}
+    assert pg_conn.execute("SELECT count(*) FROM core.listing_observations WHERE source_id='gratka'").fetchone()[0] == 2
+    assert pg_conn.execute("SELECT count(*) FROM core.dedup_runs").fetchone()[0] == 1
+    assert pg_conn.execute("SELECT count(*) FROM scrape.portal_details WHERE source_id='gratka'").fetchone()[0] == 2

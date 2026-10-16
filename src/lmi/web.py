@@ -57,6 +57,14 @@ def overview():
                    WHERE status IN ('ok', 'warning') ORDER BY run_id DESC LIMIT 1""")
     attempt = _rows("""SELECT started_at, finished_at, status, message FROM scrape.runs
                        ORDER BY run_id DESC LIMIT 1""")
+    # stan każdego źródła: ostatni udany przebieg i ostatnia próba
+    per_source = _rows("""
+        SELECT s.source_id AS source, s.name,
+               (SELECT finished_at FROM scrape.runs r WHERE r.source_id = s.source_id
+                  AND r.status IN ('ok', 'warning') ORDER BY run_id DESC LIMIT 1) AS last_ok,
+               (SELECT json_build_object('started_at', started_at, 'status', status, 'message', message)
+                  FROM scrape.runs r WHERE r.source_id = s.source_id ORDER BY run_id DESC LIMIT 1) AS latest
+        FROM core.sources s WHERE s.approved ORDER BY s.source_id""")
     weekly = _rows("""
         SELECT count(DISTINCT week_start) AS weeks,
                max(week_start) AS last_week
@@ -71,6 +79,7 @@ def overview():
     return {
         "last_run": run[0] if run else None,          # ostatni udany przebieg
         "latest_attempt": attempt[0] if attempt else None,  # ostatnia próba, także nieudana
+        "sources": per_source,
         "last_observed": last_day,
         "weeks_of_data": weekly["weeks"],
         "last_week": weekly["last_week"],
@@ -187,7 +196,10 @@ def municipality_offers(
                    min(listed_at)                                       AS listed_at,
                    max(pushed_up_at)                                    AS pushed_up_at,
                    (array_agg(source_listing_id ORDER BY observed_at DESC)
-                        FILTER (WHERE source_id = 'otodom'))[1]          AS otodom_id
+                        FILTER (WHERE source_id = 'otodom'))[1]          AS otodom_id,
+                   (array_agg(source_id ORDER BY observed_at DESC, source_id))[1]          AS source,
+                   (array_agg(source_listing_id ORDER BY observed_at DESC, source_id))[1]  AS source_listing_id,
+                   array_agg(DISTINCT source_id)                         AS sources
             FROM o GROUP BY property_key
         ),
         -- historia ceny: dni, w których cena (najniższa z portali) się zmieniła
@@ -216,15 +228,17 @@ def municipality_offers(
         ),
         f AS (
             SELECT p.*, c.history, oh.otodom_history, oh.views, oh.saved, coalesce(oh.relists, 0) AS relists,
-                   oh.land_use_source,
+                   coalesce(oh.land_use_source, pd.detail->>'land_use_source') AS land_use_source,
                    round(price / area, 1) AS ppm2,
                    -- zmiana ceny od pierwszej znanej: z historii Otodom, a bez niej od pierwszej obserwacji
                    round((price / coalesce(oh.hist_first_price, first_price) - 1) * 100, 1) AS price_change,
                    least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS start_date,
                    last_seen - least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS age_days
             FROM p LEFT JOIN changes c USING (property_key) LEFT JOIN oh USING (property_key)
+                   LEFT JOIN scrape.portal_details pd
+                          ON pd.source_id = p.source AND pd.ad_id = p.source_listing_id
         )
-        SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise,
+        SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise, source, sources,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
                otodom_history, views, saved, relists, land_use_source
         FROM f WHERE {' AND '.join(where)}
