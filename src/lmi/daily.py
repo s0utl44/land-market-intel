@@ -96,6 +96,9 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
           f"(nowe szczegóły {stats.details_fetched}, odłożone {stats.details_deferred}, "
           f"bez ceny {stats.skipped_no_price}, bez lokalizacji {stats.skipped_no_location}, "
           f"poza regionem {stats.skipped_outside_region}); zapytań HTTP: {client.requests_made}")
+    if stats.land_use_filled:
+        print(f"Rodzaj działki uzupełniony z tytułu/opisu: {stats.land_use_filled} "
+              f"(ponownie pobranych stron: {stats.land_use_refetched})")
     if api is not None:
         print(f"Historia: nowe {stats.history_fetched}, uzupełnione {stats.history_backfilled}, "
               f"błędy {stats.history_failed}")

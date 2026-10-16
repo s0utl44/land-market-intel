@@ -454,7 +454,7 @@ async function loadOffers(){
     const histTxt=oh.length?'Historia ogłoszenia (Otodom):\n'+oh.map(h=>`${dFull(h.date)}: ${(h.changes||[]).map(c=>CH[c]||c.toLowerCase()).join(', ')}${h.price!=null?' · '+nf(h.price)+' zł':''}`).join('\n')
       :(ownHist.length>1?'Zmiany widziane przez Radar:\n'+ownHist.map(h=>`${dFull(h.date)}: ${nf(h.price)} zł`).join('\n'):'');
     return `<tr>
-    <td class="l">${esc(r.land_use||'–')}${fresh?' <span class="pill good">nowa</span>':''}</td>
+    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}</td>
     <td>${nf(r.area)} m² <span class="ar">(${nf(r.area/100,1)} ar)</span></td>
     <td>${nf(r.price)} zł</td>
     <td><b>${nf(r.ppm2)}</b></td>

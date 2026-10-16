@@ -40,6 +40,33 @@ LAND_USE = {
 }
 
 
+# Rodzaj działki z tekstu (tytuł, opis), gdy Otodom nie podaje go w polu "Typ".
+# Kolejność ma znaczenie: bardziej szczegółowe rodzaje przed ogólnymi ("rolno-budowlana" przed "rolna").
+LAND_USE_PATTERNS = [
+    ("rolno-budowlana", r"rolno[\s-]*budowl"),
+    ("siedliskowa", r"siedlis"),
+    ("budowlana", r"budowl|pod\s+zabudow|pod\s+budow|jednorodzinn|z\s+warunkami\s+zabudowy|\bwz\b|mpzp\s+mn"),
+    ("rekreacyjna", r"rekreac|letnisk"),
+    ("leśna", r"le[sś]n[aey]|\blas\b|zalesion"),
+    ("inwestycyjna", r"inwestyc|us[lł]ugow|przemys[lł]|komercyj|magazyn|produkcyj"),
+    ("rolna", r"\broln|uprawn|\bgrunt\s+orny|\b[lł][aą]k"),
+]
+
+
+def classify_land_use(text: str | None) -> str | None:
+    if not text:
+        return None
+    t = text.lower()
+    for name, pattern in LAND_USE_PATTERNS:
+        if re.search(pattern, t):
+            return name
+    return None
+
+
+def _strip_html(html: str | None) -> str:
+    return re.sub(r"<[^>]+>", " ", html or "")
+
+
 class LayoutChanged(Exception):
     """Strona nie ma oczekiwanej struktury — Otodom zmienił frontend, parser do poprawki."""
 
@@ -74,6 +101,7 @@ class SearchItem:
     area_m2: float | None
     listed_at: date | None = None      # pierwsze dodanie oferty na Otodom (createdAtFirst)
     pushed_up_at: date | None = None   # ostatnie płatne podbicie ogłoszenia
+    title: str | None = None           # tylko do ustalenia rodzaju działki, nie zapisujemy
 
 
 def _date(v) -> date | None:
@@ -104,7 +132,8 @@ def parse_search_page(html: str) -> tuple[list[SearchItem], int]:
         price = None if it.get("hidePrice") else _num(it.get("totalPrice"))
         area = _num(it.get("areaInSquareMeters")) or _num(it.get("terrainAreaInSquareMeters"))
         listed = _date(it.get("createdAtFirst")) or _date(it.get("dateCreated"))
-        items.append(SearchItem(str(it["id"]), it["slug"], price, area, listed, _date(it.get("pushedUpAt"))))
+        items.append(SearchItem(str(it["id"]), it["slug"], price, area, listed, _date(it.get("pushedUpAt")),
+                                it.get("title")))
     return items, total_pages
 
 
@@ -129,6 +158,14 @@ def parse_detail_page(html: str) -> dict:
     target = ad.get("target") or {}
 
     land_type = _first(target.get("Type"))
+    if land_type:
+        land_use, source = LAND_USE.get(str(land_type), land_type), "otodom"
+    elif (land_use := classify_land_use(ad.get("title") or target.get("Title"))):
+        source = "tytuł"
+    elif (land_use := classify_land_use(_strip_html(ad.get("description")))):
+        source = "opis"
+    else:
+        land_use, source = None, None
     municipality_hint = None
     for loc in (location.get("reverseGeocoding") or {}).get("locations") or []:
         level = str(loc.get("locationLevel") or "").lower()
@@ -144,7 +181,8 @@ def parse_detail_page(html: str) -> dict:
         "lat": lat,
         "lon": lon,
         "precise": radius == 0,
-        "land_use": LAND_USE.get(str(land_type), land_type),
+        "land_use": land_use,
+        "land_use_source": source,
         "area_m2": _num(target.get("Area")),
         "municipality_hint": municipality_hint,
     }
@@ -196,7 +234,30 @@ class ScrapeStats:
     history_backfilled: int = 0    # ... i uzupełnione dla ofert pobranych wcześniej
     history_failed: int = 0
     session_expired: bool = False  # sesja konta Otodom wygasła w trakcie przebiegu
+    land_use_filled: int = 0       # rodzaj działki uzupełniony z tytułu/opisu dla ofert z cache
+    land_use_refetched: int = 0    # ... w tym ze strony oferty pobranej ponownie
     notes: list[str] = field(default_factory=list)
+
+
+def _fill_land_use(get, it: SearchItem, detail: dict, stats: ScrapeStats, max_refetch: int) -> bool:
+    """Rodzaj działki dla oferty pobranej wcześniej bez niego: najpierw z tytułu (bez zapytania),
+    potem jednorazowo ze strony oferty (opis). True, jeśli `detail` się zmienił."""
+    if (land_use := classify_land_use(it.title)):
+        detail["land_use"], detail["land_use_source"] = land_use, "tytuł"
+        stats.land_use_filled += 1
+        return True
+    if detail.get("land_use_checked") or stats.land_use_refetched >= max_refetch:
+        return False
+    try:
+        fresh = parse_detail_page(get(DETAIL_URL.format(slug=it.slug)))
+    except (FetchError, LayoutChanged):
+        return False
+    stats.land_use_refetched += 1
+    detail["land_use_checked"] = True
+    if fresh.get("land_use"):
+        detail["land_use"], detail["land_use_source"] = fresh["land_use"], fresh["land_use_source"]
+        stats.land_use_filled += 1
+    return True
 
 
 def _add_history(api: OtodomApi | None, it: SearchItem, detail: dict, observed_at: date,
@@ -243,6 +304,7 @@ def scrape(
     geo_get: Callable[[str], str] | None = None,
     api: OtodomApi | None = None,
     history_backfill: int = 0,
+    max_type_refetch: int = 300,
 ) -> tuple[list[dict], ScrapeStats]:
     """Jeden przebieg: wszystkie strony wyników + brakujące szczegóły + gminy.
 
@@ -296,6 +358,10 @@ def scrape(
 
         elif "history" not in detail and stats.history_backfilled < history_backfill:
             if _add_history(api, it, detail, observed_at, stats, new=False):
+                cache.put_detail(it.ad_id, it.slug, detail)
+
+        if not detail.get("land_use"):
+            if _fill_land_use(get, it, detail, stats, max_type_refetch):
                 cache.put_detail(it.ad_id, it.slug, detail)
 
         area = it.area_m2 or detail.get("area_m2")

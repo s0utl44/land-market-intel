@@ -201,6 +201,7 @@ def municipality_offers(
         -- historia z konta Otodom (scrape.otodom_details), jeśli została pobrana
         oh AS (
             SELECT p.property_key, d.detail->'history' AS otodom_history,
+                   d.detail->>'land_use_source' AS land_use_source,
                    (d.detail->'stats'->>'views')::int AS views, (d.detail->'stats'->>'saved')::int AS saved,
                    (SELECT (e->>'price')::numeric FROM jsonb_array_elements(d.detail->'history') e
                      WHERE e->>'price' IS NOT NULL ORDER BY e->>'date' LIMIT 1) AS hist_first_price,
@@ -212,6 +213,7 @@ def municipality_offers(
         ),
         f AS (
             SELECT p.*, c.history, oh.otodom_history, oh.views, oh.saved, coalesce(oh.relists, 0) AS relists,
+                   oh.land_use_source,
                    round(price / area, 1) AS ppm2,
                    -- zmiana ceny od pierwszej znanej: z historii Otodom, a bez niej od pierwszej obserwacji
                    round((price / coalesce(oh.hist_first_price, first_price) - 1) * 100, 1) AS price_change,
@@ -221,7 +223,7 @@ def municipality_offers(
         )
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
-               otodom_history, views, saved, relists
+               otodom_history, views, saved, relists, land_use_source
         FROM f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)

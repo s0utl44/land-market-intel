@@ -8,9 +8,9 @@ def _wrap(next_data: dict) -> str:
 
 
 def search_item(ad_id, price=329000, area=1636, hide_price=False, estate="TERRAIN",
-                created_first="2025-03-14T09:12:00+00:00", pushed_up=None):
+                created_first="2025-03-14T09:12:00+00:00", pushed_up=None, title="Działka"):
     return {
-        "id": ad_id, "title": "Działka", "slug": f"dzialka-{ad_id}-ID{ad_id}", "estate": estate,
+        "id": ad_id, "title": title, "slug": f"dzialka-{ad_id}-ID{ad_id}", "estate": estate,
         "transaction": "SELL", "agency": None, "areaInSquareMeters": area,
         "terrainAreaInSquareMeters": None, "hidePrice": hide_price,
         "totalPrice": None if price is None else {"value": price, "currency": "PLN"},
@@ -32,12 +32,14 @@ def search_page(items, total_pages=1):
 
 
 def detail_page(lat=50.960144, lon=17.407703, radius=0, land_type="building", area="1636",
+                title="Działka 1636 m²", description="<p>Działka w spokojnej okolicy.</p>",
                 levels=(("voivodeship", "dolnośląskie"), ("county", "oławski"), ("municipality", "Oława"),
                         ("village", "Bystrzyca"))):
     return _wrap({"props": {"pageProps": {"ad": {
-        "id": 1,
+        "id": 1, "title": title, "description": description,
         "target": {"Area": area, "City": "Bystrzyca", "Price": 329000, "Price_per_m": 201,
-                   "Province": "dolnoslaskie", "Subregion": "olawski", "Type": [land_type],
+                   "Province": "dolnoslaskie", "Subregion": "olawski",
+                   **({"Type": [land_type]} if land_type else {}),
                    "seller_id": "1234567", "hidePrice": "0"},
         "location": {
             "coordinates": None if lat is None else {"latitude": lat, "longitude": lon, "__typename": "Coordinates"},

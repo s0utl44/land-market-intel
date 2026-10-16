@@ -105,7 +105,8 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
                {"date": "2025-03-01", "status": "ACTIVE", "price": 625000.0, "changes": ["ACTIVATED"]},
                {"date": "2026-05-01", "status": "ACTIVE", "price": 500000.0, "changes": ["PRICE_DOWN"]}]
     pg_conn.execute("INSERT INTO scrape.otodom_details (ad_id, slug, detail) VALUES ('777', 's', %s)",
-                    (json.dumps({"lat": 51.1, "history": history, "stats": {"views": 228, "saved": 3, "at": "2026-06-29"}}),))
+                    (json.dumps({"lat": 51.1, "history": history, "land_use": "budowlana", "land_use_source": "tytuł",
+                                 "stats": {"views": 228, "saved": 3, "at": "2026-06-29"}}),))
     pg_conn.commit()
     run_id, _ = db.run_dedup(pg_conn)
     db.run_metrics(pg_conn, run_id)
@@ -114,3 +115,4 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
     assert o["saved"] == 3 and o["views"] == 228 and o["relists"] == 1
     assert o["price_change"] == -20.0           # 625 000 -> 500 000 z historii Otodom
     assert o["start_date"] == "2013-05-08" and len(o["otodom_history"]) == 5
+    assert o["land_use_source"] == "tytuł"
