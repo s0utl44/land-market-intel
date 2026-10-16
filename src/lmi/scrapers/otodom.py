@@ -20,6 +20,7 @@ from typing import Callable, Protocol
 
 from . import uldk
 from .http import FetchError
+from .otodom_api import OtodomApi, SessionExpired
 
 log = logging.getLogger(__name__)
 
@@ -191,7 +192,44 @@ class ScrapeStats:
     skipped_no_area: int = 0
     skipped_no_location: int = 0
     skipped_outside_region: int = 0
+    history_fetched: int = 0       # historia + statystyki pobrane dla nowych ofert
+    history_backfilled: int = 0    # ... i uzupełnione dla ofert pobranych wcześniej
+    history_failed: int = 0
+    session_expired: bool = False  # sesja konta Otodom wygasła w trakcie przebiegu
     notes: list[str] = field(default_factory=list)
+
+
+def _add_history(api: OtodomApi | None, it: SearchItem, detail: dict, observed_at: date,
+                 stats: ScrapeStats, new: bool) -> bool:
+    """Dopisuje do `detail` historię ogłoszenia i statystyki z konta Otodom. True, jeśli się udało."""
+    if api is None or not api.alive:
+        return False
+    try:
+        history = api.history(it.ad_id)
+        if history is None:
+            stats.history_failed += 1
+            return False
+        listed = next((h["date"] for h in history if "FIRST_PUBLISHED" in h["changes"]), None)
+        statistics = api.statistics(it.ad_id, listed or (it.listed_at.isoformat() if it.listed_at else None))
+    except SessionExpired:
+        stats.session_expired = True
+        stats.notes.append("sesja Otodom wygasła: historia ofert nie jest pobierana, odśwież ciasteczko")
+        log.warning("otodom: sesja konta wygasła, pomijam historię do końca przebiegu")
+        return False
+    except (FetchError, ValueError) as exc:
+        stats.history_failed += 1
+        log.warning("otodom: historia %s: %s", it.ad_id, exc)
+        return False
+    detail["history"] = history
+    if statistics:
+        detail["stats"] = {**statistics, "at": observed_at.isoformat()}
+    if new:
+        stats.history_fetched += 1
+    else:
+        stats.history_backfilled += 1
+        if stats.history_backfilled % 100 == 0:
+            log.info("otodom: uzupełniono historię %d ofert", stats.history_backfilled)
+    return True
 
 
 def scrape(
@@ -203,12 +241,16 @@ def scrape(
     max_details: int | None = None,
     max_pages: int = MAX_PAGES,
     geo_get: Callable[[str], str] | None = None,
+    api: OtodomApi | None = None,
+    history_backfill: int = 0,
 ) -> tuple[list[dict], ScrapeStats]:
     """Jeden przebieg: wszystkie strony wyników + brakujące szczegóły + gminy.
 
     `get(url) -> html` — zwykle PoliteClient.get; w testach podmieniany.
     `max_details` ogranicza liczbę nowych stron ofert w jednym przebiegu (reszta w kolejnym).
     `geo_get` — osobny klient dla ULDK (krótsze przerwy niż dla Otodom); domyślnie `get`.
+    `api` — API zalogowanego konta (historia, statystyki); None = bez historii.
+    `history_backfill` — ile ofert pobranych wcześniej uzupełnić o historię w tym przebiegu.
     """
     geo_get = geo_get or get
     stats = ScrapeStats()
@@ -246,10 +288,15 @@ def scrape(
                 log.warning("otodom: szczegóły %s: %s", it.ad_id, exc)
                 continue
             stats.details_fetched += 1
+            _add_history(api, it, detail, observed_at, stats, new=True)
             cache.put_detail(it.ad_id, it.slug, detail)
             if stats.details_fetched % 100 == 0:
                 log.info("otodom: pobrano szczegóły %d nowych ofert (ogłoszeń z ceną: %d)",
                          stats.details_fetched, priced)
+
+        elif "history" not in detail and stats.history_backfilled < history_backfill:
+            if _add_history(api, it, detail, observed_at, stats, new=False):
+                cache.put_detail(it.ad_id, it.slug, detail)
 
         area = it.area_m2 or detail.get("area_m2")
         if area is None:

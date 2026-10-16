@@ -46,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--max-details", type=int, help="limit nowych stron ofert w jednym przebiegu")
     s.add_argument("--region", default="dolnoslaskie", help="slug województwa w adresie Otodom")
     s.add_argument("--teryt-prefix", default="02", help="kod TERYT województwa (filtr gmin)")
+    s.add_argument("--history-backfill", type=int, default=600,
+                   help="ile wcześniej pobranych ofert uzupełnić o historię z konta Otodom (domyślnie 600)")
 
     s = sub.add_parser("check-otodom", help="szybki test scrapera bez bazy (wypisuje tylko liczby)")
     s.add_argument("--region", default="dolnoslaskie")
@@ -103,7 +105,8 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "daily":
                 from .daily import run_daily
 
-                return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix)
+                return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix,
+                                 history_backfill=args.history_backfill)
             elif args.cmd == "demo":
                 return _demo(conn, args.out_dir, args.regions, args.weeks)
         except db.ImportRejected as exc:

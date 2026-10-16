@@ -86,3 +86,31 @@ def test_offers_have_listing_age_and_price_history(client):
 def test_ranking_has_listing_age(client):
     rows = client.get("/api/ranking").json()
     assert all(r["age"] is not None for r in rows)
+
+
+def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
+    import json
+
+    csv = ("source_listing_id,observed_at,municipality_teryt,municipality_name,area_m2,price_pln,listed_at\n"
+           "777,2026-06-29,9900011,Syntetyczna Rozwojowa,1000,500000,2013-05-08\n")
+    # ostatni dzień danych syntetycznych to 2026-06-29, więc oferta jest aktywna w źródle "otodom"
+    f = tmp_path / "o.csv"
+    f.write_text(csv)
+    db.add_source(pg_conn, "otodom", "Otodom")
+    db.approve_source(pg_conn, "otodom", "test", "pytest")
+    db.import_csv(pg_conn, "otodom", f)
+    history = [{"date": "2013-05-08", "status": "ACTIVE", "price": None, "changes": ["FIRST_PUBLISHED"]},
+               {"date": "2024-01-10", "status": "ACTIVE", "price": 625000.0, "changes": ["PRICE"]},
+               {"date": "2025-02-01", "status": "INACTIVE", "price": 625000.0, "changes": ["DEACTIVATED"]},
+               {"date": "2025-03-01", "status": "ACTIVE", "price": 625000.0, "changes": ["ACTIVATED"]},
+               {"date": "2026-05-01", "status": "ACTIVE", "price": 500000.0, "changes": ["PRICE_DOWN"]}]
+    pg_conn.execute("INSERT INTO scrape.otodom_details (ad_id, slug, detail) VALUES ('777', 's', %s)",
+                    (json.dumps({"lat": 51.1, "history": history, "stats": {"views": 228, "saved": 3, "at": "2026-06-29"}}),))
+    pg_conn.commit()
+    run_id, _ = db.run_dedup(pg_conn)
+    db.run_metrics(pg_conn, run_id)
+    rows = client.get("/api/municipality/9900011/offers", params={"sort": "saved"}).json()
+    o = rows[0]
+    assert o["saved"] == 3 and o["views"] == 228 and o["relists"] == 1
+    assert o["price_change"] == -20.0           # 625 000 -> 500 000 z historii Otodom
+    assert o["start_date"] == "2013-05-08" and len(o["otodom_history"]) == 5

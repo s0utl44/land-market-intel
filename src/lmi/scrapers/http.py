@@ -38,12 +38,12 @@ class PoliteClient:
         if elapsed < delay:
             time.sleep(delay - elapsed)
 
-    def get(self, url: str) -> str:
+    def get(self, url: str, headers: dict | None = None) -> str:
         last_error: Exception | None = None
         for attempt in range(self.retries + 1):
             self._wait()
             req = urllib.request.Request(
-                url, headers={"User-Agent": self.user_agent, "Accept-Language": "pl-PL,pl;q=0.9"}
+                url, headers={"User-Agent": self.user_agent, "Accept-Language": "pl-PL,pl;q=0.9", **(headers or {})}
             )
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:

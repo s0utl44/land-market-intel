@@ -142,6 +142,24 @@ sed -i "s|^LMI_BASIC_AUTH='\(.*\)'|LMI_BASIC_AUTH='\1,$U:$H'|" .env && docker co
 Usunięcie osoby: otwórz `.env` (`nano .env`), w linii `LMI_BASIC_AUTH` usuń fragment `,login:skrót`
 tej osoby i uruchom `docker compose up -d web metabase`.
 
+## Historia ofert z konta Otodom (opcjonalnie)
+
+Historię ogłoszenia (wystawienie, zmiany cen, zdjęcia i ponowne wystawienia) oraz liczbę wyświetleń
+i zapisań Otodom pokazuje tylko zalogowanym. Radar korzysta z sesji osobnego konta: program się
+nie loguje, tylko używa ciasteczka skopiowanego z przeglądarki.
+
+1. Zaloguj się na Otodom w Chrome, otwórz dowolne ogłoszenie, **F12** → **Network** → **F5** →
+   pierwszy wiersz → **Headers** → **Request Headers** → wiersz `cookie` → prawy przycisk → **Copy value**.
+2. Na serwerze (edytor nano, bo terminal obcina wklejane linie dłuższe niż 4095 znaków):
+   ```bash
+   cd /opt/lmi && mkdir -p data && nano data/otodom-cookie    # wklej, Ctrl+O, Enter, Ctrl+X
+   chmod 600 data/otodom-cookie && wc -c < data/otodom-cookie  # powinno być > 4095
+   ```
+
+Codzienny przebieg pobiera historię dla nowych ofert i uzupełnia ją dla 600 starszych dziennie
+(`lmi daily --history-backfill N` zmienia limit). Gdy sesja wygaśnie, przebieg działa dalej bez historii,
+a na stronie pojawia się ostrzeżenie. Wtedy powtórz kroki 1–2.
+
 ## Monitoring
 
 | Kod wyjścia `lmi daily` | Znaczenie |

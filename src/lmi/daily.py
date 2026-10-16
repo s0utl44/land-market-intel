@@ -16,12 +16,14 @@ from pathlib import Path
 from . import db
 from .scrapers import otodom
 from .scrapers.http import Blocked, PoliteClient
+from .scrapers.otodom_api import OtodomApi, load_cookie
 from .scrapers.pg_cache import PgCache
 from .synthetic import CSV_COLUMNS
 
 log = logging.getLogger(__name__)
 SOURCE_ID = "otodom"
 DROP_ALERT_RATIO = 0.5
+HISTORY_BACKFILL_PER_RUN = 600  # ~1 h dziennie; ~4100 ofert uzupełni się w ok. tydzień
 
 
 def _log_run(conn, started, status, rows=None, stats=None, message=None):
@@ -57,7 +59,8 @@ def write_csv(rows: list[dict], out_dir: Path, observed_at: date) -> Path:
 def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = None,
               region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
               client: PoliteClient | None = None, observed_at: date | None = None,
-              geo_client: PoliteClient | None = None) -> int:
+              geo_client: PoliteClient | None = None, history_backfill: int = HISTORY_BACKFILL_PER_RUN,
+              api: OtodomApi | None = None) -> int:
     started = datetime.now(timezone.utc)
     observed_at = observed_at or date.today()
     db.apply_schema(conn)
@@ -72,10 +75,14 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
     client = client or PoliteClient()
     geo_client = geo_client or (PoliteClient(min_delay=0.3, max_delay=0.6) if isinstance(client, PoliteClient)
                                 else client)
+    if api is None and isinstance(client, PoliteClient):
+        cookie = load_cookie()
+        api = OtodomApi(client.get, cookie) if cookie else None
+    print("Historia ofert z konta Otodom:", "włączona" if api else "wyłączona (brak pliku z ciasteczkiem)")
     try:
         rows, stats = otodom.scrape(client.get, PgCache(conn), observed_at, region_slug=region_slug,
                                     teryt_prefix=teryt_prefix, max_details=max_details,
-                                    geo_get=geo_client.get)
+                                    geo_get=geo_client.get, api=api, history_backfill=history_backfill)
     except Blocked as exc:
         _log_run(conn, started, "blocked", message=str(exc))
         print(f"BLOKADA: {exc}. Przerwano bez ponawiania.")
@@ -89,6 +96,9 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
           f"(nowe szczegóły {stats.details_fetched}, odłożone {stats.details_deferred}, "
           f"bez ceny {stats.skipped_no_price}, bez lokalizacji {stats.skipped_no_location}, "
           f"poza regionem {stats.skipped_outside_region}); zapytań HTTP: {client.requests_made}")
+    if api is not None:
+        print(f"Historia: nowe {stats.history_fetched}, uzupełnione {stats.history_backfilled}, "
+              f"błędy {stats.history_failed}")
     if not rows:
         _log_run(conn, started, "error", 0, stats, "0 wierszy")
         print("BŁĄD: 0 wierszy.")
@@ -108,6 +118,11 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
         _log_run(conn, started, "warning", len(rows), stats, msg)
         print(f"OSTRZEŻENIE: {msg} — sprawdź, czy parser działa poprawnie.")
         return 5
+    if stats.session_expired:
+        msg = "Sesja konta Otodom wygasła: historia ofert nie jest pobierana. Odśwież ciasteczko (deploy/README.md)."
+        _log_run(conn, started, "warning", len(rows), stats, msg)
+        print("OSTRZEŻENIE:", msg)
+        return 0
     _log_run(conn, started, "ok", len(rows), stats)
     return 0
 

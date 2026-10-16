@@ -53,7 +53,7 @@ def me(request: Request):
 
 @app.get("/api/overview")
 def overview():
-    run = _rows("""SELECT finished_at, status, rows_written FROM scrape.runs
+    run = _rows("""SELECT finished_at, status, rows_written, message FROM scrape.runs
                    WHERE status IN ('ok', 'warning') ORDER BY run_id DESC LIMIT 1""")
     weekly = _rows("""
         SELECT count(DISTINCT week_start) AS weeks,
@@ -118,6 +118,8 @@ SORTS = {
     "longest": "start_date ASC",
     "cut": "price_change ASC",
     "pushed": "pushed_up_at DESC NULLS LAST",
+    "saved": "saved DESC NULLS LAST",
+    "views": "views DESC NULLS LAST",
 }
 
 
@@ -180,7 +182,9 @@ def municipality_offers(
                    bool_or(lat IS NOT NULL)                             AS precise,
                    bool_or(in_latest)                                   AS active,
                    min(listed_at)                                       AS listed_at,
-                   max(pushed_up_at)                                    AS pushed_up_at
+                   max(pushed_up_at)                                    AS pushed_up_at,
+                   (array_agg(source_listing_id ORDER BY observed_at DESC)
+                        FILTER (WHERE source_id = 'otodom'))[1]          AS otodom_id
             FROM o GROUP BY property_key
         ),
         -- historia ceny: dni, w których cena (najniższa z portali) się zmieniła
@@ -194,15 +198,30 @@ def municipality_offers(
             WHERE prev IS NULL OR price <> prev
             GROUP BY property_key
         ),
+        -- historia z konta Otodom (scrape.otodom_details), jeśli została pobrana
+        oh AS (
+            SELECT p.property_key, d.detail->'history' AS otodom_history,
+                   (d.detail->'stats'->>'views')::int AS views, (d.detail->'stats'->>'saved')::int AS saved,
+                   (SELECT (e->>'price')::numeric FROM jsonb_array_elements(d.detail->'history') e
+                     WHERE e->>'price' IS NOT NULL ORDER BY e->>'date' LIMIT 1) AS hist_first_price,
+                   (SELECT (e->>'date')::date FROM jsonb_array_elements(d.detail->'history') e
+                     WHERE e->'changes' ? 'FIRST_PUBLISHED' ORDER BY e->>'date' LIMIT 1) AS hist_published,
+                   (SELECT count(*) FROM jsonb_array_elements(d.detail->'history') e
+                     WHERE e->'changes' ? 'ACTIVATED')::int AS relists
+            FROM p JOIN scrape.otodom_details d ON d.ad_id = p.otodom_id
+        ),
         f AS (
-            SELECT p.*, c.history, round(price / area, 1) AS ppm2,
-                   round((price / first_price - 1) * 100, 1) AS price_change,
-                   least(first_seen, coalesce(listed_at, first_seen)) AS start_date,
-                   last_seen - least(first_seen, coalesce(listed_at, first_seen)) AS age_days
-            FROM p LEFT JOIN changes c USING (property_key)
+            SELECT p.*, c.history, oh.otodom_history, oh.views, oh.saved, coalesce(oh.relists, 0) AS relists,
+                   round(price / area, 1) AS ppm2,
+                   -- zmiana ceny od pierwszej znanej: z historii Otodom, a bez niej od pierwszej obserwacji
+                   round((price / coalesce(oh.hist_first_price, first_price) - 1) * 100, 1) AS price_change,
+                   least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS start_date,
+                   last_seen - least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS age_days
+            FROM p LEFT JOIN changes c USING (property_key) LEFT JOIN oh USING (property_key)
         )
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise,
-               first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history
+               first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
+               otodom_history, views, saved, relists
         FROM f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)
