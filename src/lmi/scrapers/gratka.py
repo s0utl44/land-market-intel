@@ -187,10 +187,21 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
         page += 1
     stats.unique_ads = len(ads)
     log.info("gratka: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
+    rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
+                      parse_detail_page, "gratka")
+    return rows, stats
 
+
+def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_details: int | None, geo_get,
+               stats: ScrapeStats, parse_detail, label: str) -> list[dict]:
+    """Wspólne dla portali z listą + stroną oferty: brakujące szczegóły (raz na ofertę), gmina z ULDK, wiersze CSV.
+
+    `parse_detail(html, title, description)` zwraca słownik z lat/lon/precise/land_use/area_m2
+    (opcjonalnie listed_at, gdy data dodania jest tylko na stronie oferty).
+    """
     names: dict[str, str] = {}
     rows = []
-    for it in ads.values():
+    for it in items:
         if it.price_pln is None:
             stats.skipped_no_price += 1
             continue
@@ -200,15 +211,15 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
                 stats.details_deferred += 1
                 continue
             try:
-                detail = parse_detail_page(get(it.url), it.title, it.description)
+                detail = parse_detail(get(it.url), it.title, it.description)
             except FetchError as exc:
                 stats.details_failed += 1
-                log.warning("gratka: szczegóły %s: %s", it.ad_id, exc)
+                log.warning("%s: szczegóły %s: %s", label, it.ad_id, exc)
                 continue
             stats.details_fetched += 1
             cache.put_detail(it.ad_id, it.url, detail)
             if stats.details_fetched % 100 == 0:
-                log.info("gratka: pobrano szczegóły %d nowych ofert", stats.details_fetched)
+                log.info("%s: pobrano szczegóły %d nowych ofert", label, stats.details_fetched)
 
         area = it.area_m2 or detail.get("area_m2")
         if area is None:
@@ -235,13 +246,14 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
             stats.skipped_outside_region += 1
             continue
         name = names.setdefault(teryt, uldk_name or f"{detail.get('municipality_hint') or 'gmina'} [{teryt}]")
+        listed = it.listed_at or _date(detail.get("listed_at"))
         rows.append({
             "source_listing_id": it.ad_id,
             "observed_at": observed_at.isoformat(),
             "municipality_teryt": teryt,
             "municipality_name": name,
             "parcel_id": "",
-            # środek miejscowości (niedokładny) pomijamy, żeby nie łączyć duplikatów po takim położeniu
+            # położenie przybliżone (np. środek miejscowości) pomijamy, żeby nie łączyć duplikatów po takim położeniu
             "lat": f"{detail['lat']:.6f}" if detail.get("precise") else "",
             "lon": f"{detail['lon']:.6f}" if detail.get("precise") else "",
             "area_m2": f"{area:.2f}",
@@ -249,12 +261,12 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
             "land_use": detail.get("land_use") or "",
             "url": it.url,
             "title": "",
-            "listed_at": it.listed_at.isoformat() if it.listed_at and it.listed_at <= observed_at else "",
+            "listed_at": listed.isoformat() if listed and listed <= observed_at else "",
             "pushed_up_at": it.refreshed_at.isoformat()
             if it.refreshed_at and it.refreshed_at <= observed_at else "",
         })
     stats.rows = len(rows)
-    return rows, stats
+    return rows
 
 
 def check(region_slug: str = "dolnoslaskie", details: int = 3) -> int:

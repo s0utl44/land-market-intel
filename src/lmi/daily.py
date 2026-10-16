@@ -19,15 +19,16 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from . import db
-from .scrapers import gratka, otodom
+from .scrapers import gratka, nonline, otodom
 from .scrapers.http import Blocked, PoliteClient
 from .scrapers.otodom_api import OtodomApi, load_cookie
 from .scrapers.pg_cache import PgCache
 from .synthetic import CSV_COLUMNS
 
 log = logging.getLogger(__name__)
-SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka"}
-DEFAULT_SOURCES = ("otodom", "gratka")
+SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka", "nieruchomosci-online": "Nieruchomości-online"}
+DEFAULT_SOURCES = ("otodom", "gratka", "nieruchomosci-online")
+PORTAL_SCRAPERS = {"gratka": gratka.scrape, "nieruchomosci-online": nonline.scrape}
 DROP_ALERT_RATIO = 0.5
 # Mało zapytań dziennie: po blokadzie IP (403) wolimy wolniejsze uzupełnianie niż kolejną blokadę.
 HISTORY_BACKFILL_PER_RUN = 150  # ~300 zapytań API dziennie; ~3300 ofert uzupełni się w ok. 3 tygodnie
@@ -99,6 +100,11 @@ class _SourceLock:
             self.f = None
 
 
+def _approved(conn, source: str) -> bool:
+    row = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (source,)).fetchone()
+    return bool(row and row[0])
+
+
 def configured_sources() -> tuple[str, ...]:
     raw = os.environ.get("LMI_SOURCES")
     return tuple(x.strip() for x in raw.split(",") if x.strip()) if raw else DEFAULT_SOURCES
@@ -117,10 +123,15 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
                                 else client)
     codes, imported = [], False
     first_error: Exception | None = None
+    explicit = sources is not None
     for source in sources or configured_sources():
         if source not in SOURCE_NAMES:
             print(f"Nieznane źródło: {source}")
             codes.append(1)
+            continue
+        if not explicit and not _approved(conn, source):
+            # portal z domyślnej listy, jeszcze niewłączony: nie psuje codziennego przebiegu
+            print(f"{SOURCE_NAMES[source]}: źródło niezatwierdzone, pomijam.")
             continue
         if if_needed and already_done_today(conn, observed_at, source):
             print(f"{SOURCE_NAMES[source]}: dzisiejsze pobieranie już się udało.")
@@ -157,8 +168,7 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
 def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
                 geo_client, history_backfill, api, started) -> tuple[int, bool]:
     name = SOURCE_NAMES[source]
-    approved = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (source,)).fetchone()
-    if not approved or not approved[0]:
+    if not _approved(conn, source):
         print(f"Źródło '{source}' nie jest zatwierdzone. Uruchom raz:\n"
               f"  lmi add-source {source} {name}\n"
               f"  lmi approve-source {source} --legal-basis '...' --approved-by '...'")
@@ -174,8 +184,9 @@ def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, c
                                         teryt_prefix=teryt_prefix, max_details=max_details,
                                         geo_get=geo_client.get, api=api, history_backfill=history_backfill)
         else:
-            rows, stats = gratka.scrape(client.get, PgCache(conn, source), observed_at, region_slug=region_slug,
-                                        teryt_prefix=teryt_prefix, max_details=max_details, geo_get=geo_client.get)
+            rows, stats = PORTAL_SCRAPERS[source](client.get, PgCache(conn, source), observed_at,
+                                                  region_slug=region_slug, teryt_prefix=teryt_prefix,
+                                                  max_details=max_details, geo_get=geo_client.get)
     except Blocked as exc:
         _log_run(conn, source, started, "blocked", message=str(exc))
         print(f"{name}: BLOKADA: {exc}. Przerwano bez ponawiania.")

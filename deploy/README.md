@@ -39,7 +39,7 @@ docker compose run --rm app approve-source otodom \
   --legal-basis "prywatne narzędzie; regulamin przeczytany, ryzyko przyjęte" --approved-by "<Twoje imię>"
 ```
 
-## 4b. Kolejne portale (Gratka)
+## 4b. Kolejne portale (Gratka, Nieruchomości-online)
 
 Każdy portal to osobne źródło: blokada jednego nie zatrzymuje pozostałych.
 
@@ -48,10 +48,18 @@ docker compose run --rm app check-gratka        # test: 1 strona + 3 oferty, tyl
 docker compose run --rm app add-source gratka Gratka
 docker compose run --rm app approve-source gratka \
   --legal-basis "prywatne narzędzie; regulamin przeczytany, ryzyko przyjęte" --approved-by "<Twoje imię>"
+
+docker compose run --rm app check-nonline       # Nieruchomości-online: to samo
+docker compose run --rm app add-source nieruchomosci-online Nieruchomości-online
+docker compose run --rm app approve-source nieruchomosci-online \
+  --legal-basis "prywatne narzędzie; regulamin przeczytany, ryzyko przyjęte" --approved-by "<Twoje imię>"
 ```
 
+Morizon pomijamy: ma tę samą bazę ofert co Gratka (ta sama grupa, identyczna liczba ofert),
+więc dawałby same duplikaty przy podwójnej liczbie zapytań.
+
 Codzienny przebieg obejmuje wszystkie zatwierdzone portale z listy `LMI_SOURCES`
-(domyślnie `otodom,gratka`). Jeden portal można uruchomić osobno: `lmi daily --sources gratka`.
+(domyślnie `otodom,gratka,nieruchomosci-online`; niezatwierdzone są pomijane). Jeden portal można uruchomić osobno: `lmi daily --sources gratka`.
 
 ## 5. Pierwsze pełne pobranie
 

@@ -58,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("check-gratka", help="szybki test scrapera Gratki bez bazy (wypisuje tylko liczby)")
     s.add_argument("--region", default="dolnoslaskie")
 
+    s = sub.add_parser("check-nonline", help="szybki test scrapera Nieruchomości-online bez bazy")
+    s.add_argument("--region", default="dolnoslaskie")
+
     s = sub.add_parser("demo", help="pełny pipeline na danych syntetycznych")
     s.add_argument("--out-dir", default="data/synthetic")
     s.add_argument("--regions", type=int, default=0, help="liczba losowych gmin zamiast 3 domyślnych")
@@ -76,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
         from .scrapers import gratka
 
         return gratka.check(args.region)
+
+    if args.cmd == "check-nonline":
+        from .scrapers import nonline
+
+        return nonline.check(args.region)
 
     if args.cmd == "check-otodom":
         from .daily import check_otodom

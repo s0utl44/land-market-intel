@@ -257,3 +257,14 @@ def test_source_already_running_is_skipped(pg_conn, tmp_path):
     held.release()
     assert run_daily(pg_conn, tmp_path, sources=("otodom",), client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 0
     assert web.calls
+
+
+def test_unapproved_default_source_is_skipped(pg_conn, tmp_path, monkeypatch):
+    from lmi.daily import run_daily
+    from test_otodom import make_web
+
+    # nowy portal na domyślnej liście, jeszcze niezatwierdzony: codzienny przebieg go pomija bez błędu
+    monkeypatch.setenv("LMI_SOURCES", "nieruchomosci-online")
+    assert run_daily(pg_conn, tmp_path, client=_FakeClient(make_web())) == 0
+    # wywołany wprost nadal zgłasza brak zatwierdzenia
+    assert run_daily(pg_conn, tmp_path, sources=("nieruchomosci-online",), client=_FakeClient(make_web())) == 2
