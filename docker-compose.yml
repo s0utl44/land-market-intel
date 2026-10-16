@@ -1,6 +1,7 @@
 services:
   db:
     image: postgis/postgis:16-3.4
+    restart: unless-stopped   # po restarcie Dockera/serwera baza wstaje sama
     environment:
       POSTGRES_DB: lmi
       POSTGRES_USER: lmi
@@ -44,6 +45,7 @@ services:
 
   metabase:
     image: metabase/metabase:v0.50.36
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
