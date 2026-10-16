@@ -116,3 +116,13 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
     assert o["price_change"] == -20.0           # 625 000 -> 500 000 z historii Otodom
     assert o["start_date"] == "2013-05-08" and len(o["otodom_history"]) == 5
     assert o["land_use_source"] == "tytuł"
+
+
+def test_overview_reports_failed_attempt(client, pg_conn):
+    pg_conn.execute("""INSERT INTO scrape.runs (source_id, started_at, status, rows_written)
+                       VALUES ('otodom', now() - interval '1 day', 'ok', 4000)""")
+    pg_conn.execute("""INSERT INTO scrape.runs (source_id, started_at, status, message)
+                       VALUES ('otodom', now(), 'blocked', '403 dla ...')""")
+    pg_conn.commit()
+    d = client.get("/api/overview").json()
+    assert d["last_run"]["status"] == "ok" and d["latest_attempt"]["status"] == "blocked"

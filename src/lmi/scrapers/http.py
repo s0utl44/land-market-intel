@@ -24,8 +24,9 @@ class FetchError(Exception):
 
 @dataclass
 class PoliteClient:
-    min_delay: float = 2.0
-    max_delay: float = 4.0
+    # 4–8 s między zapytaniami: 2026-10-16 Otodom zablokował serwer (403) przy 2–4 s
+    min_delay: float = 4.0
+    max_delay: float = 8.0
     retries: int = 3
     timeout: float = 40.0
     user_agent: str = field(default_factory=lambda: os.environ.get("LMI_USER_AGENT", DEFAULT_UA))

@@ -178,3 +178,32 @@ def test_daily_alerts_on_sudden_drop(pg_conn, tmp_path):
     from fixtures_otodom import search_item, search_page
     web.pages = [search_page([search_item(1)], total_pages=1)]  # nagle tylko 1 z 3
     assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=date(2026, 10, 17)) == 5
+
+
+def test_daily_if_needed_skips_after_success_and_errors_are_logged(pg_conn, tmp_path):
+    from datetime import date
+
+    from lmi.daily import run_daily
+    from test_otodom import make_web
+
+    db.add_source(pg_conn, "otodom", "Otodom")
+    db.approve_source(pg_conn, "otodom", "test", "pytest")
+    day = date.today()
+    # ponowna próba po nieudanym ranku: ma się wykonać
+    class Broken:
+        requests_made = 0
+
+        def get(self, url):
+            raise RuntimeError("coś nieprzewidzianego")
+
+    with pytest.raises(RuntimeError):
+        run_daily(pg_conn, tmp_path, client=Broken(), observed_at=day)
+    status, msg = pg_conn.execute("SELECT status, message FROM scrape.runs ORDER BY run_id DESC LIMIT 1").fetchone()
+    assert status == "error" and "nieprzewidzianego" in msg
+    assert run_daily(pg_conn, tmp_path, client=_FakeClient(make_web()), observed_at=day, if_needed=True) == 0
+    n = pg_conn.execute("SELECT count(*) FROM scrape.runs WHERE status = 'ok'").fetchone()[0]
+    assert n == 1
+    # po udanym przebiegu kolejna próba "if needed" nic nie robi
+    web = make_web()
+    assert run_daily(pg_conn, tmp_path, client=_FakeClient(web), observed_at=day, if_needed=True) == 0
+    assert pg_conn.execute("SELECT count(*) FROM scrape.runs").fetchone()[0] == 2

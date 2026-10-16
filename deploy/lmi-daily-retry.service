@@ -1,0 +1,11 @@
+[Unit]
+Description=LMI: ponowna próba pobierania, jeśli poranna się nie udała
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/lmi
+ExecStart=/usr/bin/docker compose run --rm -T app daily --if-needed
+TimeoutStartSec=12h

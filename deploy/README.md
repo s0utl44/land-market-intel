@@ -52,10 +52,13 @@ journalctl -u lmi-daily -f                # podgląd (Ctrl+C nie przerywa pobier
 
 Jeśli przebieg zostanie przerwany, nic nie przepada: pobrane szczegóły są w cache, a następny przebieg zaczyna od brakujących.
 
-## 6. Codziennie o 8:00
+## 6. Codziennie o 8:00 (+ ponowna próba o 14:00)
 
 ```bash
 systemctl enable --now lmi-daily.timer
+# ponowna próba o 14:00, tylko jeśli poranne pobieranie się nie udało (np. chwilowa blokada 403)
+cp deploy/lmi-daily-retry.service deploy/lmi-daily-retry.timer /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now lmi-daily-retry.timer
 systemctl list-timers lmi-daily.timer     # pokazuje następne uruchomienie
 ```
 

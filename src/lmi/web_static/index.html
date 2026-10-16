@@ -63,6 +63,7 @@ button,input,select{font:inherit}
 .notice{display:flex;gap:10px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;color:var(--ink-2);font-size:.9rem}
 .notice b{color:var(--ink)}
 .notice.warn{background:var(--warn-bg);border-color:var(--warn)}
+.notice.bad{background:var(--bad-bg);border-color:var(--bad)}
 
 main{display:flex;flex-direction:column;gap:36px;padding-block:24px 56px}
 section{display:flex;flex-direction:column;gap:12px}
@@ -274,13 +275,23 @@ async function load(){
     $('#rank-body').innerHTML='<tr><td class="l" colspan="11"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
-  renderStatus(); renderSummary(); renderRank();
+  renderStatus(); renderAttempt(); renderSummary(); renderRank();
   api('/api/me').then(m=>{if(m.email){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email)}</span><a href="${m.logout_url}">Wyloguj</a>`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
 }
 
+function renderAttempt(){
+  const a=OV.latest_attempt;
+  if(!a||['ok','warning'].includes(a.status))return;
+  const why={blocked:'Otodom zablokował dostęp z serwera (403). Następna próba odbędzie się automatycznie.',
+    layout_changed:'Otodom zmienił wygląd strony i scraper wymaga poprawki.',
+    error:'Wystąpił błąd: '+(a.message||'nieznany')+'.'}[a.status]||(a.message||a.status);
+  const t=new Date(a.started_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const n=$('#alert');n.hidden=false;n.classList.add('bad');
+  n.innerHTML=`<span aria-hidden="true">⛔</span><div><b>Pobieranie z ${t} nie powiodło się.</b> ${esc(why)} Na stronie są dane z ostatniego udanego pobrania.</div>`;
+}
 function renderStatus(){
   const r=OV.last_run;
   if(!r){$('#status').innerHTML='<span><i class="dot warn"></i>Pierwsze pobieranie danych jeszcze trwa</span><a href="/metabase/">Metabase ↗</a>';return}

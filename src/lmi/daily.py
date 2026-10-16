@@ -56,14 +56,37 @@ def write_csv(rows: list[dict], out_dir: Path, observed_at: date) -> Path:
     return path
 
 
+def already_done_today(conn, today: date) -> bool:
+    row = conn.execute(
+        """SELECT 1 FROM scrape.runs WHERE source_id = %s AND status IN ('ok', 'warning')
+           AND (started_at AT TIME ZONE 'Europe/Warsaw')::date = %s LIMIT 1""",
+        (SOURCE_ID, today),
+    ).fetchone()
+    return row is not None
+
+
 def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = None,
               region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
               client: PoliteClient | None = None, observed_at: date | None = None,
               geo_client: PoliteClient | None = None, history_backfill: int = HISTORY_BACKFILL_PER_RUN,
-              api: OtodomApi | None = None) -> int:
+              api: OtodomApi | None = None, if_needed: bool = False) -> int:
     started = datetime.now(timezone.utc)
     observed_at = observed_at or date.today()
     db.apply_schema(conn)
+    if if_needed and already_done_today(conn, observed_at):
+        print("Dzisiejsze pobieranie już się udało, ponowna próba niepotrzebna.")
+        return 0
+    try:
+        return _run(conn, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
+                    geo_client, history_backfill, api, started)
+    except Exception as exc:  # każdy nieprzewidziany błąd zostaje w dzienniku i na stronie
+        conn.rollback()
+        _log_run(conn, started, "error", message=f"{type(exc).__name__}: {exc}"[:500])
+        raise
+
+
+def _run(conn, out_dir, max_details, region_slug, teryt_prefix, client, observed_at,
+         geo_client, history_backfill, api, started) -> int:
 
     approved = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (SOURCE_ID,)).fetchone()
     if not approved or not approved[0]:

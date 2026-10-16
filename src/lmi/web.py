@@ -55,6 +55,8 @@ def me(request: Request):
 def overview():
     run = _rows("""SELECT finished_at, status, rows_written, message FROM scrape.runs
                    WHERE status IN ('ok', 'warning') ORDER BY run_id DESC LIMIT 1""")
+    attempt = _rows("""SELECT started_at, finished_at, status, message FROM scrape.runs
+                       ORDER BY run_id DESC LIMIT 1""")
     weekly = _rows("""
         SELECT count(DISTINCT week_start) AS weeks,
                max(week_start) AS last_week
@@ -67,7 +69,8 @@ def overview():
         WHERE week_start = (SELECT max(week_start) FROM mart.weekly_region_metrics)""")[0]
     last_day = _rows("SELECT max(observed_at) AS d FROM core.listing_observations")[0]["d"]
     return {
-        "last_run": run[0] if run else None,
+        "last_run": run[0] if run else None,          # ostatni udany przebieg
+        "latest_attempt": attempt[0] if attempt else None,  # ostatnia próba, także nieudana
         "last_observed": last_day,
         "weeks_of_data": weekly["weeks"],
         "last_week": weekly["last_week"],
