@@ -102,6 +102,63 @@ def get_path(obj, path):
     return obj
 
 
+def nuxt_unflatten(data):
+    """Rozpakowuje __NUXT_DATA__ (format devalue: płaska tablica, obiekty wskazują indeksy)."""
+    memo = {}
+    special = {-1: None, -2: None, -3: float("nan"), -4: float("inf"), -5: float("-inf"), -6: 0}
+
+    def h(i, depth=0):
+        if not isinstance(i, int):
+            return i
+        if i < 0:
+            return special.get(i)
+        if i in memo:
+            return memo[i]
+        if depth > 60:
+            return "<głęboko>"
+        v = data[i]
+        if isinstance(v, list):
+            if v and isinstance(v[0], str) and v[0] in (
+                "Reactive", "ShallowReactive", "Ref", "ShallowRef", "EmptyRef", "EmptyShallowRef", "NuxtError"):
+                out = h(v[1], depth + 1) if len(v) > 1 else None
+            elif v and isinstance(v[0], str) and v[0] in ("Date", "BigInt", "RegExp", "null"):
+                out = v[1] if len(v) > 1 else None
+            elif v and isinstance(v[0], str) and v[0] in ("Set", "Map"):
+                out = [h(x, depth + 1) for x in v[1:]]
+            else:
+                out = []
+                memo[i] = out
+                out.extend(h(x, depth + 1) for x in v)
+                return out
+        elif isinstance(v, dict):
+            out = {}
+            memo[i] = out
+            for k, x in v.items():
+                out[k] = h(x, depth + 1)
+            return out
+        else:
+            out = v
+        memo[i] = out
+        return out
+
+    return h(0)
+
+
+def find_keys(obj, pattern, path="$", out=None, limit=25):
+    out = [] if out is None else out
+    if len(out) >= limit:
+        return out
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if re.search(pattern, k, re.I) and isinstance(v, (int, float, str)) and len(str(v)) < 30:
+                out.append((f"{path}.{k}", v if not isinstance(v, str) or re.fullmatch(r"[\d.,-]+", v) else f"<str {len(v)}>"))
+            find_keys(v, pattern, f"{path}.{k}", out, limit)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj[:3]):
+            find_keys(v, pattern, f"{path}[{i}]", out, limit)
+    return out
+
+
 def embedded_json(html):
     """Szuka JSON-ów osadzonych w stronie (Next.js, Nuxt, stan aplikacji, JSON-LD)."""
     found = []
@@ -120,6 +177,8 @@ def embedded_json(html):
             data = json.loads(raw)
             if isinstance(data, str):
                 data = json.loads(data)
+            if name == "json#__NUXT_DATA__" and isinstance(data, list):
+                data = nuxt_unflatten(data)
             out.append((name, data))
         except ValueError:
             out.append((name, None))
@@ -158,11 +217,36 @@ def main():
                 print(json.dumps(schema(first), ensure_ascii=False, indent=1)[:4000])
             elif n == "ld+json":
                 print(f"\n  [{n}] {json.dumps(schema(data), ensure_ascii=False)[:1200]}")
+        for n, data in blobs:
+            if n == "json#__NUXT_DATA__" and data is not None:
+                loc = find_keys(data, r"^(lat|lng|lon|latitude|longitude|teryt|gmina|commune|municipality|county|powiat|district|city|locality|province|region)$")
+                pag = find_keys(data, r"^(page|pages|totalPages|total|totalCount|count|perPage|limit|offset)$", limit=12)
+                print(f"\n  [{n}] współrzędne/lokalizacja: {loc}")
+                print(f"  [{n}] paginacja: {pag}")
         if not any(ad_lists(d) for _, d in blobs if d is not None):
             # brak JSON-a: pokaż, jakie atrybuty data-* / klasy niosą cenę i metraż
             attrs = sorted(set(re.findall(r'(data-[a-z-]*(?:price|area|cena|size|id)[a-z-]*)=', html, re.I)))[:20]
             classes = sorted(set(re.findall(r'class="([^"]*(?:price|cena|area|powierzch|size)[^"]*)"', html, re.I)))[:15]
             print(f"  brak listy ofert w JSON; atrybuty: {attrs}\n  klasy: {classes}")
+        if "--detale" in sys.argv:
+            ids = re.findall(r'href="([^"]*/ob/\d+[^"]*)"', html) or [l for l in links if re.search(r"\d{6,}", l)]
+            p2 = final + ("&" if "?" in final else "?") + "page=2"
+            print(f"\n### {name}: strona 2 ({p2})")
+            s2, h2, _ = fetch(p2)
+            if h2:
+                ids2 = re.findall(r'/ob/(\d+)', h2)
+                ids1 = re.findall(r"/ob/(\d+)", html)
+                print(f"  oferty na stronie 1: {ids1[:4]} | na stronie 2: {ids2[:4]}")
+            if ids:
+                detail = ids[0] if ids[0].startswith("http") else "https://" + final.split("/")[2] + ids[0]
+                print(f"\n### {name}: strona oferty")
+                ds, dh, _ = fetch(detail)
+                if dh:
+                    for n, data in embedded_json(dh):
+                        if data is None:
+                            continue
+                        hits = find_keys(data, r"^(lat|lng|lon|latitude|longitude|teryt|gmina|commune|municipality|county|powiat|city|locality|addressLocality|postalCode|geo|price|area|powierzchnia|typ|type|rodzaj|przeznaczenie|plotType)$")
+                        print(f"  [{n}] {hits}")
         break
     print("\nKONIEC")
 
