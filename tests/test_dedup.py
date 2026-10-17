@@ -51,7 +51,7 @@ def test_price_area_not_used_when_both_have_coords():
     assert groups(links) == [["1"], ["2"]]
 
 
-def test_price_area_requires_close_start_dates():
+def test_price_area_requires_overlapping_activity():
     links = dedup.deduplicate([L("a", "1"), L("b", "2", first=date(2026, 5, 4), last=date(2026, 6, 1))])
     assert groups(links) == [["1"], ["2"]]
 
@@ -108,3 +108,45 @@ def test_quality_is_stable_across_seeds(tmp_path, seed):
     q = dedup.evaluate(dedup.deduplicate(dedup.listings_from_observations(rows)),
                        synthetic.load_ground_truth(paths["ground_truth"]))
     assert q.precision >= 0.90 and q.recall >= 0.80, q
+
+
+def test_portal_added_later_still_matches_long_running_offer():
+    # oferta na Otodomie od marca, Adresowo pobrane pierwszy raz w październiku: widoczne naraz -> ta sama działka
+    old = L("otodom", "1", area=1636, prices=(329_000.0,), lat=51.0, lon=17.0,
+            first=date(2026, 3, 2), last=date(2026, 10, 17))
+    new = L("adresowo", "2", area=1636, prices=(335_000.0,), first=date(2026, 10, 17), last=date(2026, 10, 17))
+    assert groups(dedup.deduplicate([old, new])) == [["1", "2"]]
+
+
+def test_round_area_with_different_price_is_not_enough():
+    # 1000 m² i cena różna o 2%: za mało wspólnego, żeby łączyć
+    assert groups(dedup.deduplicate([L("a", "1", lat=52.0, lon=21.0), L("b", "2", prices=(102_000.0,))])) == [["1"], ["2"]]
+
+
+def test_different_land_use_blocks_attribute_match():
+    a, b = L("a", "1", area=1636, lat=52.0, lon=21.0), L("b", "2", area=1636)
+    a.land_use, b.land_use = "budowlana", "rolna"
+    assert groups(dedup.deduplicate([a, b])) == [["1"], ["2"]]
+
+
+def test_neighbouring_plots_from_one_subdivision_stay_separate():
+    # ten sam portal, widoczne naraz, 40 m od siebie, 1000 i 1020 m², różne ceny: dwie działki
+    plots = [L("a", "1", lat=52.0, lon=21.0, prices=(200_000.0,)),
+             L("a", "2", lat=52.00036, lon=21.0, area=1020, prices=(210_000.0,))]
+    assert groups(dedup.deduplicate(plots)) == [["1"], ["2"]]
+    # ...a ogłoszenie z innego portalu przy obu nie skleja ich pośrednio
+    plots.append(L("b", "3", lat=52.00018, lon=21.0, area=1010, prices=(205_000.0,)))
+    assert all(len(g) <= 2 for g in groups(dedup.deduplicate(plots)))
+
+
+def test_same_portal_double_post_is_merged():
+    a = L("a", "1", lat=52.0, lon=21.0)
+    b = L("a", "2", lat=52.0002, lon=21.0)
+    assert groups(dedup.deduplicate([a, b])) == [["1", "2"]]
+
+
+def test_parcel_conflict_is_not_bridged_transitively():
+    ls = [L("a", "1", parcel="X/1", lat=52.0, lon=21.0), L("b", "2", lat=52.0003, lon=21.0),
+          L("c", "3", parcel="X/2", lat=52.0006, lon=21.0)]
+    assert all(len({l.source_listing_id for l in dedup.deduplicate(ls) if l.property_key == k}) <= 2
+               for k in {l.property_key for l in dedup.deduplicate(ls)})

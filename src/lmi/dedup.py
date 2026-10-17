@@ -3,14 +3,17 @@
 Reguły (od najmocniejszej):
   1. parcel_id   — ten sam znormalizowany identyfikator działki.
   2. location    — odległość <= max_distance_m i różnica powierzchni <= location_area_tol.
-  3. price_area  — tylko gdy któreś ogłoszenie nie ma współrzędnych: ta sama gmina,
-                   pierwsze pojawienie się w odstępie <= price_area_max_start_gap_days,
-                   powierzchnia <= price_area_area_tol i jakakolwiek para cen
-                   <= price_area_price_tol. To słaby sygnał, więc para jest akceptowana
-                   tylko gdy jest jednoznaczna (ogłoszenie bez współrzędnych ma dokładnie
-                   jednego kandydata z danego źródła).
-Dwa ogłoszenia z RÓŻNYMI parcel_id nigdy nie są łączone (konflikt).
-Łączenie jest przechodnie (union-find), więc A~B i B~C daje jedną nieruchomość A,B,C.
+  3. price_area  — "wspólne mianowniki", gdy któreś ogłoszenie nie ma dokładnej pinezki (albo obie
+                   pinezki są do 1 km od siebie — wtedy o punkt więcej): ta sama gmina, oba wystawione w tym samym czasie (okresy
+                   widoczności nachodzą na siebie albo przerwa <= price_area_max_gap_days, np. ponowne
+                   wystawienie), powierzchnia <= price_area_area_tol. Punkty: zgodna powierzchnia 2,
+                   nieokrągła powierzchnia (np. 1636 m²) +1, cena <= 0,5% +2 albo <= 3% +1, ten sam typ
+                   działki +1; łączymy od PRICE_AREA_MIN_SCORE i tylko jednoznacznie (jeden kandydat
+                   z danego portalu). Inny typ działki albo cena różna o > 3% wyklucza.
+Dwa ogłoszenia z RÓŻNYMI parcel_id nigdy nie trafiają do jednej nieruchomości (także pośrednio).
+Ogłoszenia z jednego portalu widoczne w tym samym czasie łączymy tylko, gdy są niemal identyczne
+(metraż <= 1%, cena <= 2%) — inaczej to zwykle sąsiednie działki z jednego podziału.
+Łączenie jest przechodnie (union-find), od najmocniejszych par, z tymi zakazami na poziomie grup.
 """
 from __future__ import annotations
 
@@ -18,11 +21,12 @@ import hashlib
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from itertools import combinations
 from typing import Iterable
 
-ALGORITHM_VERSION = "dedup-v1"
+ALGORITHM_VERSION = "dedup-v2"
+PRICE_AREA_MIN_SCORE = 4
 
 METHOD_CONFIDENCE = {
     "single": 1.00,
@@ -38,8 +42,11 @@ class DedupParams:
     max_distance_m: float = 150.0
     location_area_tol: float = 0.05
     price_area_area_tol: float = 0.005
-    price_area_price_tol: float = 0.005
-    price_area_max_start_gap_days: int = 14
+    price_area_price_tol: float = 0.03
+    price_area_max_gap_days: int = 14
+    price_area_max_distance_m: float = 1000.0
+    same_source_area_tol: float = 0.01
+    same_source_price_tol: float = 0.02
 
     def as_dict(self) -> dict:
         return dict(self.__dict__)
@@ -57,6 +64,7 @@ class Listing:
     parcel_id: str | None = None
     lat: float | None = None
     lon: float | None = None
+    land_use: str | None = None
 
     @property
     def key(self) -> tuple[str, str]:
@@ -120,6 +128,7 @@ def listings_from_observations(rows: Iterable[dict]) -> list[Listing]:
                 parcel_id=normalize_parcel_id(last_non_null("parcel_id")),
                 lat=lat,
                 lon=lon,
+                land_use=last_non_null("land_use") or None,
             )
         )
     return listings
@@ -162,6 +171,41 @@ def _prices_close(a: Listing, b: Listing, tol: float) -> bool:
     return any(_rel_diff(pa, pb) <= tol for pa in a.prices for pb in b.prices)
 
 
+def _price_gap(a: Listing, b: Listing) -> float:
+    return min(_rel_diff(pa, pb) for pa in a.prices for pb in b.prices)
+
+
+def _overlap(a: Listing, b: Listing, gap_days: int = 0) -> bool:
+    """Okresy widoczności nachodzą na siebie (albo przerwa między nimi <= gap_days)."""
+    return a.first_seen <= b.last_seen + timedelta(days=gap_days) and \
+        b.first_seen <= a.last_seen + timedelta(days=gap_days)
+
+
+def _same_source_clash(a: Listing, b: Listing, params: DedupParams) -> bool:
+    """Dwa ogłoszenia z jednego portalu, widoczne naraz i nie bliźniacze: osobne działki (np. z jednego podziału)."""
+    return (a.source_id == b.source_id and _overlap(a, b)
+            and not (_rel_diff(a.area_m2, b.area_m2) <= params.same_source_area_tol
+                     and _price_gap(a, b) <= params.same_source_price_tol))
+
+
+def attribute_score(a: Listing, b: Listing, params: DedupParams) -> int:
+    """Punkty zgodności dla pary bez wspólnej dokładnej pinezki; 0 = wykluczone."""
+    if _rel_diff(a.area_m2, b.area_m2) > params.price_area_area_tol:
+        return 0
+    gap = _price_gap(a, b)
+    if gap > params.price_area_price_tol:
+        return 0
+    if a.land_use and b.land_use and a.land_use != b.land_use:
+        return 0
+    score = 2
+    if round(a.area_m2) % 100 and round(b.area_m2) % 100:
+        score += 1                       # nieokrągły metraż rzadko się powtarza przypadkiem
+    score += 2 if gap <= 0.005 else 1
+    if a.land_use and a.land_use == b.land_use:
+        score += 1
+    return score
+
+
 def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[int, int, str]]:
     """Zwraca pary (i, j, metoda) spełniające którąkolwiek regułę."""
     pairs: list[tuple[int, int, str]] = []
@@ -193,7 +237,7 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
                 if j <= i:
                     continue
                 b = listings[j]
-                if _parcel_conflict(a, b):
+                if _parcel_conflict(a, b) or _same_source_clash(a, b, params):
                     continue
                 if (
                     _rel_diff(a.area_m2, b.area_m2) <= params.location_area_tol
@@ -201,29 +245,34 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
                 ):
                     pairs.append((i, j, "location"))
 
-    # 3. price_area — tylko gdy brakuje współrzędnych po którejś stronie
+    # 3. price_area — wspólne mianowniki, gdy brak dokładnej pinezki po którejś stronie (albo pinezki blisko)
     by_muni: dict[str, list[int]] = defaultdict(list)
     for i, l in enumerate(listings):
         by_muni[l.municipality_teryt].append(i)
-    price_area: set[tuple[int, int]] = set()
+    ok: dict[int, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
     for idx in by_muni.values():
-        for i in (i for i in idx if not listings[i].has_coords):
+        by_area = sorted(idx, key=lambda k: listings[k].area_m2)
+        for pos, i in enumerate(by_area):
             a = listings[i]
-            per_source: dict[str, list[int]] = defaultdict(list)
-            for j in idx:
+            # kandydaci tylko z wąskiego przedziału metrażu (lista posortowana), każda para raz
+            for j in by_area[pos + 1:]:
                 b = listings[j]
-                if j == i or _parcel_conflict(a, b):
+                if b.area_m2 > a.area_m2 * (1 + params.price_area_area_tol) + 0.01:
+                    break
+                if a.has_coords and b.has_coords and \
+                        haversine_m(a.lat, a.lon, b.lat, b.lon) > params.price_area_max_distance_m:
                     continue
-                if (
-                    abs((a.first_seen - b.first_seen).days) <= params.price_area_max_start_gap_days
-                    and _rel_diff(a.area_m2, b.area_m2) <= params.price_area_area_tol
-                    and _prices_close(a, b, params.price_area_price_tol)
-                ):
-                    per_source[b.source_id].append(j)
-            for candidates in per_source.values():
-                if len(candidates) == 1:  # niejednoznaczne dopasowania odrzucamy
-                    j = candidates[0]
-                    price_area.add((min(i, j), max(i, j)))
+                if (_parcel_conflict(a, b) or _same_source_clash(a, b, params)
+                        or not _overlap(a, b, params.price_area_max_gap_days)):
+                    continue
+                # obie dokładne pinezki dalej niż reguła lokalizacji: potrzeba mocniejszej zgodności
+                need = PRICE_AREA_MIN_SCORE + (1 if a.has_coords and b.has_coords else 0)
+                if attribute_score(a, b, params) >= need:
+                    ok[i][b.source_id].append(j)
+                    ok[j][a.source_id].append(i)
+    # tylko pary jednoznaczne z obu stron: jeden kandydat z danego portalu
+    price_area = {(min(i, j), max(i, j)) for i, per_src in ok.items() for src, cands in per_src.items()
+                  if len(cands) == 1 for j in cands if ok[j][listings[i].source_id] == [i]}
     pairs.extend((i, j, "price_area") for i, j in sorted(price_area))
     return pairs
 
@@ -232,9 +281,23 @@ def deduplicate(listings: list[Listing], params: DedupParams | None = None) -> l
     params = params or DedupParams()
     uf = _UnionFind(len(listings))
     best_method: dict[int, str] = {}
+    members: dict[int, list[int]] = {i: [i] for i in range(len(listings))}
 
-    for i, j, method in candidate_pairs(listings, params):
+    def group_conflict(ra: int, rb: int) -> bool:
+        return any(_parcel_conflict(listings[x], listings[y]) or _same_source_clash(listings[x], listings[y], params)
+                   for x in members[ra] for y in members[rb])
+
+    # od najmocniejszych par: słabsze nie mogą skleić grup, które się wykluczają
+    for i, j, method in sorted(candidate_pairs(listings, params), key=lambda p: -_METHOD_RANK[p[2]]):
+        ra, rb = uf.find(i), uf.find(j)
+        if ra == rb:
+            continue
+        if group_conflict(ra, rb):
+            continue
         uf.union(i, j)
+        root = uf.find(i)
+        merged = members.pop(ra) + members.pop(rb)
+        members[root] = merged
         for k in (i, j):
             if _METHOD_RANK[method] > _METHOD_RANK.get(best_method.get(k, ""), 0):
                 best_method[k] = method
@@ -259,6 +322,60 @@ def deduplicate(listings: list[Listing], params: DedupParams | None = None) -> l
                 )
             )
     return links
+
+
+def review(listings: list[Listing], links: list[Link], params: DedupParams | None = None,
+           examples: int = 25) -> dict:
+    """Kontrola jakości po deduplikacji (dla panelu administratora):
+      - suspicious: grupy, w których ceny lub metraże za bardzo się różnią (może złe połączenie),
+      - near_miss: pary z różnych grup, które prawie spełniają regułę (może przeoczony duplikat),
+      - outliers: ogłoszenia z nieprawdopodobną ceną za m² albo metrażem (błąd w ogłoszeniu lub parserze).
+    """
+    params = params or DedupParams()
+    by_key = {l.key: l for l in listings}
+    prop_of = {(k.source_id, k.source_listing_id): k.property_key for k in links}
+    groups_: dict[str, list[Listing]] = defaultdict(list)
+    for k in links:
+        groups_[k.property_key].append(by_key[(k.source_id, k.source_listing_id)])
+    multi = {p: g for p, g in groups_.items() if len(g) > 1}
+    suspicious = []
+    for p, g in multi.items():
+        prices = [min(l.prices) for l in g]
+        areas = [l.area_m2 for l in g]
+        if max(prices) / min(prices) > 1.25 or max(areas) / min(areas) > 1 + params.location_area_tol:
+            suspicious.append({"property": p, "listings": [f"{l.source_id}:{l.source_listing_id}" for l in g],
+                               "prices": sorted(prices), "areas": sorted(areas)})
+    near = []
+    by_muni: dict[str, list[Listing]] = defaultdict(list)
+    for l in listings:
+        by_muni[l.municipality_teryt].append(l)
+    for ls in by_muni.values():
+        ls.sort(key=lambda l: l.area_m2)
+        for pos, a in enumerate(ls):
+            for b in ls[pos + 1:]:
+                if b.area_m2 > a.area_m2 * (1 + params.price_area_area_tol) + 0.01:
+                    break
+                if prop_of[a.key] == prop_of[b.key] or a.source_id == b.source_id or not _overlap(a, b, 14):
+                    continue
+                if attribute_score(a, b, params) == PRICE_AREA_MIN_SCORE - 1:
+                    near.append({"a": f"{a.source_id}:{a.source_listing_id}", "b": f"{b.source_id}:{b.source_listing_id}",
+                                 "area": a.area_m2, "prices": [min(a.prices), min(b.prices)]})
+    outliers = []
+    for l in listings:
+        ppm2 = min(l.prices) / l.area_m2
+        if ppm2 < 2 or ppm2 > 4000 or l.area_m2 < 100 or l.area_m2 > 2_000_000:
+            outliers.append({"listing": f"{l.source_id}:{l.source_listing_id}", "area": l.area_m2,
+                             "price": min(l.prices), "ppm2": round(ppm2, 1)})
+    methods: dict[str, int] = defaultdict(int)
+    for k in links:
+        methods[k.match_method] += 1
+    return {
+        "listings": len(listings), "properties": len(groups_), "multi_listing_properties": len(multi),
+        "methods": dict(methods),
+        "suspicious": len(suspicious), "suspicious_examples": suspicious[:examples],
+        "near_miss": len(near), "near_miss_examples": near[:examples],
+        "outliers": len(outliers), "outlier_examples": outliers[:examples],
+    }
 
 
 @dataclass(frozen=True)

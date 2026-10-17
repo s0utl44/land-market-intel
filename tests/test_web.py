@@ -298,3 +298,14 @@ def test_merge_features_across_portals():
     ])
     assert f["seller"] == "biuro" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True
     assert f["updated_at"] == "2026-10-05" and set(f["params"]) == {"otodom", "gratka"}
+
+
+def test_changes(client):
+    d = client.get("/api/changes", params={"days": 7}).json()
+    assert d["last_day"] == "2026-06-29" and d["daily"] and d["weekly"]
+    day = d["daily"][-1]
+    assert day["active"] > 100 and day["new"] >= 0 and day["gone"] >= 0
+    assert sum(w["new"] for w in d["weekly"]) > 0 and sum(w["gone"] for w in d["weekly"]) > 0
+    assert all(c["change"] < 0 for c in d["cuts"])
+    assert all("vs_median" in f for f in d["fresh"]) and isinstance(d["gminy"], list)
+    assert client.get("/api/changes", params={"days": 99}).status_code == 422

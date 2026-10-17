@@ -6,6 +6,7 @@ Dostęp chroni Traefik (hasło na wejściu), aplikacja sama nie ma logowania.
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import psycopg
@@ -126,6 +127,144 @@ def ranking():
             GROUP BY gmina_teryt
         ) t ON t.gmina_teryt = municipality_teryt
         ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""", PPM2_RANGE)
+
+
+# --- co się zmieniło: województwo dzień po dniu i tydzień po tygodniu -------------------------------
+
+CHANGES_BASE = """
+    WITH links AS (
+        SELECT source_id, source_listing_id, property_key FROM core.listing_property_links
+        WHERE run_id = (SELECT max(run_id) FROM core.dedup_runs)
+    ),
+    src_start AS (SELECT source_id, min(observed_at) AS s FROM core.listing_observations GROUP BY 1),
+    src_days AS (SELECT DISTINCT source_id, observed_at FROM core.listing_observations),
+    lst AS (
+        SELECT o.source_id, l.property_key, min(o.observed_at) AS fs, max(o.observed_at) AS ls
+        FROM core.listing_observations o JOIN links l USING (source_id, source_listing_id)
+        GROUP BY 1, 2
+    ),
+    p0 AS (SELECT property_key, min(fs) AS fs, max(ls) AS ls FROM lst GROUP BY 1),
+    prop AS (
+        SELECT p0.property_key, p0.fs, p0.ls,
+               -- nowa naprawdę, a nie pierwsze pobranie świeżo dodanego portalu
+               bool_and(lst.fs > ss.s) FILTER (WHERE lst.fs = p0.fs) AS genuine_new,
+               -- zniknęła: żaden z jej portali jej już nie pokazał, choć pobierały się później
+               bool_or(EXISTS (SELECT 1 FROM src_days d WHERE d.source_id = lst.source_id AND d.observed_at > p0.ls))
+                   AS gone_known
+        FROM p0 JOIN lst USING (property_key) JOIN src_start ss USING (source_id)
+        GROUP BY 1, 2, 3
+    ),
+    pday AS (
+        SELECT l.property_key, o.observed_at AS d, min(o.price_pln) AS price, max(o.area_m2) AS area,
+               (array_agg(o.municipality_teryt))[1] AS teryt, (array_agg(o.municipality_name))[1] AS gmina,
+               (array_agg(o.url ORDER BY o.source_id))[1] AS url
+        FROM core.listing_observations o JOIN links l USING (source_id, source_listing_id)
+        GROUP BY 1, 2
+    ),
+    pchg AS (
+        SELECT *, lag(price) OVER (PARTITION BY property_key ORDER BY d) AS prev_price FROM pday
+    )
+"""
+
+
+_CHANGES_CACHE: dict = {}
+
+
+@app.get("/api/changes")
+def changes(days: int = Query(7, ge=1, le=31)):
+    """Serie dzienne (ostatnie 60 dni) i tygodniowe oraz najważniejsze zmiany z ostatnich `days` dni.
+
+    Liczone raz na stan danych (ostatni dzień obserwacji + ostatnia deduplikacja + RCN), potem z pamięci."""
+    state = _rows("""SELECT (SELECT max(observed_at) FROM core.listing_observations) AS d,
+                            (SELECT max(run_id) FROM core.dedup_runs) AS run,
+                            (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS rcn""")[0]
+    key = (days, state["d"], state["run"], state["rcn"])
+    if key not in _CHANGES_CACHE:
+        if len(_CHANGES_CACHE) > 20:
+            _CHANGES_CACHE.clear()
+        _CHANGES_CACHE[key] = _changes(days)
+    return _CHANGES_CACHE[key]
+
+
+def _changes(days: int) -> dict:
+    with _conn() as conn:
+        last = conn.execute("SELECT max(observed_at) AS d FROM core.listing_observations").fetchone()["d"]
+        if last is None:
+            return {"last_day": None, "daily": [], "weekly": [], "cuts": [], "fresh": [], "gone_fast": [],
+                    "gminy": [], "rcn": []}
+        params = {"last": last, "since": last - timedelta(days=days - 1)}
+        # jedno przejście zamiast zapytania na każdy dzień: liczniki per dzień, składane niżej
+        rows = conn.execute(CHANGES_BASE + """
+            SELECT 'active' AS k, d, count(*)::float AS v FROM pday WHERE d > %(last)s::date - 61 GROUP BY d
+            UNION ALL SELECT 'ppm2', d, percentile_cont(0.5) WITHIN GROUP (ORDER BY price / area)
+                      FROM pday WHERE d > %(last)s::date - 61 AND area > 0 GROUP BY d
+            UNION ALL SELECT 'new', fs, count(*) FROM prop WHERE genuine_new AND fs > %(last)s::date - 61 GROUP BY fs
+            UNION ALL SELECT 'gone_after', ls, count(*) FROM prop WHERE gone_known AND ls > %(last)s::date - 62
+                      GROUP BY ls
+            UNION ALL SELECT 'cuts', d, count(*) FROM pchg WHERE d > %(last)s::date - 61
+                      AND price < prev_price * 0.995 GROUP BY d""", params).fetchall()
+        by: dict = {}
+        for r in rows:
+            by.setdefault(r["k"], {})[r["d"]] = r["v"]
+        day_list = sorted(by.get("active", {}))
+        daily = []
+        for i, d in enumerate(day_list):
+            prev = day_list[i - 1] if i else None
+            daily.append({"d": d, "active": int(by["active"][d]), "new": int(by.get("new", {}).get(d, 0)),
+                          # zniknięcie liczymy w dniu, w którym oferty już nie było
+                          "gone": int(by.get("gone_after", {}).get(prev, 0)) if prev else 0,
+                          "cuts": int(by.get("cuts", {}).get(d, 0)), "ppm2": by.get("ppm2", {}).get(d)})
+        cuts = conn.execute(CHANGES_BASE + """
+            SELECT c.property_key AS id, c.gmina, c.teryt, c.price, c.area, round(c.price / c.area, 1) AS ppm2,
+                   c.url, max(c.prev_price) AS before, round((c.price / max(c.prev_price) - 1) * 100, 1) AS change
+            FROM pchg c WHERE c.d >= %(since)s AND c.price < c.prev_price * 0.995
+              AND c.property_key IN (SELECT property_key FROM pday WHERE d = %(last)s)
+            GROUP BY 1, 2, 3, 4, 5, 7 ORDER BY change ASC LIMIT 8""", params).fetchall()
+        fresh = conn.execute(CHANGES_BASE + """,
+            med AS (SELECT teryt, percentile_cont(0.5) WITHIN GROUP (ORDER BY price / area) AS m
+                    FROM pday WHERE d = %(last)s GROUP BY 1 HAVING count(*) >= 5)
+            SELECT pd.property_key AS id, pd.gmina, pd.teryt, pd.price, pd.area, round(pd.price / pd.area, 1) AS ppm2,
+                   pd.url, round(((pd.price / pd.area / med.m::numeric - 1) * 100)::numeric, 0) AS vs_median
+            FROM prop JOIN pday pd ON pd.property_key = prop.property_key AND pd.d = %(last)s
+            JOIN med ON med.teryt = pd.teryt
+            WHERE prop.genuine_new AND prop.fs >= %(since)s
+            ORDER BY pd.price / pd.area / med.m ASC LIMIT 8""", params).fetchall()
+        gone_fast = conn.execute(CHANGES_BASE + """
+            SELECT pd.property_key AS id, pd.gmina, pd.teryt, pd.price, pd.area, round(pd.price / pd.area, 1) AS ppm2,
+                   pd.url, prop.ls - prop.fs AS days_listed
+            FROM prop JOIN pday pd ON pd.property_key = prop.property_key AND pd.d = prop.ls
+            WHERE prop.gone_known AND prop.ls >= %(since)s::date - 1 AND prop.ls < %(last)s AND prop.genuine_new
+            ORDER BY prop.ls - prop.fs ASC, pd.price / pd.area ASC LIMIT 8""", params).fetchall()
+        gminy = conn.execute(CHANGES_BASE + """
+            SELECT pd.teryt, max(pd.gmina) AS gmina,
+                   count(DISTINCT pd.property_key) FILTER (WHERE prop.genuine_new AND prop.fs >= %(since)s) AS new,
+                   count(DISTINCT pd.property_key) FILTER (WHERE prop.gone_known AND prop.ls < %(last)s
+                                                          AND prop.ls >= %(since)s::date - 1 AND pd.d = prop.ls) AS gone,
+                   count(DISTINCT pd.property_key) FILTER (WHERE pd.d >= %(since)s AND pd.price < pd.prev_price * 0.995)
+                       AS cuts,
+                   count(DISTINCT pd.property_key) FILTER (WHERE pd.d = %(last)s) AS active
+            FROM pchg pd JOIN prop USING (property_key)
+            GROUP BY pd.teryt
+            HAVING count(DISTINCT pd.property_key) FILTER (WHERE prop.genuine_new AND prop.fs >= %(since)s)
+                 + count(DISTINCT pd.property_key) FILTER (WHERE pd.d >= %(since)s AND pd.price < pd.prev_price * 0.995)
+                 > 0
+            ORDER BY 3 + 4 + 5 DESC LIMIT 10""", params).fetchall()
+        rcn = conn.execute("""
+            SELECT date_trunc('month', doc_date)::date AS month, count(*) AS tx,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) AS ppm2
+            FROM mart.rcn_land_transactions
+            WHERE buildable AND ppm2 BETWEEN %(lo)s AND %(hi)s AND doc_date >= DATE '2024-01-01'
+            GROUP BY 1 ORDER BY 1""", PPM2_RANGE).fetchall()
+    weekly: dict = {}
+    for r in daily:
+        wk = r["d"] - timedelta(days=r["d"].weekday())
+        w = weekly.setdefault(wk, {"week": wk, "new": 0, "gone": 0, "cuts": 0, "active": 0, "ppm2": None})
+        w["new"] += r["new"]
+        w["gone"] += r["gone"]
+        w["cuts"] += r["cuts"]
+        w["active"], w["ppm2"] = r["active"], r["ppm2"]   # stan na ostatni dzień tygodnia
+    return {"last_day": last, "since": params["since"], "daily": daily, "weekly": list(weekly.values()),
+            "cuts": cuts, "fresh": fresh, "gone_fast": gone_fast, "gminy": gminy, "rcn": rcn}
 
 
 # zł/m² poza tym zakresem to zwykle drogi, udziały albo błędy w rejestrze
@@ -460,7 +599,19 @@ def admin_status(request: Request):
     if feedback_open:
         issues.append({"level": "info", "title": f"Nowe zgłoszenia od zespołu: {feedback_open}",
                        "detail": "przycisk „Zgłoszenia”", "when": None})
-    return {"issues": issues, "jobs": jobs, "sources": sources, "runs": runs, "rcn": rcn,
+    quality = _rows("""SELECT run_id, created_at AS run_at, algorithm_version, report FROM core.dedup_runs
+                       ORDER BY run_id DESC LIMIT 1""")
+    quality = quality[0] if quality else None
+    rep = (quality or {}).get("report") or {}
+    if rep.get("suspicious"):
+        issues.append({"level": "info", "title": f"Deduplikacja: {rep['suspicious']} grup do sprawdzenia",
+                       "detail": "połączone ogłoszenia z dużą różnicą ceny lub metrażu (sekcja Jakość danych)",
+                       "when": quality["run_at"]})
+    if rep.get("outliers"):
+        issues.append({"level": "info", "title": f"Nieprawdopodobne ceny/metraże: {rep['outliers']} ogłoszeń",
+                       "detail": "np. cena za m² poniżej 2 zł albo metraż poniżej 100 m² (sekcja Jakość danych)",
+                       "when": quality["run_at"]})
+    return {"issues": issues, "jobs": jobs, "sources": sources, "runs": runs, "rcn": rcn, "quality": quality,
             "problems": sum(1 for i in issues if i["level"] in ("bad", "warn"))}
 
 

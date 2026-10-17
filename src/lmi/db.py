@@ -138,7 +138,7 @@ def import_csv(conn, source_id: str, path: str | Path, allow_partial: bool = Fal
 
 
 OBS_COLUMNS = ("source_id", "source_listing_id", "observed_at", "municipality_teryt",
-               "municipality_name", "parcel_id", "lat", "lon", "area_m2", "price_pln", "listed_at")
+               "municipality_name", "parcel_id", "lat", "lon", "area_m2", "price_pln", "listed_at", "land_use")
 
 
 def load_observations(conn) -> pd.DataFrame:
@@ -153,11 +153,13 @@ def run_dedup(conn, params: dedup.DedupParams | None = None) -> tuple[int, list[
     params = params or dedup.DedupParams()
     obs = load_observations(conn)
     records = obs.astype(object).where(obs.notna(), None).to_dict("records")
-    links = dedup.deduplicate(dedup.listings_from_observations(records), params)
+    listings = dedup.listings_from_observations(records)
+    links = dedup.deduplicate(listings, params)
+    report = dedup.review(listings, links, params)
     with _committed(conn):
         run_id = conn.execute(
-            "INSERT INTO core.dedup_runs (algorithm_version, params) VALUES (%s, %s) RETURNING run_id",
-            (dedup.ALGORITHM_VERSION, json.dumps(params.as_dict())),
+            "INSERT INTO core.dedup_runs (algorithm_version, params, report) VALUES (%s, %s, %s) RETURNING run_id",
+            (dedup.ALGORITHM_VERSION, json.dumps(params.as_dict()), json.dumps(report)),
         ).fetchone()[0]
         with conn.cursor() as cur:
             cur.executemany(
