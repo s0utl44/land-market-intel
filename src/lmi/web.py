@@ -46,18 +46,16 @@ def healthz():
 TEAM_USER = "zespół"  # przy wspólnym haśle (bez logowania Google) wszyscy są jednym użytkownikiem
 
 
-def _email(request: Request) -> str | None:
-    """Nagłówek ustawia Traefik z odpowiedzi oauth2-proxy (logowanie Google); przy bramce z hasłem go nie ma."""
-    return request.headers.get("x-auth-request-email") or request.headers.get("x-auth-request-user")
-
-
 def _user(request: Request) -> str:
-    return (_email(request) or TEAM_USER).strip().lower()
+    """Kto korzysta ze strony. Nagłówki ustawia Traefik: X-Auth-Request-Email z logowania Google
+    (oauth2-proxy), X-Auth-Request-User z bramki z hasłem (login osoby). Bez nich: wspólny „zespół”."""
+    who = request.headers.get("x-auth-request-email") or request.headers.get("x-auth-request-user")
+    return (who or TEAM_USER).strip().lower()
 
 
 @app.get("/api/me")
 def me(request: Request):
-    email = _email(request)
+    email = request.headers.get("x-auth-request-email")
     return {"email": email, "user": _user(request), "logout_url": "/oauth2/sign_out?rd=%2F" if email else None}
 
 

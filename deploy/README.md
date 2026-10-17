@@ -131,7 +131,7 @@ docker compose run --rm --entrypoint python -e MB_URL=http://metabase:3000 \
 
 ### Logowanie kontem Google (zamiast hasła w okienku)
 
-Wpuszcza tylko konta z domeny firmy (`wrenieruchomosci.pl`, zmiana: `LMI_EMAIL_DOMAIN` w `.env`).
+Wpuszcza tylko konta z domeny firmowej poczty DoneHome: ustaw ją w `.env` jako `LMI_EMAIL_DOMAIN=...` (bez @).
 Konfiguracja: `docker-compose.google.yml`, polskie ekrany logowania: `deploy/oauth2/templates/`.
 
 **1. Google Cloud (jednorazowo, ok. 10 minut)**, zalogowany kontem administratora Google Workspace firmy:
@@ -147,8 +147,9 @@ Konfiguracja: `docker-compose.google.yml`, polskie ekrany logowania: `deploy/oau
 
 ```bash
 cd /opt/lmi && git pull && docker compose build web
+read -p "Domena firmowej poczty (bez @): " DOM && \
 read -p "Identyfikator klienta: " CID && read -s -p "Tajny klucz klienta: " CS && echo && \
-printf "GOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\nOAUTH2_COOKIE_SECRET=%s\n" "$CID" "$CS" "$(openssl rand -base64 32 | tr -- '+/' '-_')" >> .env
+printf "LMI_EMAIL_DOMAIN=%s\nGOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\nOAUTH2_COOKIE_SECRET=%s\n" "$DOM" "$CID" "$CS" "$(openssl rand -base64 32 | tr -- '+/' '-_')" >> .env
 sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml:docker-compose.google.yml|' .env
 docker compose up -d web metabase oauth2-proxy
 ```
@@ -161,7 +162,8 @@ Metabase (`/metabase`) ma dodatkowo własne konto, niezależne od logowania Goog
 
 ### Dostęp dla kolejnej osoby z zespołu (tryb hasła w okienku)
 
-Każda osoba ma własny login do bramki. Dodanie osoby (pyta o login i dwa razy o hasło):
+Każda osoba ma własny login do bramki. Login trafia do strony, więc ulubione i podpis pod komentarzami
+są przypisane do osoby także bez logowania Google. Dodanie osoby (pyta o login i dwa razy o hasło):
 
 ```bash
 cd /opt/lmi

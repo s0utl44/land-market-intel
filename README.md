@@ -36,7 +36,7 @@ Na serwerze uruchamia się codziennie o 8:00. Wdrożenie: [deploy/README.md](dep
 ## Strona Radar Działek
 
 `src/lmi/web.py` (FastAPI) i `src/lmi/web_static/index.html`: ranking gmin, wykresy gminy na tle
-mediany województwa i lista aktywnych ofert z filtrami i linkami do ogłoszeń. Barwy WRE Nieruchomości.
+mediany województwa i lista aktywnych ofert z filtrami i linkami do ogłoszeń. Identyfikacja wizualna DoneHome (granat, złoto, Manrope).
 Lokalnie: `uvicorn lmi.web:app --port 8080`. Na serwerze działa pod domeną za hasłem (deploy/README.md, punkt 7).
 
 ## Praca z własnymi plikami CSV

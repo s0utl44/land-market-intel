@@ -15,6 +15,8 @@ services:
       - traefik.http.routers.lmi.service=lmi-web
       - traefik.http.services.lmi-web.loadbalancer.server.port=8080
       - traefik.http.middlewares.lmi-auth.basicauth.users=${LMI_BASIC_AUTH:?ustaw LMI_BASIC_AUTH w .env}
+      # login z bramki trafia do aplikacji (ulubione i komentarze na osobę); Traefik nadpisuje ten nagłówek
+      - traefik.http.middlewares.lmi-auth.basicauth.headerField=X-Auth-Request-User
       - traefik.http.middlewares.lmi-headers.headers.stsSeconds=31536000
       - traefik.http.middlewares.lmi-headers.headers.frameDeny=true
       - traefik.http.middlewares.lmi-headers.headers.contentTypeNosniff=true
