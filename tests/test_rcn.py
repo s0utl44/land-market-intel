@@ -221,3 +221,25 @@ def test_duplicate_records_in_service_are_not_a_gap(no_sleep):
              ("2025-01-05", "0223", feature("T2", "022302_2.0001.2", day="2025-01-05", gid=3))]
     rows, matched, gaps = rcn.fetch_period(CappedService(feats, cap=10).get, "02", date(2025, 1, 5), date(2025, 1, 6))
     assert matched == 3 and len(rows) == 2 and gaps == [] and no_sleep == []
+
+
+@pytest.mark.integration
+def test_undated_query_rejected_by_service_is_noted_not_fatal(pg_conn):
+    import urllib.error
+
+    from lmi import db
+
+    db.apply_schema(pg_conn)
+    pg_conn.execute("DELETE FROM scrape.rcn_fetch_log")
+    feats = [("2025-01-05", "0223", feature("T1", "022302_2.0001.1", day="2025-01-05", gid=1))]
+    svc = CappedService(feats, cap=10)
+
+    def get(url):
+        if "PropertyIsNull" in urllib.parse.unquote(url):
+            raise urllib.error.HTTPError(url, 403, "Server processing failed", {}, None)
+        return svc.get(url)
+
+    assert rcn.refresh(pg_conn, get, today=date(2025, 1, 20), since=date(2025, 1, 1)) == 1
+    noted = pg_conn.execute("SELECT gaps FROM scrape.rcn_fetch_log WHERE period_start IS NULL").fetchone()[0]
+    assert noted.startswith("akty bez daty")
+    assert rcn.repair(pg_conn, get) == (0, 1)        # takiej uwagi naprawa nie ponawia w kółko

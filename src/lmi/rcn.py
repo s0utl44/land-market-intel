@@ -15,11 +15,12 @@ from __future__ import annotations
 import logging
 import re
 import time
+import urllib.error
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta
 
-from .scrapers.http import PoliteClient
+from .scrapers.http import Blocked, FetchError, PoliteClient
 
 log = logging.getLogger(__name__)
 
@@ -292,7 +293,15 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
     total = 0
     periods = list(months(since, today + timedelta(days=1))) + [(None, None)]  # + akty bez daty
     for a, b in periods:
-        rows, matched, gaps = fetch_period(get, teryt_prefix, a, b)
+        try:
+            rows, matched, gaps = fetch_period(get, teryt_prefix, a, b)
+        except (urllib.error.HTTPError, Blocked, FetchError) as exc:
+            if a is not None:
+                raise
+            # geoportal odrzuca zapytanie o akty bez daty (403 "Server processing failed"): to błąd serwera
+            # przy tym jednym filtrze, nie blokada — miesiące są już zapisane, więc tylko odnotowujemy
+            log.warning("rcn: akty bez daty niedostępne: %s", exc)
+            rows, matched, gaps = [], 0, [f"akty bez daty: usługa odrzuca zapytanie ({str(exc)[:80]})"]
         with conn.cursor() as cur:
             cur.executemany(UPSERT, rows)
             cur.execute("""INSERT INTO scrape.rcn_fetch_log (teryt_prefix, period_start, period_end, matched, saved, gaps)
