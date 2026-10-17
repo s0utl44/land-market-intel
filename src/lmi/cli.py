@@ -153,6 +153,9 @@ def main(argv: list[str] | None = None) -> int:
                                     "WHERE gmina_teryt LIKE %s", (args.teryt_prefix + "%",)).fetchone()
                 print(f"RCN: zapisano {n} rekordów działek; transakcji samym gruntem w bazie: {land[0]} "
                       f"(ostatni akt: {land[1]})")
+                for (g,) in conn.execute("SELECT gaps FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL "
+                                         "AND fetched_at > now() - interval '1 day' ORDER BY fetched_at"):
+                    print("  luka w usłudze geoportalu:", g)
             elif args.cmd == "rcn-coverage":
                 from datetime import date as _date
 

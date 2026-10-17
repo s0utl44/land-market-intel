@@ -69,8 +69,8 @@ def test_capped_service_is_split_until_complete():
     feats = [(f"2025-01-{d:02d}", "0223", feature(f"T{d}{i}", f"022302_2.0001.{d}{i}", day=f"2025-01-{d:02d}", gid=d * 10 + i))
              for d in range(1, 29) for i in range(3)]
     svc = CappedService(feats, cap=4)
-    rows, matched = rcn.fetch_period(svc.get, "02", date(2025, 1, 1), date(2025, 2, 1))
-    assert matched == 84 and len(rows) == 84 and len({r[0] for r in rows}) == 84
+    rows, matched, gaps = rcn.fetch_period(svc.get, "02", date(2025, 1, 1), date(2025, 2, 1))
+    assert matched == 84 and len(rows) == 84 and len({r[0] for r in rows}) == 84 and gaps == []
 
 
 def test_record_on_split_boundary_counted_twice_is_ok():
@@ -85,15 +85,15 @@ def test_record_on_split_boundary_counted_twice_is_ok():
                 body = body.replace("</wfs:FeatureCollection>", extra + "</wfs:FeatureCollection>")
             return body
 
-    rows, matched = rcn.fetch_period(Overlapping(feats, cap=4).get, "02", date(2025, 1, 1), date(2025, 2, 1))
-    assert matched == 84 and len(rows) > 84 and len({(r[0], r[1]) for r in rows}) == 84
+    rows, matched, gaps = rcn.fetch_period(Overlapping(feats, cap=4).get, "02", date(2025, 1, 1), date(2025, 2, 1))
+    assert matched == 84 and len(rows) == 84 and gaps == []          # powtórzenia usunięte przed zapisem
 
 
-def test_incomplete_download_is_refused():
-    # jeden dzień i jeden powiat ponad limit: dalej dzielić się nie da
+def test_service_gap_on_single_day_is_recorded_not_fatal():
+    # jeden dzień i jeden powiat ponad to, co usługa oddaje: luka zapisana, reszta pobrana
     feats = [("2025-01-05", "0223", feature(f"T{i}", f"022302_2.0001.{i}", day="2025-01-05", gid=i)) for i in range(6)]
-    with pytest.raises(rcn.Incomplete):
-        rcn.fetch_period(CappedService(feats, cap=4).get, "02", date(2025, 1, 5), date(2025, 1, 6))
+    rows, matched, gaps = rcn.fetch_period(CappedService(feats, cap=4).get, "02", date(2025, 1, 5), date(2025, 1, 6))
+    assert matched == 6 and len(rows) == 4 and gaps == ["0223 2025-01-05–2025-01-06: brak 2 z 6"]
 
 
 def test_service_error_is_raised():

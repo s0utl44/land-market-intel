@@ -54,13 +54,15 @@ def _filter(teryt_prefix: str, since: date | None, until: date | None) -> str:
     return f'<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:And>{teryt}{when}</fes:And></fes:Filter>'
 
 
-def page_url(teryt_prefix: str, since: date | None, until: date | None, start: int, count: int = PAGE) -> str:
-    return WFS + "?" + urllib.parse.urlencode({
-        "SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature", "TYPENAMES": LAYER,
-        "PROPERTYNAME": ",".join(FIELDS),           # bez geometrii: kilka razy mniejsze odpowiedzi
-        "FILTER": _filter(teryt_prefix, since, until),
-        "SORTBY": "gid", "COUNT": str(count), "STARTINDEX": str(start),
-    })
+def page_url(teryt_prefix: str, since: date | None, until: date | None, start: int, count: int = PAGE,
+             plain: bool = False) -> str:
+    """plain=True: bez wyboru pól i sortowania (zapytanie awaryjne, gdy zwykłe pomija rekordy)."""
+    params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature", "TYPENAMES": LAYER,
+              "FILTER": _filter(teryt_prefix, since, until), "COUNT": str(count), "STARTINDEX": str(start)}
+    if not plain:
+        params["PROPERTYNAME"] = ",".join(FIELDS)   # bez geometrii: kilka razy mniejsze odpowiedzi
+        params["SORTBY"] = "gid"
+    return WFS + "?" + urllib.parse.urlencode(params)
 
 
 def hits_url(teryt_prefix: str, since: date | None, until: date | None) -> str:
@@ -181,11 +183,12 @@ def _powiaty(prefix: str) -> list[str]:
     return POWIATY_02 if prefix == "02" else [f"{prefix}{n:02d}" for n in list(range(1, 41)) + list(range(61, 66))]
 
 
-def _pages(get, prefix: str, since: date | None, until: date | None, matched: int) -> list[dict]:
+def _pages(get, prefix: str, since: date | None, until: date | None, matched: int,
+           plain: bool = False) -> list[dict]:
     recs: list[dict] = []
     start = 0
     while len(recs) < matched:
-        page = parse_features(get(page_url(prefix, since, until, start)))
+        page = parse_features(get(page_url(prefix, since, until, start, plain=plain)))
         if not page:
             break
         recs.extend(page)
@@ -193,16 +196,34 @@ def _pages(get, prefix: str, since: date | None, until: date | None, matched: in
     return recs
 
 
-def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[list[dict], int]:
-    """Rekordy okresu; gdy usługa przestaje oddawać kolejne strony (zdarza się przy dużych wynikach),
-    dzieli zapytanie: najpierw okres na połowy (do pojedynczego dnia), potem województwo na powiaty.
-    Suma części musi się zgadzać z liczbą zadeklarowaną dla całości."""
+def _key(rec: dict) -> tuple:
+    return (rec.get("TRAN_LOKALNY_ID_IIP"), rec.get("DZI_ID_DZIALKI"), rec.get("NIER_RODZAJ") or "",
+            rec.get("NIER_UDZIAL") or "")
+
+
+def _unique(recs: list[dict]) -> list[dict]:
+    seen, out = set(), []
+    for r in recs:
+        k = _key(r)
+        if k not in seen:
+            seen.add(k)
+            out.append(r)
+    return out
+
+
+def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[list[dict], int, list[str]]:
+    """Rekordy okresu (bez powtórzeń) + liczba zadeklarowana przez usługę + luki.
+
+    Gdy usługa przestaje oddawać kolejne strony, zapytanie jest dzielone: okres na połowy (do jednego dnia),
+    potem województwo na powiaty. Gdy nawet jeden dzień w jednym powiecie nie daje wszystkich rekordów,
+    próbujemy zapytania bez wyboru pól i sortowania; jeśli i to nie pomoże, to błąd samej usługi —
+    zapisujemy lukę (widoczną w dzienniku i raporcie) i jedziemy dalej, zamiast blokować cały import."""
     matched = parse_hits(get(hits_url(prefix, since, until)))
     if matched == 0:
-        return [], 0
-    recs = _pages(get, prefix, since, until, matched)
+        return [], 0, []
+    recs = _unique(_pages(get, prefix, since, until, matched))
     if len(recs) >= matched:
-        return recs, matched
+        return recs, matched, []
     log.info("rcn: %s %s–%s: usługa oddała %d z %d, dzielę zapytanie", prefix, since, until, len(recs), matched)
     if since is not None and until is not None and (until - since).days > 1:
         mid = since + (until - since) // 2
@@ -210,26 +231,31 @@ def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[li
     elif len(prefix) == 2:
         parts = [_fetch(get, pw, since, until) for pw in _powiaty(prefix)]
     else:
-        raise Incomplete(f"{prefix} {since}–{until}: pobrano {len(recs)} z {matched} rekordów")
-    got = [r for part, _ in parts for r in part]
-    declared = sum(n for _, n in parts)
-    # błąd tylko przy braku; nadmiar bywa (akt z datą na granicy części liczony w obu) i znika przy zapisie,
-    # bo klucz rekordu (transakcja, działka, rodzaj, udział) jest unikalny
-    if declared < matched or len(got) < matched:
+        plain = _unique(_pages(get, prefix, since, until, matched, plain=True))
+        best = plain if len(plain) > len(recs) else recs
+        if len(best) >= matched:
+            return best, matched, []
+        gap = f"{prefix} {since or 'bez daty'}–{until or ''}: brak {matched - len(best)} z {matched}"
+        log.warning("rcn: luka w usłudze: %s", gap)
+        return best, matched, [gap]
+    got = _unique([r for part, _, _ in parts for r in part])
+    gaps = [g for _, _, gs in parts for g in gs]
+    # nadmiar bywa (akt z dnia granicy liczony w obu częściach) i znika przy usuwaniu powtórzeń;
+    # brak jest dopuszczalny tylko wtedy, gdy wynika z zapisanych luk usługi
+    if len(got) < matched and not gaps:
         raise Incomplete(f"{prefix} {since}–{until}: części dały {len(got)} rekordów, usługa deklaruje {matched}")
-    if len(got) > matched:
-        log.info("rcn: %s %s–%s: %d rekordów ponad deklarowane %d (podwójne na granicy części)",
-                 prefix, since, until, len(got) - matched, matched)
-    return got, matched
+    return got, matched, gaps
 
 
-def fetch_period(get, teryt_prefix: str, since: date | None, until: date | None) -> tuple[list[tuple], int]:
-    """Wszystkie rekordy okresu z kontrolą kompletności. Zwraca (wiersze, liczba zadeklarowana przez usługę)."""
-    recs_all, matched = _fetch(get, teryt_prefix, since, until)
+def fetch_period(get, teryt_prefix: str, since: date | None,
+                 until: date | None) -> tuple[list[tuple], int, list[str]]:
+    """Wszystkie rekordy okresu z kontrolą kompletności. Zwraca (wiersze, liczba w usłudze, luki usługi)."""
+    recs_all, matched, gaps = _fetch(get, teryt_prefix, since, until)
     rows = [r for r in map(to_row, recs_all) if r]
-    log.info("rcn: %s – %s: %d rekordów (usługa: %d, bez numeru transakcji/działki: %d)",
-             since or "bez daty", until or "", len(rows), matched, len(recs_all) - len(rows))
-    return rows, matched
+    log.info("rcn: %s – %s: %d rekordów (usługa: %d, bez numeru transakcji/działki: %d%s)",
+             since or "bez daty", until or "", len(rows), matched, len(recs_all) - len(rows),
+             f", luki: {len(gaps)}" if gaps else "")
+    return rows, matched, gaps
 
 
 def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
@@ -244,11 +270,12 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
     total = 0
     periods = list(months(since, today + timedelta(days=1))) + [(None, None)]  # + akty bez daty
     for a, b in periods:
-        rows, matched = fetch_period(get, teryt_prefix, a, b)
+        rows, matched, gaps = fetch_period(get, teryt_prefix, a, b)
         with conn.cursor() as cur:
             cur.executemany(UPSERT, rows)
-            cur.execute("""INSERT INTO scrape.rcn_fetch_log (teryt_prefix, period_start, period_end, matched, saved)
-                           VALUES (%s, %s, %s, %s, %s)""", (teryt_prefix, a, b, matched, len(rows)))
+            cur.execute("""INSERT INTO scrape.rcn_fetch_log (teryt_prefix, period_start, period_end, matched, saved, gaps)
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (teryt_prefix, a, b, matched, len(rows), "; ".join(gaps) or None))
         conn.commit()  # miesiąc po miesiącu: przerwane pobieranie nie traci wyników
         total += len(rows)
     log.info("rcn: zapisano %d rekordów (od %s)", total, since)

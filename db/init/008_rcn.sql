@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS scrape.rcn_fetch_log (
     matched         integer NOT NULL,
     saved           integer NOT NULL
 );
+-- luki: rekordy, które usługa liczy, ale nie oddaje nawet przy zapytaniu o jeden dzień i powiat
+ALTER TABLE scrape.rcn_fetch_log ADD COLUMN IF NOT EXISTS gaps text;
 
 -- Transakcje samym gruntem: każda działka niezabudowana, w całości, wolny rynek albo przetarg,
 -- jedna gmina. Mieszane (dom + działka, lokal z udziałem w gruncie, bonifikaty) pomijamy.

@@ -36,5 +36,6 @@ psql -c "SELECT count(*) AS rekordy_dzialek, min(doc_date) AS od, max(doc_date) 
                 (SELECT count(*) FROM mart.rcn_land_transactions) AS transakcje_gruntowe
          FROM scrape.rcn_parcels" 2>/dev/null
 psql -c "SELECT fetched_at::timestamp(0) AS kiedy, coalesce(period_start::text, 'bez daty') AS okres,
-                matched AS w_usludze, saved AS zapisane
+                matched AS w_usludze, saved AS zapisane, left(coalesce(gaps, ''), 60) AS luki
          FROM scrape.rcn_fetch_log ORDER BY fetched_at DESC LIMIT 5" 2>/dev/null
+psql -c "SELECT count(*) AS miesiace_z_lukami, string_agg(gaps, ' | ') AS luki FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL" 2>/dev/null
