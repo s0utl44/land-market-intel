@@ -193,16 +193,17 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
 
 
 def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_details: int | None, geo_get,
-               stats: ScrapeStats, parse_detail, label: str) -> list[dict]:
+               stats: ScrapeStats, parse_detail, label: str, price_from_detail: bool = False) -> list[dict]:
     """Wspólne dla portali z listą + stroną oferty: brakujące szczegóły (raz na ofertę), gmina z ULDK, wiersze CSV.
 
     `parse_detail(html, title, description)` zwraca słownik z lat/lon/precise/land_use/area_m2
-    (opcjonalnie listed_at, gdy data dodania jest tylko na stronie oferty).
+    (opcjonalnie listed_at, gdy data dodania jest tylko na stronie oferty, i price_pln,
+    gdy `price_from_detail` i na liście ceny zabrakło).
     """
     names: dict[str, str] = {}
     rows = []
     for it in items:
-        if it.price_pln is None:
+        if it.price_pln is None and not price_from_detail:
             stats.skipped_no_price += 1
             continue
         detail = cache.get_detail(it.ad_id)
@@ -221,6 +222,10 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
             if stats.details_fetched % 100 == 0:
                 log.info("%s: pobrano szczegóły %d nowych ofert", label, stats.details_fetched)
 
+        price = it.price_pln or detail.get("price_pln")
+        if price is None:
+            stats.skipped_no_price += 1
+            continue
         area = it.area_m2 or detail.get("area_m2")
         if area is None:
             stats.skipped_no_area += 1
@@ -257,7 +262,7 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
             "lat": f"{detail['lat']:.6f}" if detail.get("precise") else "",
             "lon": f"{detail['lon']:.6f}" if detail.get("precise") else "",
             "area_m2": f"{area:.2f}",
-            "price_pln": f"{it.price_pln:.2f}",
+            "price_pln": f"{price:.2f}",
             "land_use": detail.get("land_use") or "",
             "url": it.url,
             "title": "",

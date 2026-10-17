@@ -39,7 +39,7 @@ def test_search_url():
 
 
 def test_parse_search_page():
-    items, last = adresowo.parse_search_page(search_page([card("4263582"), card("1", price="1 725 000", area="3,45",
+    items, last = adresowo.parse_search_page(search_page([card("4263582"), card("1", price="1&nbsp;725&nbsp;000", area="3,45",
                                                                                    unit="ha"), card("4263582")],
                                                          pages=(2, 3, 94)))
     assert last == 94 and [i.ad_id for i in items] == ["4263582", "1"]  # powtórzony kafelek raz
@@ -59,7 +59,7 @@ def test_layout_change_detected():
 
 def test_parse_detail_page():
     d = adresowo.parse_detail_page(detail_page())
-    assert (d["lat"], d["lon"], d["precise"]) == (50.862365, 17.322521, True)
+    assert (d["lat"], d["lon"], d["precise"], d["price_pln"]) == (50.862365, 17.322521, True, 129000.0)
     assert (d["land_use"], d["land_use_source"]) == ("budowlana", "tytuł")  # z adresu oferty
     assert "Kowalski" not in str(d) and "600100200" not in str(d)
     d = adresowo.parse_detail_page(detail_page(url="https://adresowo.pl/o/dzialka-olawa-x", lat=50.86, lon=17.32))
@@ -85,15 +85,15 @@ class Web:
 def test_scrape_end_to_end():
     web = Web(
         pages=[search_page([card("1"), card("2")], pages=(2,)), search_page([card("3"), card("4", price="")], pages=(1,))],
-        details={"1": detail_page(), "2": detail_page(lat=50.8624, lon=17.3225), "3": detail_page(lat=52.4, lon=16.9)},
+        details={"1": detail_page(), "2": detail_page(lat=50.8624, lon=17.3225), "3": detail_page(lat=52.4, lon=16.9), "4": detail_page()},
         communes={"17.322521,50.862365": "0\n021503_2|Oława", "17.322500,50.862400": "0\n021503_2|Oława",
                   "16.900000,52.400000": "0\n306401_1|Poznań"},
     )
     cache = otodom.MemoryCache()
     rows, stats = adresowo.scrape(web.get, cache, date(2026, 10, 17))
     assert stats.pages == 2 and stats.unique_ads == 4  # strona 3 pusta -> koniec
-    assert {r["source_listing_id"] for r in rows} == {"1", "2"}
-    assert stats.skipped_outside_region == 1 and stats.skipped_no_price == 1
+    assert {r["source_listing_id"] for r in rows} == {"1", "2", "4"}  # 4: cena ze strony oferty
+    assert stats.skipped_outside_region == 1 and stats.skipped_no_price == 0
     by_id = {r["source_listing_id"]: r for r in rows}
     assert by_id["1"]["lat"] != "" and by_id["2"]["lat"] == ""  # mniej niż 6 miejsc po przecinku
     assert by_id["1"]["municipality_teryt"] == "0215032" and by_id["1"]["land_use"] == "budowlana"

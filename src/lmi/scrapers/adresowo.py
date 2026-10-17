@@ -34,7 +34,7 @@ def search_url(region: str, page: int) -> str:
 
 
 def _number(text: str) -> float | None:
-    s = re.sub(r"[\s ]", "", text or "").replace(",", ".")
+    s = re.sub(r"\s", "", text or "").replace(",", ".")
     try:
         v = float(s)
     except ValueError:
@@ -60,9 +60,12 @@ def parse_card(aid: str, frag: str) -> Item | None:
         return None
     price = area = None
     # pary <span class="font-bold">129 000</span><span ...>zł</span>
-    for value, unit in re.findall(r'<span class="font-bold">\s*([\d\s ,.]+?)\s*</span>\s*<span[^>]*>\s*([^<\s]+)\s*</span>',
+    # (separator tysięcy bywa encją &nbsp; albo wąską spacją, więc najpierw unescape)
+    for value, unit in re.findall(r'<span class="font-bold">\s*([^<]+?)\s*</span>\s*<span[^>]*>\s*([^<]+?)\s*</span>',
                                   frag):
-        unit = unit.strip().lower()
+        value, unit = htmllib.unescape(value), htmllib.unescape(unit).strip().lower()
+        if not re.fullmatch(r"[\d\s,.]+", value):
+            continue
         if unit in ("zł", "zl", "pln") and price is None:
             price = _number(value)
         elif unit in UNITS and area is None and (n := _number(value)):
@@ -114,7 +117,8 @@ def parse_detail_page(page_html: str, title: str | None = None, description: str
     lat, lon = geo.get("latitude"), geo.get("longitude")
     lat = float(lat) if lat not in (None, "") else None
     lon = float(lon) if lon not in (None, "") else None
-    url = next((g.get("url") for g in graph if g.get("@type") == "Offer" and g.get("url")), "") or ""
+    offer = next((g for g in graph if g.get("@type") == "Offer"), {})
+    url = offer.get("url") or ""
     # adres oferty niesie rodzaj, np. /o/dzialka-budowlana-olawa-...
     land_use = classify_land_use(title) or classify_land_use(place.get("name")) or \
         classify_land_use(url.replace("-", " "))
@@ -129,6 +133,7 @@ def parse_detail_page(page_html: str, title: str | None = None, description: str
                                                                  _decimals(geo.get("longitude"))) >= 6,
         "land_use": land_use, "land_use_source": source if land_use else None,
         "area_m2": None,
+        "price_pln": _number(str(offer.get("price") or "")),
         "municipality_hint": None,
     }
 
@@ -139,8 +144,8 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     geo_get = geo_get or get
     stats = ScrapeStats()
     ads: dict[str, Item] = {}
-    page, total_pages = 1, 1
-    while page <= min(total_pages, max_pages):
+    page = 1
+    while page <= max_pages:
         try:
             html = get(search_url(region_slug, page))
         except FetchError:
@@ -149,12 +154,13 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
             log.warning("adresowo: strona %d niedostępna, kończę listę", page)
             break
         try:
-            items, last_seen = parse_search_page(html, region_slug)
+            items, _ = parse_search_page(html, region_slug)
         except LayoutChanged:
             if page == 1:
                 raise
             break  # strona za końcem listy bywa pusta
-        total_pages = max(total_pages, last_seen)  # stronicowanie pokazuje tylko sąsiednie numery
+        # stronicowanie pokazuje tylko następny numer, a strony mają różną liczbę kafelków:
+        # idziemy dalej, dopóki pojawiają się nowe oferty
         stats.pages += 1
         stats.items_seen += len(items)
         new = [it for it in items if it.ad_id not in ads]
@@ -166,7 +172,7 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     stats.unique_ads = len(ads)
     log.info("adresowo: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
-                      parse_detail_page, "adresowo")
+                      parse_detail_page, "adresowo", price_from_detail=True)
     return rows, stats
 
 
@@ -182,18 +188,30 @@ def check(region_slug: str = "dolnoslaskie", details: int = 3) -> int:
     nav = sorted(set(re.findall(r'href="(' + re.escape(list_path(region_slug)) + r'[^"]+)"', html)))[:6]
     print(f"Wyniki: {len(items)} ofert na stronie 1, stronicowanie do: {last}, w tekście: {total}, linki stron: {nav}, "
           f"z ceną: {sum(1 for i in items if i.price_pln)}, z metrażem: {sum(1 for i in items if i.area_m2)}")
-    items2, _ = parse_search_page(client.get(search_url(region_slug, 2)), region_slug)
-    fresh = len({i.ad_id for i in items2} - {i.ad_id for i in items})
-    print(f"Strona 2 ({search_url(region_slug, 2)}): {len(items2)} ofert, nowych względem strony 1: {fresh}")
-    ok = bool(items) and fresh > 0 and sum(1 for i in items if i.price_pln and i.area_m2) >= 0.8 * len(items)
+    seen, fresh = {i.ad_id for i in items}, 0
+    for n in (2, 3):
+        h = client.get(search_url(region_slug, n))
+        got, _ = parse_search_page(h, region_slug)
+        new = {i.ad_id for i in got} - seen
+        fresh = fresh or len(new)
+        seen |= new
+        links = sorted(set(re.findall(r'href="(' + re.escape(list_path(region_slug)) + r'[^"]+)"', h)))[:6]
+        print(f"Strona {n} ({search_url(region_slug, n)}): {len(got)} ofert, nowych: {len(new)}, "
+              f"z ceną: {sum(1 for i in got if i.price_pln)}, linki stron: {links}")
+    if items and not any(i.price_pln for i in items):
+        # podgląd zapisu ceny w kafelku (tylko znaczniki i liczby), żeby poprawić parser
+        frag = _cards(html)[0][1]
+        spans = re.findall(r'<span class="font-bold">([^<]{0,40})</span>\s*(<span[^>]*>[^<]{0,12}</span>)?', frag)[:3]
+        print("Cena w kafelku (surowo):", [(repr(v), u) for v, u in spans])
+    ok = bool(items) and fresh > 0 and sum(1 for i in items if i.area_m2) >= 0.8 * len(items)
     for it in items[:details]:
         d = parse_detail_page(client.get(it.url), it.title)
         commune = None
         if d["lat"] is not None:
             commune = uldk.parse_commune_response(PoliteClient(min_delay=0.3, max_delay=0.6).get(
                 uldk.commune_url(d["lat"], d["lon"])))
-        print(f"  ad {it.ad_id}: cena={it.price_pln} m2={it.area_m2} lat={d['lat']} lon={d['lon']} "
+        print(f"  ad {it.ad_id}: cena={it.price_pln} (strona oferty: {d['price_pln']}) m2={it.area_m2} lat={d['lat']} lon={d['lon']} "
               f"dokładna={d['precise']} typ={d['land_use']} ({d['land_use_source']}) gmina={commune}")
-        ok = ok and d["lat"] is not None and commune is not None
+        ok = ok and d["lat"] is not None and commune is not None and (it.price_pln or d["price_pln"])
     print("WYNIK:", "OK" if ok else "PROBLEM — wklej ten wynik do czatu")
     return 0 if ok else 1
