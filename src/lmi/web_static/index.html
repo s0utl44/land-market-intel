@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700&display=swap">
 <style>
-/* Układ: pasek DoneHome (granat + złoto, wzór heksagonów) -> pas podsumowania -> ranking gmin -> karta gminy.
+/* Układ: pasek DoneHome -> kafelki i wykresy zmian (dzień / 7 / 30 dni) -> ranking gmin obok karty gminy (zakładki).
    Barwy i krój z księgi znaku DoneHome: Dark #1f2a36, Gingerbread #cba052, Subtle Cream #f8f7f2, Manrope. */
 :root{
   --bg:#f8f7f2; --surface:#ffffff; --ink:#1f2a36; --ink-2:#47515e; --muted:#77808c; --line:#e7e4da; --line-2:#d5d0c2;
@@ -36,7 +36,7 @@ html,body{margin:0}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1,h2,h3{margin:0;text-wrap:balance}
 h2{font-size:1.35rem;font-weight:600;letter-spacing:-.01em}
 a{color:var(--gold-ink)}
@@ -63,18 +63,55 @@ button,input,select{font:inherit}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:1px}
 .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
 
-/* podsumowanie */
-.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--line);background:var(--surface)}
-.summary div{padding:16px 18px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+/* podsumowanie: kafelki ze zmianą w wybranym okresie */
+.summary-band{border-bottom:1px solid var(--line)}
+.summary-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 16px;padding-top:14px}
+.summary-head .label{font-size:.74rem}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:5px 12px;font-size:.84rem;font-weight:700;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line-2)}
+.seg button[aria-pressed="true"]{background:var(--gold);color:#1f2a36}
+.seg button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.summary div{padding:10px 16px 14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:1px;min-width:0}
 .summary div:first-child{border-left:0;padding-left:0}
-.summary b{font-size:1.75rem;font-weight:300;line-height:1.15;color:var(--ink)}
-.summary small{color:var(--muted);font-size:.8rem}
+.summary b{font-size:1.6rem;font-weight:300;line-height:1.15;color:var(--ink)}
+.summary small{color:var(--muted);font-size:.78rem}
+.delta{font-size:.8rem;font-weight:700}
+.delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--muted)}
+/* co się zmieniło */
+.ch-charts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ch-lists{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mini{padding:12px 14px 4px;position:relative;min-width:0}
+.mini h3{font-size:.9rem;font-weight:700}
+.mini .sub{font-size:.76rem;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin:1px 0 4px}
+.mini svg{display:block;width:100%;height:auto;overflow:visible}
+.mini text{font-size:10px;fill:var(--muted);font-family:var(--font)}
+.key i.g{border-top:6px solid var(--good);width:10px} .key i.r{border-top:6px solid var(--bad);width:10px} .key i.o{border-top:6px solid var(--gold);width:10px}
+.lst{padding:12px 14px;min-width:0}
+.lst h3{font-size:.9rem;font-weight:700;margin-bottom:6px}
+.lst ol{list-style:none;margin:0;padding:0}
+.lst li{display:grid;grid-template-columns:1fr auto;gap:0 10px;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;align-items:baseline}
+.lst li:first-child{border-top:0}
+.lst li .g{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.lst li .g:hover{color:var(--gold-ink)}
+.lst li small{grid-column:1/-1;color:var(--muted);font-size:.76rem}
+.lst li a{font-weight:700;text-decoration:none;white-space:nowrap}
+/* ranking obok karty gminy */
+.layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:24px;align-items:start}
+.layout > section{min-width:0}
+@media (max-width:1300px){.layout{grid-template-columns:minmax(0,1fr)}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{all:unset;cursor:pointer;padding:8px 14px;font-weight:700;font-size:.9rem;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold)}
+.tabs button:focus-visible{outline:2px solid var(--gold)}
+.tabs .n{font-weight:600;color:var(--muted);font-size:.8rem;margin-left:4px}
 .notice{display:flex;gap:10px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;color:var(--ink-2);font-size:.9rem}
 .notice b{color:var(--ink)}
 .notice.warn{background:var(--warn-bg);border-color:var(--warn)}
 .notice.bad{background:var(--bad-bg);border-color:var(--bad)}
 
-main{display:flex;flex-direction:column;gap:36px;padding-block:24px 56px}
+main{display:flex;flex-direction:column;gap:28px;padding-block:20px 56px}
 section{display:flex;flex-direction:column;gap:12px}
 .head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px 16px}
 .head p{margin:2px 0 0;color:var(--ink-2);max-width:66ch;font-size:.92rem}
@@ -102,7 +139,8 @@ th.l,td.l{text-align:left}
 #rank-table tbody tr[aria-selected="true"]{background:var(--gold-soft);box-shadow:inset 3px 0 0 var(--gold)}
 .pos{font-weight:700;color:var(--muted);width:2.5em}
 .gm b{font-weight:700}
-.gm small{display:block;color:var(--muted);font-size:.74rem}
+.gm small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
+.gm small .pill{font-size:.68rem;padding:0 7px}
 .score{display:inline-grid;grid-template-columns:64px 3.2em;align-items:center;gap:8px}
 .sbar{position:relative;height:7px;background:var(--line);border-radius:4px}
 .sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line-2)}
@@ -120,6 +158,7 @@ th.l,td.l{text-align:left}
 .gm-head .teryt{color:var(--muted);font-size:.85rem}
 .facts{display:flex;flex-wrap:wrap;gap:8px}
 .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gm-sticky{position:sticky;top:0}
 .chart{padding:14px 14px 6px;position:relative;min-width:0}
 .chart h3{font-size:.95rem;font-weight:700}
 .chart .sub{font-size:.8rem;color:var(--muted);margin:1px 0 6px;display:flex;gap:14px;flex-wrap:wrap}
@@ -136,7 +175,13 @@ th.l,td.l{text-align:left}
 .ar{color:var(--muted);font-size:.78rem}
 .sub2{display:block;color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:2px}
 .sub2.feat{max-width:260px;white-space:normal}
-td.two-line{white-space:normal;min-width:120px}
+td.two-line{white-space:normal;min-width:110px}
+td.wide{min-width:200px}
+.layout th,.layout td{padding:8px 7px}
+.layout .score{grid-template-columns:auto}
+.layout .sbar{display:none}
+.layout td.gm{white-space:normal;min-width:130px}
+.layout th{font-size:.66rem;letter-spacing:.04em}
 .ext{font-weight:700;text-decoration:none}
 /* ceny transakcyjne */
 .tx-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
@@ -224,9 +269,15 @@ tr.cm-row td{background:var(--bg);white-space:normal;text-align:left;padding:12p
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
 footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
+@media (max-width:1100px){.ch-charts,.ch-lists{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .summary div:nth-child(4){border-left:0;padding-left:0}
+  .summary div:nth-child(n+4){border-top:1px solid var(--line)}}
 @media (max-width:820px){
+  .ch-charts,.ch-lists{grid-template-columns:minmax(0,1fr)}
   .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .summary div:nth-child(3){border-left:0;padding-left:0}
+  .summary div{border-left:1px solid var(--line);padding-left:16px;border-top:0}
+  .summary div:nth-child(odd){border-left:0;padding-left:0}
   .summary div:nth-child(n+3){border-top:1px solid var(--line)}
   .charts{grid-template-columns:minmax(0,1fr)}
   .brand{gap:10px}
@@ -255,16 +306,37 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 </header>
 
 <div class="summary-band" style="background:var(--surface)">
-  <div class="wrap summary" id="summary" aria-label="Podsumowanie województwa">
-    <div><span class="label">Aktywne oferty</span><b id="k-offers">–</b><small>działki na sprzedaż, dolnośląskie</small></div>
-    <div><span class="label">Gminy z ofertami</span><b id="k-munis">–</b><small id="k-rated">–</small></div>
-    <div><span class="label">Nowe w tym tygodniu</span><b id="k-new">–</b><small>pierwszy raz widziane</small></div>
-    <div><span class="label">Historia danych</span><b id="k-weeks">–</b><small id="k-weeks-note">tygodni</small></div>
+  <div class="wrap">
+    <div class="summary-head">
+      <span class="label" id="k-period-note">Zmiany w województwie</span>
+      <div class="seg" role="group" aria-label="Okres zmian" id="period">
+        <button type="button" data-days="1" aria-pressed="false">Ostatni dzień</button>
+        <button type="button" data-days="7" aria-pressed="true">7 dni</button>
+        <button type="button" data-days="30" aria-pressed="false">30 dni</button>
+      </div>
+    </div>
+    <div class="summary" id="summary" aria-label="Podsumowanie województwa">
+      <div><span class="label">Aktywne oferty</span><b id="k-offers">–</b><small id="k-offers-d">działki, dolnośląskie</small></div>
+      <div><span class="label">Nowe</span><b id="k-new">–</b><small id="k-new-d">pierwszy raz widziane</small></div>
+      <div><span class="label">Zniknęły</span><b id="k-gone">–</b><small id="k-gone-d">zdjęte z portali</small></div>
+      <div><span class="label">Obniżki cen</span><b id="k-cuts">–</b><small id="k-cuts-d">ofert z niższą ceną</small></div>
+      <div><span class="label">Mediana ofert</span><b id="k-ppm2">–</b><small id="k-ppm2-d">zł/m²</small></div>
+      <div><span class="label">Transakcje RCN</span><b id="k-tx">–</b><small id="k-tx-d">grunty pod zabudowę</small></div>
+    </div>
   </div>
 </div>
 
 <main class="wrap">
   <div class="notice" id="early" hidden></div>
+
+  <section id="changes" aria-labelledby="h-ch">
+    <div class="head">
+      <div><h2 id="h-ch">Co się zmieniło</h2>
+        <p id="ch-note">Nowe i zniknięte oferty, obniżki i ceny w całym województwie. Okres wybierasz nad kafelkami.</p></div>
+    </div>
+    <div class="ch-charts" id="ch-charts"><div class="panel empty" style="grid-column:1/-1">Ładowanie…</div></div>
+    <div class="ch-lists" id="ch-lists"></div>
+  </section>
 
   <section id="sys" aria-labelledby="h-sys" hidden>
     <div class="head">
@@ -295,18 +367,19 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
     <div class="panel">
       <div class="scroll">
         <table>
-          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Typ</th><th class="l">Gmina</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th>Na rynku</th><th>Zainteresowanie</th><th>Portale</th><th class="l">Zmiana ceny</th><th class="l">Ogłoszenie</th></tr></thead>
+          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Działka</th><th>Cena</th><th>Na rynku</th><th>Zainteresowanie</th><th class="l">Ogłoszenie</th></tr></thead>
           <tbody id="favs-body"></tbody>
         </table>
       </div>
     </div>
   </section>
 
+  <div class="layout">
   <section aria-labelledby="h-rank">
     <div class="head">
       <div>
         <h2 id="h-rank">Ranking gmin</h2>
-        <p>Gminy, w których działki schodzą najszybciej, ceny rosną, a sprzedający rzadko obniżają cenę. Kliknij gminę, żeby zobaczyć szczegóły i oferty.</p>
+        <p>Gdzie działki schodzą najszybciej, ceny rosną, a obniżek jest mało. Kliknij gminę: szczegóły otworzą się obok.</p>
       </div>
       <div class="tools">
         <input type="search" id="q" placeholder="Szukaj gminy…" aria-label="Szukaj gminy">
@@ -321,14 +394,9 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
             <th class="l" data-k="name" aria-sort="none"><button type="button">Gmina</button></th>
             <th data-k="score" aria-sort="none"><button type="button">Ocena</button></th>
             <th data-k="supply" aria-sort="none"><button type="button">Oferty</button></th>
-            <th data-k="ppm2" aria-sort="none"><button type="button">Mediana zł/m²</button></th>
-            <th data-k="absorption" aria-sort="none"><button type="button">Znika / tydz.</button></th>
-            <th data-k="price_trend" aria-sort="none"><button type="button">Trend cen</button></th>
-            <th data-k="discounted" aria-sort="none"><button type="button">Z obniżką</button></th>
-            <th data-k="days" aria-sort="none"><button type="button">Dni do zniknięcia</button></th>
-            <th data-k="age" aria-sort="none"><button type="button">Wiek ofert</button></th>
-            <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu pod zabudowę w ostatnich 12 miesiącach"><button type="button">Transakcje 12 mies.</button></th>
-            <th class="l">Rynek</th>
+            <th data-k="ppm2" aria-sort="none" title="Mediana ceny ofertowej za m²"><button type="button">zł/m²</button></th>
+            <th data-k="price_trend" aria-sort="none"><button type="button">Trend</button></th>
+            <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu pod zabudowę w ostatnich 12 miesiącach"><button type="button">Akty 12 m.</button></th>
           </tr></thead>
           <tbody id="rank-body"></tbody>
         </table>
@@ -344,18 +412,17 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       </div>
       <div class="facts" id="gm-facts"></div>
     </div>
-    <div class="charts" id="charts"></div>
-
-    <div class="head" style="margin-top:12px">
-      <div><h2>Ceny transakcyjne</h2>
-        <p>Akty notarialne z Rejestru Cen Nieruchomości (geoportal GUGiK): sprzedaże samego gruntu niezabudowanego w całości, na wolnym rynku lub w przetargu. Starostwa dopisują akty z opóźnieniem kilku tygodni.</p></div>
+    <div class="tabs" role="tablist" aria-label="Karta gminy">
+      <button type="button" role="tab" id="t-ov" aria-controls="p-ov" aria-selected="true">Przegląd</button>
+      <button type="button" role="tab" id="t-of" aria-controls="p-of" aria-selected="false">Oferty<span class="n" id="t-of-n"></span></button>
+      <button type="button" role="tab" id="t-tx" aria-controls="p-tx" aria-selected="false">Transakcje<span class="n" id="t-tx-n"></span></button>
     </div>
-    <div id="tx"></div>
-
-    <div class="head" style="margin-top:12px">
-      <div><h2>Aktywne oferty</h2>
-        <p>Ta sama działka z kilku ogłoszeń liczy się raz. „Na rynku” liczymy od daty wystawienia w portalu; „≥” oznacza ofertę sprzed zbierania tej daty. Najedź na zmianę ceny, żeby zobaczyć historię.</p></div>
+    <div id="p-ov" role="tabpanel" aria-labelledby="t-ov"><div class="charts" id="charts"></div></div>
+    <div id="p-tx" role="tabpanel" aria-labelledby="t-tx" hidden>
+      <p class="ar" style="margin:0 0 10px">Akty notarialne z Rejestru Cen Nieruchomości (geoportal GUGiK): sprzedaże samego gruntu niezabudowanego w całości, na wolnym rynku lub w przetargu. Starostwa dopisują akty z opóźnieniem kilku tygodni.</p>
+      <div id="tx"></div>
     </div>
+    <div id="p-of" role="tabpanel" aria-labelledby="t-of" hidden>
     <div class="panel">
       <div class="filters">
         <label><span class="label">Typ działki</span>
@@ -374,13 +441,16 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Typ</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th>Na rynku</th><th>Zainteresowanie</th><th>Portale</th><th class="l">Zmiana ceny</th><th class="l">Ogłoszenie</th></tr></thead>
+          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Działka</th><th>Cena</th><th>Na rynku</th><th>Zainteresowanie</th><th class="l">Ogłoszenie</th></tr></thead>
           <tbody id="offers-body"></tbody>
         </table>
       </div>
       <div class="more" id="offers-more"></div>
     </div>
+    <p class="ar" style="margin:8px 0 0">Ta sama działka z kilku portali liczy się raz. „Na rynku” liczymy od wystawienia w portalu; „≥” to oferta sprzed zbierania tej daty. Najedź na cenę, żeby zobaczyć historię.</p>
+    </div>
   </section>
+  </div>
 </main>
 
 <div class="pick-bar" id="pick-bar" role="region" aria-label="Zaznaczanie obszarów do zgłoszenia" hidden>
@@ -431,17 +501,17 @@ async function api(u){
   return r.json()}
 
 let OV=null, RANK=[], sortK='rank', sortDir=1, selected=null, showAll=false;
-const PAGE=40; let rankLimit=PAGE;
+const PAGE=20; let rankLimit=PAGE;
 
 async function load(){
   try{
     [OV,RANK]=await Promise.all([api('/api/overview'),api('/api/ranking')]);
   }catch(e){
     $('#status').innerHTML='<span><i class="dot bad"></i>Nie udało się pobrać danych. Odśwież stronę za chwilę.</span>';
-    $('#rank-body').innerHTML='<tr><td class="l" colspan="12"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
+    $('#rank-body').innerHTML='<tr><td class="l" colspan="7"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
-  renderStatus(); renderAttempt(); renderSummary(); renderRank();
+  renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges();
   api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
@@ -462,21 +532,104 @@ function renderStatus(){
 }
 
 function renderSummary(){
-  const rated=RANK.filter(r=>r.rank!=null).length;
   $('#k-offers').textContent=nf(OV.active_offers);
-  $('#k-munis').textContent=nf(OV.municipalities);
-  $('#k-rated').textContent=`${rated} z oceną (min. ${OV.min_supply_for_rank} ofert)`;
-  $('#k-new').textContent=nf(OV.new_this_week);
-  $('#k-weeks').textContent=nf(OV.weeks_of_data);
-  $('#k-weeks-note').textContent=OV.weeks_of_data===1?'tydzień':(OV.weeks_of_data<5?'tygodnie':'tygodni');
   const w=OV.weeks_of_data||0, early=$('#early');
   if(w===0){
     early.hidden=false;
     early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Trwa pierwsze pobieranie ofert.</b> Pierwsze pełne pobranie wszystkich działek w dolnośląskim trwa kilka godzin. Ranking i oferty pojawią się tutaj, gdy się zakończy. Potem dane odświeżają się codziennie o 8:00.</div>`;
   }else if(w<4){
     early.hidden=false;
-    early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Ranking wstępny: dane z ${w} ${w===1?'tygodnia':'tygodni'}.</b> Liczba ofert i ceny są już wiarygodne. Tempo znikania ofert, trend cen i czas na rynku potrzebują kilku tygodni historii, więc ranking zacznie mieć sens po ok. 4 tygodniach, a stabilny będzie po 2–3 miesiącach.</div>`;
+    early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Ranking wstępny: dane z ${w} ${w===1?'tygodnia':'tygodni'}.</b> Liczba ofert i ceny są już wiarygodne. Tempo znikania, trend cen i czas na rynku potrzebują kilku tygodni historii: ranking zacznie mieć sens po ok. 4 tygodniach, a stabilny będzie po 2–3 miesiącach.</div>`;
   }
+}
+
+/* ---------- co się zmieniło ---------- */
+let PERIOD=7, CH=null, chReq=0;
+const PERIOD_TXT={1:'ostatni dzień',7:'ostatnie 7 dni',30:'ostatnie 30 dni'};
+document.querySelectorAll('#period button').forEach(b=>b.onclick=()=>{
+  PERIOD=+b.dataset.days; document.querySelectorAll('#period button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); loadChanges()});
+const delta=(now,before,inv)=>{if(now==null||!before)return '';const d=(now/before-1)*100;if(Math.abs(d)<0.5)return '<span class="delta flat">bez zmian</span>';
+  const up=d>0;return `<span class="delta ${(up!==!!inv)?'up':'down'}">${up?'▲':'▼'} ${nf(Math.abs(d),1)}%</span>`};
+async function loadChanges(){
+  const id=++chReq;
+  let d; try{d=await api('/api/changes?days='+PERIOD)}catch(e){$('#ch-charts').innerHTML='<div class="panel empty" style="grid-column:1/-1">Nie udało się pobrać zmian.</div>';return}
+  if(id!==chReq)return; CH=d;
+  const days=d.daily, last=days[days.length-1], inP=days.filter(x=>x.d>=d.since);
+  const before=days.filter(x=>x.d<d.since).slice(-1)[0];
+  const sum=k=>inP.reduce((a,x)=>a+(x[k]||0),0);
+  $('#k-period-note').textContent=d.last_day?`Zmiany w województwie: ${PERIOD_TXT[PERIOD]} (do ${dFull(d.last_day)})`:'Zmiany w województwie';
+  if(last){
+    $('#k-offers').textContent=nf(last.active);
+    $('#k-offers-d').innerHTML=before?`${delta(last.active,before.active)} vs ${dPL(before.d)}`:'działki, dolnośląskie';
+    $('#k-new').textContent=nf(sum('new')); $('#k-gone').textContent=nf(sum('gone')); $('#k-cuts').textContent=nf(sum('cuts'));
+    $('#k-ppm2').textContent=nf(last.ppm2); $('#k-ppm2-d').innerHTML=`zł/m² ${before?delta(last.ppm2,before.ppm2):''}`;
+  }
+  const rcn=d.rcn||[], r12=rcn.slice(-12), lastM=rcn[rcn.length-1];
+  $('#k-tx').textContent=r12.length?nf(r12.reduce((a,x)=>a+x.tx,0)):'–';
+  $('#k-tx-d').textContent=lastM?`12 mies. do ${new Date(lastM.month+'T00:00:00').toLocaleDateString('pl-PL',{month:'short',year:'numeric'})}`:'po pobraniu RCN';
+  // wykresy: dzień -> ostatnie 30 dni dziennie, 7 i 30 dni -> tygodnie
+  const daily=PERIOD===1, series=daily?days.slice(-30):d.weekly.slice(-16);
+  const lab=series.map(x=>daily?dPL(x.d):wkPL(x.week));
+  const box=$('#ch-charts'); box.innerHTML='';
+  if(!series.length){box.innerHTML='<div class="panel empty" style="grid-column:1/-1">Zmiany pojawią się po drugim dniu pobierania.</div>';$('#ch-lists').innerHTML='';return}
+  miniChart(box,{title:'Nowe i zniknięte oferty',sub:daily?'dziennie':'tygodniowo',labels:lab,
+    bars:[{name:'nowe',cls:'g',color:'var(--good)',vals:series.map(x=>x.new)},{name:'zniknęły',cls:'r',color:'var(--bad)',vals:series.map(x=>x.gone)}],fmt:v=>nf(v)});
+  miniChart(box,{title:'Obniżki cen',sub:daily?'ofert z niższą ceną dziennie':'tygodniowo',labels:lab,
+    bars:[{name:'obniżki',cls:'o',color:'var(--gold)',vals:series.map(x=>x.cuts)}],fmt:v=>nf(v)});
+  miniChart(box,{title:'Aktywne oferty',sub:'stan na koniec '+(daily?'dnia':'tygodnia'),labels:lab,line:{name:'oferty',vals:series.map(x=>x.active)},fmt:v=>nf(v)});
+  if(rcn.length>1){
+    const rr=rcn.slice(-24);
+    miniChart(box,{title:'Transakcje gruntem (RCN)',sub:'miesięcznie',labels:rr.map(x=>new Date(x.month+'T00:00:00').toLocaleDateString('pl-PL',{month:'short',year:'2-digit'})),
+      bars:[{name:'transakcje',cls:'o',color:'var(--gold)',vals:rr.map(x=>x.tx)}],line2:{name:'mediana zł/m²',vals:rr.map(x=>x.ppm2)},fmt:v=>nf(v)});
+  }else{
+    miniChart(box,{title:'Mediana ceny ofert',sub:'zł/m²',labels:lab,line:{name:'zł/m²',vals:series.map(x=>x.ppm2)},fmt:v=>nf(v)+' zł',nozero:true});
+  }
+  const offerLi=(o,right,sub)=>`<li><span class="g" data-t="${esc(o.teryt)}" title="Pokaż gminę ${esc(o.gmina)}">${esc(o.gmina)}</span>${o.url?`<a class="ext" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${right} ↗</a>`:`<span>${right}</span>`}<small>${sub}</small></li>`;
+  const list=(title,rows,fn,empty)=>`<div class="panel lst"><h3>${title}</h3>${rows.length?`<ol>${rows.map(fn).join('')}</ol>`:`<div class="na" style="font-size:.84rem">${empty}</div>`}</div>`;
+  $('#ch-lists').innerHTML=
+    list('Największe obniżki',d.cuts.slice(0,5),o=>offerLi(o,`<span class="pill warn">▼ ${nf(-o.change,1)}%</span>`,`${nf(o.area)} m² · ${nf(o.before)} → ${nf(o.price)} zł · ${nf(o.ppm2)} zł/m²`),'Brak obniżek w tym okresie.')+
+    list('Nowe, tańsze od mediany gminy',d.fresh.slice(0,5),o=>offerLi(o,`<span class="pill ${o.vs_median<0?'good':'mute'}">${o.vs_median>0?'+':''}${nf(o.vs_median)}%</span>`,`${nf(o.area)} m² · ${nf(o.price)} zł · ${nf(o.ppm2)} zł/m²`),'Brak nowych ofert w gminach z min. 5 ofertami.')+
+    list('Szybko zniknęły',d.gone_fast.slice(0,5),o=>offerLi(o,`${o.days_listed} dni`,`${nf(o.area)} m² · ${nf(o.price)} zł · ${nf(o.ppm2)} zł/m² · może sprzedana`),'Żadna nowa oferta nie zniknęła w tym okresie.')+
+    list('Najwięcej ruchu',d.gminy.slice(0,5),g=>`<li><span class="g" data-t="${esc(g.teryt)}">${esc(g.gmina)}</span><span>${nf(g.active)} ofert</span><small>nowe ${nf(g.new)} · zniknęły ${nf(g.gone)} · obniżki ${nf(g.cuts)}</small></li>`,'Brak zmian w tym okresie.');
+}
+$('#ch-lists').addEventListener('click',e=>{const g=e.target.closest('.g[data-t]');if(g)select(g.dataset.t,true)});
+// mały wykres: słupki (jedna lub dwie serie obok siebie) i/lub linia; podpowiedź po najechaniu
+function miniChart(box,o){
+  const el=document.createElement('div'); el.className='panel mini';
+  const keys=[...(o.bars||[]).map(b=>`<span class="key"><i class="${b.cls}"></i>${b.name}</span>`),o.line2?`<span class="key"><i></i>${o.line2.name}</span>`:''].join('');
+  el.innerHTML=`<h3>${o.title}</h3><div class="sub"><span>${o.sub||''}</span>${(o.bars||[]).length>1||o.line2?keys:''}</div>`;
+  const W=320,H=150,M={l:38,r:o.line2?38:8,t:8,b:20},n=o.labels.length;
+  const bw=(W-M.l-M.r)/Math.max(n,1), xs=i=>M.l+bw*i+bw/2;
+  const left=[...(o.bars||[]).flatMap(b=>b.vals),...(o.line?o.line.vals:[])].filter(v=>v!=null);
+  if(!left.length){el.insertAdjacentHTML('beforeend','<div class="empty">Brak danych.</div>');box.appendChild(el);return}
+  let lo=o.nozero||o.line&&!o.bars?Math.min(...left):0,hi=Math.max(...left,1);
+  if(o.line&&!o.bars){const pad=(hi-lo)*.15||hi*.05;lo=Math.max(0,lo-pad);hi+=pad}
+  const tk=ticks(lo,hi,3),y0=tk[0],y1=tk[tk.length-1],y=v=>H-M.b-(v-y0)/(y1-y0||1)*(H-M.t-M.b);
+  let g='';
+  tk.forEach(v=>g+=`<line x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${M.l-5}" y="${y(v)+3}" text-anchor="end">${nf(v)}</text>`);
+  const bars=o.bars||[], k=bars.length, inner=Math.min(bw*.8,28), each=inner/Math.max(k,1);
+  bars.forEach((b,bi)=>b.vals.forEach((v,i)=>{if(!v)return;const x=xs(i)-inner/2+bi*each;g+=`<rect x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${Math.max(1,each-1).toFixed(1)}" height="${(y(y0)-y(v)).toFixed(1)}" fill="${b.color}" rx="1.5"/>`}));
+  const path=(arr,yf)=>{let d='',pen=false;arr.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+xs(i).toFixed(1)+' '+yf(v).toFixed(1);pen=true});return d};
+  if(o.line)g+=`<path d="${path(o.line.vals,y)}" fill="none" stroke="var(--gold-line)" stroke-width="2" stroke-linejoin="round"/>`;
+  let y2=null;
+  if(o.line2){const v2=o.line2.vals.filter(v=>v!=null);if(v2.length){const t2=ticks(Math.min(...v2)*.9,Math.max(...v2)*1.05,3),a=t2[0],b2=t2[t2.length-1];
+    y2=v=>H-M.b-(v-a)/(b2-a||1)*(H-M.t-M.b);
+    t2.forEach(v=>g+=`<text x="${W-M.r+5}" y="${y2(v)+3}">${nf(v)}</text>`);
+    g+=`<path d="${path(o.line2.vals,y2)}" fill="none" stroke="var(--ink-2)" stroke-width="1.75" stroke-linejoin="round"/>`}}
+  const step=Math.max(1,Math.ceil(n/5));
+  o.labels.forEach((l,i)=>{if(i%step===0||i===n-1&&n-1-i<step)g+=`<text x="${xs(i)}" y="${H-5}" text-anchor="middle">${esc(l)}</text>`});
+  g+=`<line class="cross" x1="0" x2="0" y1="${M.t}" y2="${H-M.b}" stroke="var(--line-2)" visibility="hidden"/><rect class="hit" x="${M.l}" y="${M.t}" width="${W-M.l-M.r}" height="${H-M.t-M.b}" fill="transparent"/>`;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('aria-label',o.title);svg.innerHTML=g;el.appendChild(svg);
+  const tip=document.createElement('div');tip.className='tip';tip.hidden=true;el.appendChild(tip);
+  const cross=svg.querySelector('.cross'),hit=svg.querySelector('.hit');
+  const show=ev=>{const r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W,i=Math.max(0,Math.min(n-1,Math.floor((px-M.l)/bw)));
+    cross.setAttribute('x1',xs(i));cross.setAttribute('x2',xs(i));cross.setAttribute('visibility','visible');
+    tip.innerHTML=`<div class="label" style="margin-bottom:4px">${esc(o.labels[i])}</div>`+bars.map(b=>`<div class="r"><span>${b.name}</span><b>${o.fmt(b.vals[i])}</b></div>`).join('')+
+      (o.line?`<div class="r"><span>${o.line.name}</span><b>${o.fmt(o.line.vals[i])}</b></div>`:'')+(o.line2?`<div class="r"><span>${o.line2.name}</span><b>${nf(o.line2.vals[i])}</b></div>`:'');
+    tip.hidden=false;const b=el.getBoundingClientRect();let lft=ev.clientX-b.left+12;if(lft+180>b.width)lft=ev.clientX-b.left-190;tip.style.left=Math.max(4,lft)+'px';tip.style.top=(ev.clientY-b.top+10)+'px'};
+  hit.addEventListener('pointermove',show);hit.addEventListener('pointerdown',show);
+  hit.addEventListener('pointerleave',()=>{tip.hidden=true;cross.setAttribute('visibility','hidden')});
+  box.appendChild(el);
 }
 
 /* ---------- ranking ---------- */
@@ -500,22 +653,18 @@ function marketPill(r){
 function renderRank(){
   const rows=rankRows(), max=Math.max(0.01,...RANK.map(r=>Math.abs(r.score||0)));
   const body=$('#rank-body');
-  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="12"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="7"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
   body.innerHTML=rows.slice(0,rankLimit).map(r=>{
     const sc=r.score, w=sc==null?0:Math.abs(sc)/max*50;
-    return `<tr data-t="${r.teryt}" tabindex="0" aria-selected="${r.teryt===selected}">
+    const more=`znika ${pct(r.absorption)} tygodniowo · z obniżką ${pct(r.discounted,0)} · do zniknięcia ${nf(r.days)} dni · oferty wiszą ${age(r.age==null?null:Math.round(r.age))}`;
+    return `<tr data-t="${r.teryt}" tabindex="0" aria-selected="${r.teryt===selected}" title="${esc(more)}">
       <td class="pos">${r.rank??'–'}</td>
-      <td class="l gm"><b>${esc(r.name)}</b><small>TERYT ${r.teryt}</small></td>
-      <td>${sc==null?'<span class="na">–</span>':`<span class="score"><span class="sbar"><i style="${sc>=0?'left:50%':'right:50%'};width:${w}%;background:${sc>=0?'var(--good)':'var(--bad)'}"></i></span><span>${sc>0?'+':''}${nf(sc,2)}</span></span>`}</td>
+      <td class="l gm"><b>${esc(r.name)}</b><small>${marketPill(r)}</small></td>
+      <td>${sc==null?'<span class="na">–</span>':`<span class="score" style="color:${sc>0.5?'var(--good)':sc<-0.5?'var(--bad)':'inherit'};font-weight:700"><span class="sbar"><i style="${sc>=0?'left:50%':'right:50%'};width:${w}%;background:${sc>=0?'var(--good)':'var(--bad)'}"></i></span><span>${sc>0?'+':''}${nf(sc,2)}</span></span>`}</td>
       <td>${nf(r.supply)}</td>
       <td>${nf(r.ppm2)}</td>
-      <td>${pct(r.absorption)}</td>
       <td>${sgn(r.price_trend)}</td>
-      <td>${pct(r.discounted,0)}</td>
-      <td>${nf(r.days)}</td>
-      <td title="mediana: jak długo wiszą aktywne oferty">${age(r.age==null?null:Math.round(r.age))}</td>
-      <td title="${r.tx_ppm2!=null?'mediana transakcyjna '+nf(r.tx_ppm2)+' zł/m²':''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td>
-      <td class="l">${marketPill(r)}</td></tr>`}).join('');
+      <td title="${r.tx_ppm2!=null?'mediana transakcyjna '+nf(r.tx_ppm2)+' zł/m²':''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
     (rows.length>rankLimit?'<button class="btn" id="rank-all" type="button">Pokaż wszystkie</button>':'');
@@ -540,18 +689,27 @@ async function select(teryt,scroll){
   $('#gm-facts').innerHTML=r?[
     r.rank!=null?`<span class="pill info">miejsce ${r.rank} z ${RANK.filter(x=>x.rank!=null).length}</span>`:'',
     marketPill(r),`<span class="pill mute">${nf(r.supply)} ofert</span>`,`<span class="pill mute">mediana ${nf(r.ppm2)} zł/m²</span>`,
+    `<span class="pill mute">znika ${pct(r.absorption)} / tydz.</span>`,`<span class="pill mute">z obniżką ${pct(r.discounted,0)}</span>`,
+    r.days!=null?`<span class="pill mute">do zniknięcia ok. ${nf(r.days)} dni</span>`:'',
     r.age!=null?`<span class="pill mute">oferty wiszą średnio ${age(Math.round(r.age))}</span>`:''].join(''):'';
+  $('#t-tx-n').textContent=r&&r.tx_12m?r.tx_12m:''; $('#t-of-n').textContent=r&&r.supply?r.supply:'';
   if(scroll)sec.scrollIntoView({block:'start'});
   $('#charts').innerHTML='<div class="panel empty">Ładowanie wykresów…</div>';
   try{ drawCharts(await api(`/api/municipality/${teryt}/weekly`)); }
   catch(e){ $('#charts').innerHTML='<div class="panel empty">Nie udało się pobrać wykresów dla tej gminy.</div>'; }
   loadTx(teryt);
-  loadOffers();
+  offersLimit=OFFERS_PAGE; loadOffers();
 }
+// zakładki karty gminy
+const TABS={'t-ov':'p-ov','t-of':'p-of','t-tx':'p-tx'};
+function tab(id){Object.entries(TABS).forEach(([t,p])=>{$('#'+t).setAttribute('aria-selected',String(t===id));$('#'+p).hidden=t!==id})}
+Object.keys(TABS).forEach(t=>$('#'+t).onclick=()=>tab(t));
+$('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const ks=Object.keys(TABS),i=ks.indexOf(document.activeElement.id);if(i<0)return;
+  const n=ks[(i+(e.key==='ArrowRight'?1:ks.length-1))%ks.length];tab(n);$('#'+n).focus()});
 
 const MPZP={budownictwoMieszkanioweJednorodzinne:'MN jednorodzinna',budownictwoMieszkanioweWielorodzinne:'MW wielorodzinna',terenRolniczy:'rolny',terenDrogWewnetrznych:'droga wewn.',terenDrogPublicznych:'droga publ.',terenZieleniUrzadzonej:'zieleń',brakMPZPLubWZ:'brak planu/WZ',terenUslug:'usługi',terenLasu:'las'};
 const mpzpTxt=v=>(v||'').split(';').filter(Boolean).map(x=>MPZP[x]||x.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase()).join(', ')||'–';
-async function loadTx(teryt,limit=15){
+async function loadTx(teryt,limit=10){
   const box=$('#tx'); box.innerHTML='<div class="panel empty">Ładowanie transakcji…</div>';
   let d; try{d=await api(`/api/municipality/${teryt}/transactions?limit=${limit}`)}catch(e){box.innerHTML='<div class="panel empty">Nie udało się pobrać transakcji.</div>';return}
   if(teryt!==selected)return;
@@ -633,9 +791,10 @@ function drawCharts(data){
 }
 
 /* ---------- oferty ---------- */
-let offersTimer=null, offersReq=0;
-['#f-use','#f-sort','#f-age','#f-seller','#f-media'].forEach(s=>$(s).onchange=loadOffers);
-['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(loadOffers,350)});
+let offersTimer=null, offersReq=0; const OFFERS_PAGE=50; let offersLimit=OFFERS_PAGE;
+const reloadOffers=()=>{offersLimit=OFFERS_PAGE;loadOffers()};
+['#f-use','#f-sort','#f-age','#f-seller','#f-media'].forEach(s=>$(s).onchange=reloadOffers);
+['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(reloadOffers,350)});
 // --- wiersz oferty (tabela gminy i "Moje ulubione") ---------------------------------------------
 const ROWS={}; let ME={user:'zespół'};
 const ICON_CM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
@@ -671,17 +830,15 @@ function offerRow(r,opts={}){
     const histTxt=oh.length?'Historia ogłoszenia (Otodom):\n'+oh.map(h=>`${dFull(h.date)}: ${(h.changes||[]).map(c=>CH[c]||c.toLowerCase()).join(', ')}${h.price!=null?' · '+nf(h.price)+' zł':''}`).join('\n')
       :(ownHist.length>1?'Zmiany widziane przez Radar:\n'+ownHist.map(h=>`${dFull(h.date)}: ${nf(h.price)} zł`).join('\n'):'');
     ROWS[r.id]=r;
+    const cut=r.price_change<=-1?` · <b class="down" style="color:var(--bad)">▼ ${nf(-r.price_change,1)}%</b>`:r.price_change>=1?` · ▲ ${nf(r.price_change,1)}%`:'';
+    const more=(r.portals||0)>1?` <span class="ar" title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">+${r.portals-1}</span>`:'';
     return `<tr data-id="${esc(r.id)}">
     <td class="l team">${teamCell(r)}</td>
-    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}${featLine(r.features)}</td>${opts.gmina?`\n    <td class="l">${esc(r.municipality||'–')}</td>`:''}
-    <td>${nf(r.area)} m² <span class="ar">(${nf(r.area/100,1)} ar)</span></td>
-    <td>${nf(r.price)} zł</td>
-    <td><b>${nf(r.ppm2)}</b></td>
-    <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">wystawiana ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
+    <td class="l two-line wide"><b>${esc(r.land_use||'działka')}</b>${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Portal nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''} · <span title="${nf(r.area/100,1)} ar">${nf(r.area)} m²</span>${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}${opts.gmina?`<span class="sub2">${esc(r.municipality||'–')}</span>`:''}${featLine(r.features)}</td>
+    <td class="two-line" title="${esc(histTxt)}">${nf(r.price)} zł<span class="sub2"><b>${nf(r.ppm2)}</b> zł/m²${cut}</span></td>
+    <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
     <td class="two-line" title="${r.views!=null?`Licznik z portalu ${SRC[r.views_source]||r.views_source}`+(r.views_per_day!=null?'; tempo: przyrost między pomiarami albo średnia od wystawienia':''):''}">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${r.views_per_day!=null?nf(r.views_per_day,r.views_per_day<10?1:0)+'/dzień':''}${r.saved!=null?(r.views_per_day!=null?' · ':'')+nf(r.saved)+' '+(r.saved===1?'zapis':'zapisów'):''}</span>`:'<span class="na">–</span>'}</td>
-    <td title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">${r.portals}</td>
-    <td class="l two-line" title="${esc(histTxt)}">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}${hist.length>1&&hist[0].price!==hist[hist.length-1].price?`<span class="sub2">${nf(hist[0].price)} → ${nf(hist[hist.length-1].price)} zł</span>`:''}</td>
-    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}</td></tr>`}
+    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}${more}</td></tr>`}
 async function send(u,body,method='POST'){
   const r=await fetch(u,{method,headers:{'Content-Type':'application/json',Accept:'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined});
   if(r.status===401||r.status===403){location.reload();throw new Error('sesja wygasła')}
@@ -731,15 +888,15 @@ function teamClicks(tbody){
 }
 async function loadFavs(){
   const body=$('#favs-body');
-  body.innerHTML='<tr><td colspan="11" class="l"><div class="empty">Ładowanie…</div></td></tr>';
-  let rows; try{rows=await api('/api/favorites')}catch(e){body.innerHTML='<tr><td colspan="11" class="l"><div class="empty">Nie udało się pobrać ulubionych.</div></td></tr>';return}
-  body.innerHTML=rows.length?rows.map(r=>offerRow(r,{gmina:true})).join(''):'<tr><td colspan="11" class="l"><div class="empty">Nie masz jeszcze ulubionych. Kliknij ☆ przy ofercie w tabeli gminy.</div></td></tr>';
+  body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Ładowanie…</div></td></tr>';
+  let rows; try{rows=await api('/api/favorites')}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ulubionych.</div></td></tr>';return}
+  body.innerHTML=rows.length?rows.map(r=>offerRow(r,{gmina:true})).join(''):'<tr><td colspan="6" class="l"><div class="empty">Nie masz jeszcze ulubionych. Kliknij ☆ przy ofercie w tabeli gminy.</div></td></tr>';
   $('#fav-btn').textContent=`★ Ulubione${rows.length?' ('+rows.length+')':''}`;
 }
 
 async function loadOffers(){
   if(!selected)return;
-  const p=new URLSearchParams({sort:$('#f-sort').value,limit:'300'});
+  const p=new URLSearchParams({sort:$('#f-sort').value,limit:String(offersLimit)});
   if($('#f-use').value)p.set('land_use',$('#f-use').value);
   if($('#f-min').value)p.set('min_area',$('#f-min').value);
   if($('#f-max').value)p.set('max_area',$('#f-max').value);
@@ -748,13 +905,15 @@ async function loadOffers(){
   if($('#f-seller').value)p.set('seller',$('#f-seller').value);
   if($('#f-media').value)p.set('media',$('#f-media').value);
   const id=++offersReq, body=$('#offers-body');
-  body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
+  body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
   let rows;
-  try{rows=await api(`/api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
+  try{rows=await api(`/api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
   if(id!==offersReq)return;
-  if(!rows.length){body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
   body.innerHTML=rows.map(r=>offerRow(r)).join('');
-  $('#offers-more').innerHTML=`<span>${rows.length===300?'Pierwsze 300 ofert. Zawęź filtry, żeby zobaczyć resztę.':`Ofert: ${rows.length}`}</span>`;
+  const full=rows.length===offersLimit;
+  $('#offers-more').innerHTML=`<span>${full?`Pierwsze ${rows.length} ofert`:`Ofert: ${rows.length}`}</span>`+(full&&offersLimit<1000?'<button class="btn" id="offers-next" type="button">Pokaż kolejne 50</button>':'');
+  const nx=$('#offers-next'); if(nx)nx.onclick=()=>{offersLimit=Math.min(1000,offersLimit+OFFERS_PAGE);loadOffers()};
 }
 
 // --- zgłoszenia błędów i poprawek ----------------------------------------------------------------
@@ -764,7 +923,7 @@ function fbContext(){
           adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
 }
 // tryb zaznaczania: najpierw obszary strony, potem opis
-const PICKABLE='#rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
+const PICKABLE='#ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
 let PICK=[], picking=false, hoverEl=null;
 const clean=t=>(t||'').replace(/\s+/g,' ').trim();
 function describe(el){
@@ -774,6 +933,8 @@ function describe(el){
     return 'Oferta'+g+': '+(r?`${r.land_use||'–'}, ${nf(r.area)} m², ${nf(r.price)} zł, ${nf(r.ppm2)} zł/m², ${r.url||''}`:clean(el.innerText).slice(0,160));}
   if(el.matches('#tx tbody tr'))return 'Transakcja RCN'+g+': '+[...el.cells].slice(0,6).map(c=>clean(c.innerText)).join(' · ');
   if(el.matches('.panel.chart'))return 'Wykres „'+clean(el.querySelector('h3')?.innerText)+'”'+g;
+  if(el.matches('.panel.mini'))return 'Zmiany w województwie, wykres „'+clean(el.querySelector('h3')?.innerText)+'” ('+PERIOD_TXT[PERIOD]+')';
+  if(el.matches('#ch-lists li'))return 'Zmiany, „'+clean(el.closest('.lst')?.querySelector('h3')?.innerText)+'”: '+clean(el.innerText).slice(0,160);
   if(el.matches('.tx-cards > .panel'))return 'Ceny transakcyjne'+g+': '+clean(el.innerText).slice(0,120);
   if(el.matches('.summary > div'))return 'Podsumowanie: '+clean(el.innerText).slice(0,120);
   if(el.matches('#gm-facts .pill'))return 'Karta gminy'+g+': '+clean(el.innerText);
@@ -877,7 +1038,25 @@ async function loadSys(badgeOnly){
     <div class="panel"><h3>Zadania</h3>${jobs}</div>
     <div class="panel" style="grid-column:1/-1"><h3>Portale</h3><div class="scroll">${srcs}</div></div>
     <div class="panel"><h3>Ceny transakcyjne (RCN)</h3>${rcn}</div>
-    <div class="panel"><h3>Ostatnie przebiegi</h3><div class="scroll">${runs}</div></div></div>`;
+    <div class="panel"><h3>Ostatnie przebiegi</h3><div class="scroll">${runs}</div></div>
+    ${qualityPanel(d.quality)}</div>`;
+}
+function qualityPanel(q){
+  const r=q&&q.report; if(!r)return '<div class="panel" style="grid-column:1/-1"><h3>Jakość danych</h3><div class="na">Raport pojawi się po najbliższej deduplikacji.</div></div>';
+  const M={single:'pojedyncze',parcel_id:'numer działki',location:'pinezka',price_area:'cena + metraż + typ'};
+  const link=k=>{const [src,id]=k.split(':');return `${esc(SRC[src]||src)} ${esc(id)}`};
+  const ex=(arr,fn)=>arr&&arr.length?`<ul class="msg" style="margin:4px 0 0;padding-left:18px">${arr.slice(0,6).map(x=>`<li>${fn(x)}</li>`).join('')}</ul>`:'';
+  return `<div class="panel" style="grid-column:1/-1"><h3>Jakość danych <small class="ar">deduplikacja ${esc(q.algorithm_version)}, ${ago(q.run_at)}</small></h3>
+    <div><b>${nf(r.listings)}</b> ogłoszeń → <b>${nf(r.properties)}</b> działek · ${nf(r.multi_listing_properties)} działek z kilku ogłoszeń ·
+      połączenia: ${Object.entries(r.methods||{}).filter(([k])=>k!=='single').map(([k,v])=>`${M[k]||k} ${nf(v)}`).join(', ')}</div>
+    <div class="sys-grid" style="margin-top:10px">
+      <div><b>Do sprawdzenia: ${nf(r.suspicious)}</b><div class="msg">połączone ogłoszenia z ceną różną o >25% albo innym metrażem</div>
+        ${ex(r.suspicious_examples,x=>`${x.listings.map(link).join(' + ')}: ${x.prices.map(v=>nf(v)).join(' / ')} zł, ${x.areas.map(v=>nf(v)).join(' / ')} m²`)}</div>
+      <div><b>Prawie duplikaty: ${nf(r.near_miss)}</b><div class="msg">pary z różnych portali, którym zabrakło jednego punktu zgodności (nie połączone)</div>
+        ${ex(r.near_miss_examples,x=>`${link(x.a)} ↔ ${link(x.b)}: ${nf(x.area)} m², ${x.prices.map(v=>nf(v)).join(' / ')} zł`)}</div>
+      <div><b>Nieprawdopodobne wartości: ${nf(r.outliers)}</b><div class="msg">cena za m² poniżej 2 zł lub ponad 4000 zł, metraż poniżej 100 m²</div>
+        ${ex(r.outlier_examples,x=>`${link(x.listing)}: ${nf(x.area)} m², ${nf(x.price)} zł (${nf(x.ppm2,1)} zł/m²)`)}</div>
+    </div></div>`;
 }
 $('#sys-btn').addEventListener('click',()=>{
   const sec=$('#sys'), open=sec.hidden; sec.hidden=!open; $('#sys-btn').classList.toggle('on',open);
