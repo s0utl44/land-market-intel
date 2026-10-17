@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 WFS = "https://mapy.geoportal.gov.pl/wss/service/rcn"
 LAYER = "ms:dzialki"
-START = date(2020, 1, 1)        # pierwsze pobranie: od tego dnia (pełna historia z ostatnich lat)
+START = date(2024, 1, 1)        # pierwsze pobranie: od tego dnia (starsze lata pomijamy — za długo i mniej istotne)
 REFRESH_BACK_DAYS = 120         # starostwa dopisują akty z opóźnieniem: odświeżamy ostatnie miesiące
 PAGE = 1000
 # geoportal pod obciążeniem chwilowo oddaje puste strony (cały powiat "0 z 310"), a po chwili wszystko:

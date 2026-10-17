@@ -88,7 +88,7 @@ docker compose run --rm -T app init-db
 systemd-run --unit lmi-rcn-init --working-directory=/opt/lmi /usr/bin/docker compose run --rm -T app rcn
 journalctl -u lmi-rcn-init -f                    # miesiąc po miesiącu: "N rekordów (usługa: N ...)"
 systemd-run --unit lmi-rcn-repair --working-directory=/opt/lmi /usr/bin/docker compose run --rm -T app rcn --repair   # ponów tylko luki
-docker compose run --rm -T app rcn-coverage     # per powiat: rekordy w usłudze vs w bazie
+docker compose run --rm -T app rcn-coverage     # od 2024 (--since RRRR-MM-DD), per powiat: rekordy w usłudze vs w bazie
 ```
 
 Import dla każdego miesiąca najpierw pyta usługę o liczbę rekordów i przerywa (`Incomplete`), jeśli pobierze mniej.

@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
                    help="tylko ponów kawałki zapisane jako luki (bez pobierania całych miesięcy)")
 
     s = sub.add_parser("rcn-coverage", help="kompletność RCN per powiat: usługa vs baza (do porównań)")
-    s.add_argument("--since", default="2020-01-01")
+    s.add_argument("--since", default="2024-01-01")
 
     s = sub.add_parser("feedback", help="zgłoszenia ze strony jako tekst do skopiowania")
     s.add_argument("--wszystkie", action="store_true", help="także oznaczone jako zrobione")
