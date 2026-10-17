@@ -200,6 +200,12 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
         _, scores = db.run_metrics(conn, run_id)
         print(f"Deduplikacja: {len(links)} ogłoszeń -> {len({l.property_key for l in links})} nieruchomości. "
               f"Metryki przeliczone ({len(scores)} gmin).")
+        try:
+            from . import web
+            web.refresh_changes(conn)   # strona czyta gotowe "Co się zmieniło" zamiast liczyć przy wejściu
+        except Exception as exc:  # noqa: BLE001 - strona policzy sama przy pierwszym wejściu
+            conn.rollback()
+            print(f"Podsumowanie zmian dla strony: nie przeliczono ({type(exc).__name__}: {exc}).")
     if first_error is not None and not imported:
         raise first_error
     return max(codes, default=0)

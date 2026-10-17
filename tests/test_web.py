@@ -218,6 +218,8 @@ def test_transactions_endpoint_and_ranking(client, pg_conn):
                            nier_type, share, mpzp, area_m2, land_use) VALUES (%s, %s, '9900011', %s, 'wolnyRynek', %s,
                            'nieruchomoscGruntowaNiezabudowana', '1/1', %s, %s, 'gruntyRolne')""", (tx, parcel, d, price, mpzp, area))
     pg_conn.commit()
+    from lmi import rcn
+    rcn.refresh_land(pg_conn)          # strona czyta zmaterializowane transakcje, odświeżane po pobraniu RCN
     d = client.get("/api/municipality/9900011/transactions").json()
     s = d["summary"]
     assert s["tx_12m"] == 2 and s["tx_build_12m"] == 1 and float(s["ppm2_build_12m"]) == 300.0
@@ -309,3 +311,17 @@ def test_changes(client):
     assert all(c["change"] < 0 for c in d["cuts"])
     assert all("vs_median" in f for f in d["fresh"]) and isinstance(d["gminy"], list)
     assert client.get("/api/changes", params={"days": 99}).status_code == 422
+
+
+def test_changes_snapshot_is_reused(client, pg_conn):
+    from lmi import web
+
+    first = client.get("/api/changes", params={"days": 1}).json()
+    n = pg_conn.execute("SELECT count(*), count(DISTINCT state) FROM mart.changes_snapshot").fetchone()
+    assert n == (3, 1)                                   # jedno przeliczenie dało wszystkie trzy okresy
+    pg_conn.execute("UPDATE mart.changes_snapshot SET data = data || '{\"marker\": 1}'")
+    pg_conn.commit()
+    assert client.get("/api/changes", params={"days": 30}).json()["marker"] == 1   # z zapisanych, bez liczenia
+    assert first["daily"] and first["since"] == first["last_day"]
+    web.refresh_changes(pg_conn)                          # wywołanie z porannego przebiegu
+    assert "marker" not in client.get("/api/changes", params={"days": 7}).json()

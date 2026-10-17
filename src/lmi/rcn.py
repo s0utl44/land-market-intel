@@ -309,8 +309,15 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
                         (teryt_prefix, a, b, matched, len(rows), "; ".join(gaps) or None))
         conn.commit()  # miesiąc po miesiącu: przerwane pobieranie nie traci wyników
         total += len(rows)
+    refresh_land(conn)
     log.info("rcn: zapisano %d rekordów (od %s)", total, since)
     return total
+
+
+def refresh_land(conn) -> None:
+    """Przelicza zmaterializowane transakcje gruntowe (czyta je strona)."""
+    conn.execute("REFRESH MATERIALIZED VIEW mart.rcn_land_transactions")
+    conn.commit()
 
 
 GAP = re.compile(r"^(\d+) (\d{4}-\d{2}-\d{2}|bez daty)–(\d{4}-\d{2}-\d{2})?: brak \d+ z \d+$")
@@ -359,6 +366,8 @@ def repair(conn, get=None, teryt_prefix: str = "02") -> tuple[int, int]:
                      ("; ".join(remaining) or None, saved, fetched_at, prefix, period))
         conn.commit()
         left += len(remaining)
+    if fixed:
+        refresh_land(conn)
     log.info("rcn: naprawa luk: naprawiono %d, zostało %d", fixed, left)
     return fixed, left
 

@@ -38,7 +38,8 @@ ALTER TABLE scrape.rcn_fetch_log ADD COLUMN IF NOT EXISTS gaps text;
 
 -- Transakcje samym gruntem: każda działka niezabudowana, w całości, wolny rynek albo przetarg,
 -- jedna gmina. Mieszane (dom + działka, lokal z udziałem w gruncie, bonifikaty) pomijamy.
-CREATE OR REPLACE VIEW mart.rcn_land_transactions AS
+-- Definicja "na żywo"; strona czyta jej zmaterializowaną kopię mart.rcn_land_transactions (013).
+CREATE OR REPLACE VIEW mart.rcn_land_transactions_live AS
 SELECT tx_id,
        min(gmina_teryt)                                       AS gmina_teryt,
        min(doc_date)                                          AS doc_date,
