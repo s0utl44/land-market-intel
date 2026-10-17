@@ -148,6 +148,23 @@ td.two-line{white-space:normal;min-width:120px}
 .qbars span:hover{opacity:1}
 .qlab{display:flex;justify-content:space-between;color:var(--muted);font-size:.72rem}
 @media (max-width:760px){.tx-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* zgłoszenia */
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#1f2a36}
+dialog#fb-dialog{border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--ink);padding:22px;width:min(520px,calc(100vw - 32px));box-shadow:0 20px 50px rgb(0 0 0 / .25)}
+dialog#fb-dialog::backdrop{background:rgb(15 20 27 / .55)}
+#fb-form{display:flex;flex-direction:column;gap:12px}
+#fb-form label{display:flex;flex-direction:column;gap:4px}
+#fb-form textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:8px 10px;font:inherit;font-size:.92rem;resize:vertical}
+.fb-hint,.fb-ctx{margin:0;color:var(--muted);font-size:.84rem}
+.fb-actions{display:flex;justify-content:flex-end;gap:8px}
+.fb-msg{margin:0;font-size:.86rem;font-weight:600}
+.fbl-list{display:flex;flex-direction:column}
+.fbl-item{padding:12px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:4px 12px}
+.fbl-item:first-child{border-top:0}
+.fbl-item .meta{font-size:.78rem;color:var(--muted)}
+.fbl-item p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.fbl-item.done{opacity:.55}
 /* zespół: ulubione i komentarze */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 td.team{white-space:nowrap;width:1%}
@@ -167,7 +184,7 @@ tr.cm-row td{background:var(--bg);white-space:normal;text-align:left;padding:12p
 .cm-item p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-form{display:flex;gap:8px;align-items:flex-start;max-width:760px}
 .cm-form textarea{flex:1;min-height:58px;resize:vertical;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
-#fav-btn.on{border-color:var(--gold);color:var(--gold-ink)}
+#fav-btn.on,#fbl-btn.on{border-color:var(--gold);color:var(--gold-ink)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
 footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
@@ -192,7 +209,11 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       <h1>Radar <span>Działek</span></h1>
     </div>
     <div class="status" id="status"><span>Ładowanie danych…</span></div>
-    <button type="button" class="btn" id="fav-btn" aria-controls="favs" aria-expanded="false">★ Ulubione</button>
+    <div class="top-actions">
+      <button type="button" class="btn" id="fb-btn" aria-haspopup="dialog">Zgłoś uwagę</button>
+      <button type="button" class="btn" id="fbl-btn" aria-controls="fbl" aria-expanded="false" hidden>Zgłoszenia</button>
+      <button type="button" class="btn" id="fav-btn" aria-controls="favs" aria-expanded="false">★ Ulubione</button>
+    </div>
   </div>
 </header>
 
@@ -208,6 +229,18 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 <main class="wrap">
   <div class="notice warn" id="alert" role="alert" hidden></div>
   <div class="notice" id="early" hidden></div>
+
+  <section id="fbl" aria-labelledby="h-fbl" hidden>
+    <div class="head">
+      <div><h2 id="h-fbl">Zgłoszenia od zespołu</h2>
+        <p>Błędy i propozycje poprawek wysłane przyciskiem „Zgłoś uwagę”. „Kopiuj wszystkie” kopiuje otwarte zgłoszenia jako tekst, gotowy do wklejenia w rozmowę.</p></div>
+      <div class="tools">
+        <label class="check"><input type="checkbox" id="fbl-all"> pokaż też zrobione</label>
+        <button type="button" class="btn" id="fbl-copy">Kopiuj wszystkie</button>
+      </div>
+    </div>
+    <div class="panel"><div id="fbl-list" class="fbl-list"></div></div>
+  </section>
 
   <section id="favs" aria-labelledby="h-favs" hidden>
     <div class="head">
@@ -301,6 +334,20 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   </section>
 </main>
 
+<dialog id="fb-dialog" aria-labelledby="fb-title">
+  <form method="dialog" id="fb-form">
+    <h2 id="fb-title">Zgłoś uwagę</h2>
+    <p class="fb-hint">Błąd na stronie, zła liczba, brakująca oferta albo pomysł na usprawnienie. Dołączymy informację, którą gminę i widok masz otwarte.</p>
+    <label><span class="label">Rodzaj</span>
+      <select id="fb-kind"><option>błąd</option><option>poprawka danych</option><option>pomysł</option></select></label>
+    <label><span class="label">Opis</span>
+      <textarea id="fb-body" required minlength="3" maxlength="4000" rows="6" placeholder="Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”"></textarea></label>
+    <p class="fb-ctx" id="fb-ctx"></p>
+    <div class="fb-actions"><button type="button" class="btn" id="fb-cancel">Anuluj</button><button type="submit" class="btn primary" id="fb-send">Wyślij</button></div>
+    <p class="fb-msg" id="fb-msg" role="status"></p>
+  </form>
+</dialog>
+
 <footer>
   <div class="wrap">
     <span>Dane: ogłoszenia Otodom, Gratka, Nieruchomości-online i Adresowo (codziennie o 8:00), gminy: GUGiK ULDK. Ceny ofertowe, nie transakcyjne. Zniknięcie oferty nie oznacza sprzedaży.</span>
@@ -340,7 +387,7 @@ async function load(){
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank();
-  api('/api/me').then(m=>{ME=m;if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
+  api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
@@ -650,6 +697,46 @@ async function loadOffers(){
   $('#offers-more').innerHTML=`<span>${rows.length===300?'Pierwsze 300 ofert. Zawęź filtry, żeby zobaczyć resztę.':`Ofert: ${rows.length}`}</span>`;
 }
 
+// --- zgłoszenia błędów i poprawek ----------------------------------------------------------------
+function fbContext(){
+  const r=selected&&RANK.find(x=>x.teryt===selected);
+  return {gmina:r?r.name:'',teryt:selected||'',widok:!$('#favs').hidden?'ulubione':selected?'karta gminy':'ranking',
+          adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
+}
+$('#fb-btn').addEventListener('click',()=>{
+  const c=fbContext(); $('#fb-msg').textContent=''; $('#fb-send').disabled=false;
+  $('#fb-ctx').textContent=`Dołączymy: ${c.widok}${c.gmina?' · '+c.gmina:''}.`;
+  $('#fb-dialog').showModal(); $('#fb-body').focus();
+});
+$('#fb-cancel').addEventListener('click',()=>$('#fb-dialog').close());
+$('#fb-form').addEventListener('submit',async ev=>{
+  ev.preventDefault(); const body=$('#fb-body').value.trim(); if(body.length<3)return;
+  $('#fb-send').disabled=true; $('#fb-msg').textContent='Wysyłanie…';
+  try{
+    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:fbContext()});
+    $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value='';
+    setTimeout(()=>$('#fb-dialog').close(),1400); if(ME.is_admin&&!$('#fbl').hidden)loadFbl();
+  }catch(e){$('#fb-msg').textContent='Nie udało się wysłać. Spróbuj ponownie.';$('#fb-send').disabled=false}
+});
+async function loadFbl(){
+  const list=$('#fbl-list'); list.innerHTML='<div class="empty">Ładowanie…</div>';
+  let rows; try{rows=await api('/api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
+  $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
+  list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
+    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div><p>${esc(r.body)}</p></div>
+    <div><button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
+}
+$('#fbl-list').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-fb]');if(!b)return;
+  try{await send(`/api/feedback/${b.dataset.fb}/status`,{status:b.dataset.st});loadFbl()}catch(e){alert('Nie udało się zmienić statusu.')}});
+$('#fbl-all').addEventListener('change',loadFbl);
+$('#fbl-copy').addEventListener('click',async()=>{
+  try{const r=await fetch('/api/feedback/export?status='+($('#fbl-all').checked?'wszystkie':'nowe'),{credentials:'same-origin'});
+    const txt=await r.text(); await navigator.clipboard.writeText(txt);
+    $('#fbl-copy').textContent='Skopiowano ✓'; setTimeout(()=>$('#fbl-copy').textContent='Kopiuj wszystkie',1600);
+  }catch(e){alert('Nie udało się skopiować. Otwórz /api/feedback/export i skopiuj ręcznie.')}});
+$('#fbl-btn').addEventListener('click',()=>{
+  const sec=$('#fbl'), open=sec.hidden; sec.hidden=!open; $('#fbl-btn').classList.toggle('on',open);
+  $('#fbl-btn').setAttribute('aria-expanded',String(open)); if(open){loadFbl();sec.scrollIntoView({block:'start'})}});
 teamClicks($('#offers-body')); teamClicks($('#favs-body'));
 $('#fav-btn').addEventListener('click',()=>{
   const sec=$('#favs'), open=sec.hidden; sec.hidden=!open;

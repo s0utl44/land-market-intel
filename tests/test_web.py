@@ -65,7 +65,7 @@ def test_offers_rejects_bad_input(client):
 
 
 def test_me_reads_identity_from_proxy_header(client):
-    assert client.get("/api/me").json() == {"email": None, "user": "zespół", "logout_url": None}
+    assert client.get("/api/me").json() == {"email": None, "user": "zespół", "is_admin": False, "logout_url": None}
     d = client.get("/api/me", headers={"X-Auth-Request-Email": "jan@donehome.pl"}).json()
     assert d["email"] == "jan@donehome.pl" and d["logout_url"].startswith("/oauth2/sign_out")
 
@@ -193,7 +193,7 @@ def test_shared_password_is_one_team_user(client):
     assert client.get("/api/me").json()["user"] == "zespół"
     # bramka z hasłem: login osoby z nagłówka Traefika, bez linku wylogowania (to nie Google)
     assert client.get("/api/me", headers={"X-Auth-Request-User": "Kasia"}).json() == \
-        {"email": None, "user": "kasia", "logout_url": None}
+        {"email": None, "user": "kasia", "is_admin": False, "logout_url": None}
     assert client.post("/api/comments", json={"key": "x", "body": "a"}).status_code == 400
     assert client.post("/api/comments", json={"key": "otodom:1", "body": " "}).status_code == 400
 
@@ -213,3 +213,24 @@ def test_transactions_endpoint_and_ranking(client, pg_conn):
     assert [r["ppm2"] for r in d["recent"]] == [100, 300] and len(d["quarters"]) == 2
     rank = {r["teryt"]: r for r in client.get("/api/ranking").json()}
     assert rank["9900011"]["tx_12m"] == 1 and rank["9900022"]["tx_12m"] is None
+
+
+def test_feedback_flow(client, monkeypatch):
+    monkeypatch.setenv("LMI_ADMINS", "Dlys, szef@donehome.pl")
+    kasia = {"X-Auth-Request-User": "kasia"}
+    admin = {"X-Auth-Request-User": "dlys"}
+    r = client.post("/api/feedback", headers=kasia, json={
+        "kind": "błąd", "body": "  Oferta za 450 tys. jest podwójnie  ",
+        "context": {"gmina": "Kąty Wrocławskie", "widok": "karta gminy", "haslo": "nie zapisuj"}})
+    fid = r.json()["id"]
+    assert client.post("/api/feedback", headers=kasia, json={"kind": "inne", "body": "abc"}).status_code == 400
+    assert client.get("/api/feedback", headers=kasia).status_code == 403           # nie admin
+    assert client.get("/api/me", headers=admin).json()["is_admin"] is True
+    rows = client.get("/api/feedback", headers=admin).json()
+    assert [(x["id"], x["author"], x["body"]) for x in rows] == [(fid, "kasia", "Oferta za 450 tys. jest podwójnie")]
+    assert "haslo" not in rows[0]["context"] and rows[0]["context"]["gmina"] == "Kąty Wrocławskie"
+    txt = client.get("/api/feedback/export", headers=admin).text
+    assert f"#{fid} [błąd]" in txt and "gmina: Kąty Wrocławskie" in txt
+    assert client.post(f"/api/feedback/{fid}/status", headers=admin, json={"status": "zrobione"}).status_code == 200
+    assert client.get("/api/feedback", headers=admin).json() == []
+    assert len(client.get("/api/feedback", headers=admin, params={"status": "wszystkie"}).json()) == 1

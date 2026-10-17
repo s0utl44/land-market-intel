@@ -66,6 +66,18 @@ więc dawałby same duplikaty przy podwójnej liczbie zapytań.
 Codzienny przebieg obejmuje wszystkie zatwierdzone portale z listy `LMI_SOURCES`
 (domyślnie `otodom,gratka,nieruchomosci-online,adresowo`; niezatwierdzone są pomijane). Jeden portal można uruchomić osobno: `lmi daily --sources gratka`.
 
+## 4b'. Zgłoszenia ze strony (przycisk „Zgłoś uwagę”)
+
+Każdy zalogowany może wysłać błąd, poprawkę danych albo pomysł. Zgłoszenia widzą tylko administratorzy
+z `LMI_ADMINS` w `.env` (loginy z bramki z hasłem i/lub e-maile z logowania Google, po przecinku):
+
+```bash
+echo "LMI_ADMINS=<twój-login>,<twój-email>" >> .env && docker compose up -d web
+docker compose run --rm -T app feedback        # otwarte zgłoszenia jako tekst do skopiowania
+```
+
+Na stronie administrator ma przycisk „Zgłoszenia”: lista, „Kopiuj wszystkie” i oznaczanie jako zrobione.
+
 ## 4c. Ceny transakcyjne (RCN, geoportal GUGiK)
 
 Bezpłatne od 13.02.2026. Pierwsze pobranie (akty od 2020, całe województwo, bez geometrii) i kontrola kompletności:
