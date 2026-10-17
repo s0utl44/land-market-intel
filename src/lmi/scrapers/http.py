@@ -4,6 +4,7 @@ Odpowiedź 403 kończy działanie (Blocked). Celowo nie próbujemy obchodzić bl
 """
 from __future__ import annotations
 
+import http.client
 import os
 import random
 import time
@@ -60,7 +61,8 @@ class PoliteClient:
                 if exc.code == 404:
                     raise FetchError(f"404 dla {url}") from exc
                 last_error = exc  # 429 / 5xx: ponów z dłuższą przerwą
-            except (urllib.error.URLError, TimeoutError) as exc:
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as exc:
+                # zerwane połączenie (np. "Remote end closed connection") to błąd przejściowy: ponawiamy
                 self._last = time.monotonic()
                 last_error = exc
             time.sleep(min(60, 5 * 2**attempt))

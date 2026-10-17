@@ -262,7 +262,8 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
             since: date | None = None) -> int:
     """Dociąga akty od ostatniego znanego (minus REFRESH_BACK_DAYS) albo od START. Zwraca liczbę rekordów."""
     today = today or date.today()
-    get = get or PoliteClient(min_delay=1.0, max_delay=2.0, timeout=180).get  # usługa publiczna, krótsze przerwy
+    # usługa publiczna: krótsze przerwy, ale więcej ponowień (geoportal czasem zrywa połączenia)
+    get = get or PoliteClient(min_delay=1.0, max_delay=2.0, timeout=180, retries=6).get
     if since is None:
         last = conn.execute("SELECT max(doc_date) FROM scrape.rcn_parcels WHERE gmina_teryt LIKE %s",
                             (teryt_prefix + "%",)).fetchone()[0]

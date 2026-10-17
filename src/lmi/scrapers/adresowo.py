@@ -164,6 +164,8 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
         # idziemy dalej, dopóki pojawiają się nowe oferty
         stats.pages += 1
         stats.items_seen += len(items)
+        if stats.pages % 20 == 0:
+            log.info("adresowo: lista, strona %d, ogłoszeń do tej pory %d", stats.pages, len(ads) + len(items))
         new = [it for it in items if it.ad_id not in ads]
         if not new:
             break  # pusta strona albo powtórka: koniec listy

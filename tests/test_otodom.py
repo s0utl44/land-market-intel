@@ -216,3 +216,27 @@ def test_cached_offers_without_type_get_it_from_title_or_one_refetch():
     web.calls.clear()
     otodom.scrape(web.get, cache, date(2026, 10, 18))
     assert not any("/pl/oferta/" in c for c in web.calls)
+
+
+def test_dropped_connection_is_retried(monkeypatch):
+    import http.client
+    import urllib.request
+
+    from lmi.scrapers.http import PoliteClient
+
+    calls = []
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b"ok"
+
+    def fake_urlopen(req, timeout):
+        calls.append(1)
+        if len(calls) == 1:
+            raise http.client.RemoteDisconnected("Remote end closed connection without response")
+        return Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    assert PoliteClient(min_delay=0, max_delay=0).get("https://x") == "ok" and len(calls) == 2

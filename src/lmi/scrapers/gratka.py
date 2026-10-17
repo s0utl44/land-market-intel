@@ -194,6 +194,8 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
         items, total_pages = parse_search_page(html)
         stats.pages += 1
         stats.items_seen += len(items)
+        if stats.pages % 20 == 0:
+            log.info("gratka: lista, strona %d, ogłoszeń do tej pory %d", stats.pages, len(ads) + len(items))
         if not items:
             break
         for it in items:
