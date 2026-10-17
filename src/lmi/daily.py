@@ -19,16 +19,17 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from . import db
-from .scrapers import gratka, nonline, otodom
+from .scrapers import adresowo, gratka, nonline, otodom
 from .scrapers.http import Blocked, PoliteClient
 from .scrapers.otodom_api import OtodomApi, load_cookie
 from .scrapers.pg_cache import PgCache
 from .synthetic import CSV_COLUMNS
 
 log = logging.getLogger(__name__)
-SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka", "nieruchomosci-online": "Nieruchomości-online"}
-DEFAULT_SOURCES = ("otodom", "gratka", "nieruchomosci-online")
-PORTAL_SCRAPERS = {"gratka": gratka.scrape, "nieruchomosci-online": nonline.scrape}
+SOURCE_NAMES = {"otodom": "Otodom", "gratka": "Gratka", "nieruchomosci-online": "Nieruchomości-online",
+                "adresowo": "Adresowo"}
+DEFAULT_SOURCES = ("otodom", "gratka", "nieruchomosci-online", "adresowo")
+PORTAL_SCRAPERS = {"gratka": gratka.scrape, "nieruchomosci-online": nonline.scrape, "adresowo": adresowo.scrape}
 DROP_ALERT_RATIO = 0.5
 # Mało zapytań dziennie: po blokadzie IP (403) wolimy wolniejsze uzupełnianie niż kolejną blokadę.
 HISTORY_BACKFILL_PER_RUN = 150  # ~300 zapytań API dziennie; ~3300 ofert uzupełni się w ok. 3 tygodnie

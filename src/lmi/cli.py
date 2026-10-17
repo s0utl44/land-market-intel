@@ -61,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("check-nonline", help="szybki test scrapera Nieruchomości-online bez bazy")
     s.add_argument("--region", default="dolnoslaskie")
 
+    s = sub.add_parser("check-adresowo", help="szybki test scrapera Adresowo bez bazy")
+    s.add_argument("--region", default="dolnoslaskie")
+
     s = sub.add_parser("demo", help="pełny pipeline na danych syntetycznych")
     s.add_argument("--out-dir", default="data/synthetic")
     s.add_argument("--regions", type=int, default=0, help="liczba losowych gmin zamiast 3 domyślnych")
@@ -79,6 +82,11 @@ def main(argv: list[str] | None = None) -> int:
         from .scrapers import gratka
 
         return gratka.check(args.region)
+
+    if args.cmd == "check-adresowo":
+        from .scrapers import adresowo
+
+        return adresowo.check(args.region)
 
     if args.cmd == "check-nonline":
         from .scrapers import nonline
