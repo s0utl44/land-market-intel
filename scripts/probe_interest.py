@@ -14,6 +14,7 @@ import sys
 
 from lmi.scrapers import adresowo, gratka, nonline
 from lmi.scrapers.http import PoliteClient
+from lmi.scrapers.nuxt import nuxt_data
 
 WORDS = r"wy[sś]wietl\w*|ods[lł]on\w*|obserwuj\w*|zapisa\w*|ulubion\w*|polubie\w*|zainteresowan\w*|kontakt\w* z|" \
         r"views?|viewed|favou?rite\w*|saved|watch\w*|counter|popular\w*"
@@ -31,8 +32,31 @@ def scan(html: str) -> None:
         if nums:
             hits.append((m.group(0).lower(), [n.strip() for n in nums][:3]))
     print("    tekst:", sorted(set((w, tuple(n)) for w, n in hits))[:12] or "brak")
-    keys = sorted(set(KEY.findall(html)))[:15]
-    print("    pola JSON:", keys or "brak")
+    # krótki fragment wokół "odsłon"/"wyświetl" (same etykiety i liczby, bez treści ogłoszenia)
+    for m in list(re.finditer(r"ods[lł]on\w*|wy[sś]wietle\w*", text, re.I))[:3]:
+        snip = text[max(0, m.start() - 45):m.end() + 30]
+        print("    fragment:", repr(re.sub(r"\b[A-ZŁŚŻŹĆŃÓ][a-ząćęłńóśźż]{2,}\s[A-ZŁŚŻŹĆŃÓ][a-ząćęłńóśźż]{2,}\b", "<imię>", snip)))
+    nd = nuxt_data(html)
+    if nd is not None:
+        found = []
+
+        def walk(o, path, depth=0):
+            if depth > 12 or len(found) > 15:
+                return
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    if re.search(r"view|odslon|display|statist|counter|popular|favou?rit|observ", k, re.I) and \
+                            isinstance(v, (int, float, str)) and re.fullmatch(r"[\d.]+", str(v)):
+                        found.append((f"{path}.{k}", v))
+                    walk(v, f"{path}.{k}", depth + 1)
+            elif isinstance(o, list):
+                for i, v in enumerate(o[:5]):
+                    walk(v, f"{path}[{i}]", depth + 1)
+        walk(nd, "$")
+        print("    pola Nuxt (rozpakowane):", [(p[-70:], v) for p, v in found] or "brak")
+    else:
+        keys = sorted(set(KEY.findall(html)))[:15]
+        print("    pola JSON:", keys or "brak")
 
 
 def main() -> None:
