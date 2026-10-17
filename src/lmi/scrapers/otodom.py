@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Callable, Protocol
 
-from . import uldk
+from . import interest, uldk
 from .http import FetchError
 from .otodom_api import OtodomApi, SessionExpired
 
@@ -236,6 +236,9 @@ class ScrapeStats:
     session_expired: bool = False  # sesja konta Otodom wygasła w trakcie przebiegu
     land_use_filled: int = 0       # rodzaj działki uzupełniony z tytułu/opisu dla ofert z cache
     land_use_refetched: int = 0    # ... w tym ze strony oferty pobranej ponownie
+    interest_refreshed: int = 0    # ponowne pomiary wyświetleń/zapisań (interest.refresh)
+    interest_failed: int = 0
+    interest_due: int = 0          # ofert z minionym terminem pomiaru (przed budżetem)
     notes: list[str] = field(default_factory=list)
 
 
@@ -283,7 +286,7 @@ def _add_history(api: OtodomApi | None, it: SearchItem, detail: dict, observed_a
         return False
     detail["history"] = history
     if statistics:
-        detail["stats"] = {**statistics, "at": observed_at.isoformat()}
+        interest.record(detail, observed_at, statistics.get("views"), statistics.get("saved"))
     if new:
         stats.history_fetched += 1
     else:
@@ -291,6 +294,30 @@ def _add_history(api: OtodomApi | None, it: SearchItem, detail: dict, observed_a
         if stats.history_backfilled % 100 == 0:
             log.info("otodom: uzupełniono historię %d ofert", stats.history_backfilled)
     return True
+
+
+OTODOM_NEW_EVERY, OTODOM_OLD_EVERY = 3, 14  # dni; Otodom blokuje przy dużej liczbie zapytań
+
+
+def _refresh_interest(api: OtodomApi, ads: dict, cache, observed_at: date, budget: int,
+                      stats: ScrapeStats) -> None:
+    """Ponowny pomiar wyświetleń/zapisań dla ofert, które mają już historię z konta."""
+    def fetch(it, detail):
+        if "history" not in detail:
+            return None
+        listed = next((h["date"] for h in detail["history"] if "FIRST_PUBLISHED" in h.get("changes", [])), None)
+        try:
+            st = api.statistics(it.ad_id, listed or (it.listed_at.isoformat() if it.listed_at else None))
+        except SessionExpired:
+            stats.session_expired = True
+            return False
+        except ValueError as exc:  # niepoprawna odpowiedź API
+            raise FetchError(str(exc)) from exc
+        return (st.get("views"), st.get("saved")) if st else None
+
+    with_history = [it for it in ads.values() if (d := cache.get_detail(it.ad_id)) and "history" in d]
+    interest.refresh(with_history, cache, observed_at, budget, fetch, stats, "otodom",
+                     OTODOM_NEW_EVERY, OTODOM_OLD_EVERY, url_of=lambda it: it.slug)
 
 
 def scrape(
@@ -305,6 +332,7 @@ def scrape(
     api: OtodomApi | None = None,
     history_backfill: int = 0,
     max_type_refetch: int = 100,
+    interest_budget: int = 0,
 ) -> tuple[list[dict], ScrapeStats]:
     """Jeden przebieg: wszystkie strony wyników + brakujące szczegóły + gminy.
 
@@ -313,6 +341,7 @@ def scrape(
     `geo_get` — osobny klient dla ULDK (krótsze przerwy niż dla Otodom); domyślnie `get`.
     `api` — API zalogowanego konta (historia, statystyki); None = bez historii.
     `history_backfill` — ile ofert pobranych wcześniej uzupełnić o historię w tym przebiegu.
+    `interest_budget` — ile ofert z historią odświeżyć o wyświetlenia/zapisania (lekkie zapytanie API).
     """
     geo_get = geo_get or get
     stats = ScrapeStats()
@@ -412,5 +441,7 @@ def scrape(
             "listed_at": it.listed_at.isoformat() if it.listed_at else "",
             "pushed_up_at": it.pushed_up_at.isoformat() if it.pushed_up_at else "",
         })
+    if api is not None and api.alive and interest_budget:
+        _refresh_interest(api, ads, cache, observed_at, interest_budget, stats)
     stats.rows = len(rows)
     return rows, stats

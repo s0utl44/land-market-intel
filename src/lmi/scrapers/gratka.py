@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from . import uldk
+from . import interest, uldk
 from .http import FetchError
 from .nuxt import find_first, nuxt_data
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
@@ -129,6 +129,17 @@ def _land_use_from_params(pd: dict) -> str | None:
     return None
 
 
+VIEWS = re.compile(r"Liczba\s+ods[lł]on\D{0,20}?(\d[\d\s\u00a0]*)", re.I)
+GRATKA_NEW_EVERY, GRATKA_OLD_EVERY = 2, 7  # dni
+
+
+def parse_views(html: str) -> int | None:
+    """Licznik "Liczba odsłon N" ze strony oferty (tekst, nie dane Nuxt)."""
+    text = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<script.*?</script>", " ", html, flags=re.S)).split())
+    m = VIEWS.search(text)
+    return int(re.sub(r"\D", "", m.group(1))) if m else None
+
+
 def parse_detail_page(html: str, title: str | None = None, description: str | None = None) -> dict:
     nd = nuxt_data(html)
     pd = find_first(nd, lambda d: isinstance(d.get("propertyData"), dict)) if nd is not None else None
@@ -159,12 +170,15 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         "area_m2": _num(pd.get("area")),
         "municipality_hint": loc.get("commune"),
         "county_hint": loc.get("county"),
+        "views": parse_views(html),
     }
 
 
 def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
-           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None) -> tuple[list[dict], ScrapeStats]:
-    """Wszystkie strony wyników + brakujące strony ofert (raz na ofertę) + gminy z ULDK."""
+           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None,
+           interest_budget: int = 0) -> tuple[list[dict], ScrapeStats]:
+    """Wszystkie strony wyników + brakujące strony ofert (raz na ofertę) + gminy z ULDK
+    + ponowny pomiar liczby odsłon dla ofert, którym minął termin (najwyżej `interest_budget`)."""
     geo_get = geo_get or get
     stats = ScrapeStats()
     ads: dict[str, GratkaItem] = {}
@@ -189,6 +203,9 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     log.info("gratka: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
                       parse_detail_page, "gratka")
+    interest.refresh(ads.values(), cache, observed_at, interest_budget,
+                     lambda it, detail: (parse_views(get(it.url)), None), stats, "gratka",
+                     GRATKA_NEW_EVERY, GRATKA_OLD_EVERY)
     return rows, stats
 
 
@@ -218,6 +235,8 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
                 log.warning("%s: szczegóły %s: %s", label, it.ad_id, exc)
                 continue
             stats.details_fetched += 1
+            if "views" in detail:  # pierwszy pomiar licznika (portale, które go pokazują)
+                interest.record(detail, observed_at, detail.pop("views"))
             cache.put_detail(it.ad_id, it.url, detail)
             if stats.details_fetched % 100 == 0:
                 log.info("%s: pobrano szczegóły %d nowych ofert", label, stats.details_fetched)

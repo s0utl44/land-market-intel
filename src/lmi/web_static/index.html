@@ -225,7 +225,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
         <label><span class="label">Na rynku dłużej niż</span>
           <select id="f-age"><option value="">dowolnie</option><option value="90">3 miesiące</option><option value="180">6 miesięcy</option><option value="365">rok</option><option value="730">2 lata</option></select></label>
         <label><span class="label">Sortuj</span>
-          <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option><option value="pushed">ostatnio podbite</option><option value="saved">najczęściej zapisywane</option><option value="views">najczęściej oglądane</option></select></label>
+          <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option><option value="pushed">ostatnio podbite</option><option value="saved">najczęściej zapisywane</option><option value="views">najczęściej oglądane</option><option value="views_rate">najszybciej rośnie zainteresowanie</option></select></label>
       </div>
       <div class="scroll">
         <table>
@@ -479,7 +479,7 @@ async function loadOffers(){
     <td>${nf(r.price)} zł</td>
     <td><b>${nf(r.ppm2)}</b></td>
     <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">wystawiana ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
-    <td class="two-line">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${nf(r.saved)} ${r.saved===1?'zapis':'zapisów'}</span>`:'<span class="na">–</span>'}</td>
+    <td class="two-line" title="${r.views!=null?`Licznik z portalu ${SRC[r.views_source]||r.views_source}`+(r.views_per_day!=null?'; tempo: przyrost między pomiarami albo średnia od wystawienia':''):''}">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${r.views_per_day!=null?nf(r.views_per_day,r.views_per_day<10?1:0)+'/dzień':''}${r.saved!=null?(r.views_per_day!=null?' · ':'')+nf(r.saved)+' '+(r.saved===1?'zapis':'zapisów'):''}</span>`:'<span class="na">–</span>'}</td>
     <td title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">${r.portals}</td>
     <td class="l two-line" title="${esc(histTxt)}">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}${hist.length>1&&hist[0].price!==hist[hist.length-1].price?`<span class="sub2">${nf(hist[0].price)} → ${nf(hist[hist.length-1].price)} zł</span>`:''}</td>
     <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}</td></tr>`}).join('');

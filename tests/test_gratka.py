@@ -97,3 +97,24 @@ def test_missing_later_page_ends_listing():
 def test_precise_pin_vs_town_center():
     assert gratka.parse_detail_page(detail_page(lat=51.11382622, lon=16.91037529))["precise"] is True
     assert gratka.parse_detail_page(detail_page(lat=51.2851, lon=16.155))["precise"] is False
+
+
+def test_parse_views():
+    html = "<div>Numer ogłoszenia gratka-1211-34</div><div>Liczba odsłon</div> <span>1 207</span><script>x</script>"
+    assert gratka.parse_views(html) == 1207
+    assert gratka.parse_views("<div>Brak licznika</div>") is None
+
+
+def test_views_are_measured_and_refreshed():
+    page = detail_page() + "<p>Liczba odsłon 7</p>"
+    web = Web(pages=[search_page([node(1)], total=1)], details={"1": page},
+              communes={"16.155000,51.285100": "0\n020905_2|Miłkowice"})
+    cache = otodom.MemoryCache()
+    gratka.scrape(web.get, cache, date(2026, 10, 17), interest_budget=50)
+    assert cache.get_detail("1")["views_log"] == [{"date": "2026-10-17", "views": 7, "saved": None}]
+    web.details["1"] = detail_page() + "<p>Liczba odsłon 19</p>"
+    web.calls.clear()
+    gratka.scrape(web.get, cache, date(2026, 10, 18), interest_budget=50)   # za wcześnie (oferta stara: co 7 dni)
+    assert not any("/ob/" in c for c in web.calls)
+    gratka.scrape(web.get, cache, date(2026, 10, 24), interest_budget=50)
+    assert cache.get_detail("1")["stats"]["views"] == 19

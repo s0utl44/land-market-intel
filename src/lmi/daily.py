@@ -33,6 +33,10 @@ PORTAL_SCRAPERS = {"gratka": gratka.scrape, "nieruchomosci-online": nonline.scra
 DROP_ALERT_RATIO = 0.5
 # Mało zapytań dziennie: po blokadzie IP (403) wolimy wolniejsze uzupełnianie niż kolejną blokadę.
 HISTORY_BACKFILL_PER_RUN = 150  # ~300 zapytań API dziennie; ~3300 ofert uzupełni się w ok. 3 tygodnie
+# Ponowne pomiary wyświetleń na przebieg (interest.py): Otodom ostrożnie (lekkie zapytanie API),
+# Gratka więcej (strona oferty). Nieruchomości-online i Adresowo nie pokazują liczników.
+INTEREST_BUDGET = {"otodom": int(os.environ.get("LMI_INTEREST_OTODOM", 100)),
+                   "gratka": int(os.environ.get("LMI_INTEREST_GRATKA", 600))}
 
 
 def _log_run(conn, source, started, status, rows=None, stats=None, message=None):
@@ -183,11 +187,13 @@ def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, c
             print("Historia ofert z konta Otodom:", "włączona" if api else "wyłączona (brak pliku z ciasteczkiem)")
             rows, stats = otodom.scrape(client.get, PgCache(conn), observed_at, region_slug=region_slug,
                                         teryt_prefix=teryt_prefix, max_details=max_details,
-                                        geo_get=geo_client.get, api=api, history_backfill=history_backfill)
+                                        geo_get=geo_client.get, api=api, history_backfill=history_backfill,
+                                        interest_budget=INTEREST_BUDGET["otodom"])
         else:
+            extra = {"interest_budget": INTEREST_BUDGET[source]} if source in INTEREST_BUDGET else {}
             rows, stats = PORTAL_SCRAPERS[source](client.get, PgCache(conn, source), observed_at,
                                                   region_slug=region_slug, teryt_prefix=teryt_prefix,
-                                                  max_details=max_details, geo_get=geo_client.get)
+                                                  max_details=max_details, geo_get=geo_client.get, **extra)
     except Blocked as exc:
         _log_run(conn, source, started, "blocked", message=str(exc))
         print(f"{name}: BLOKADA: {exc}. Przerwano bez ponawiania.")
@@ -207,6 +213,9 @@ def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, c
     if source == "otodom" and api is not None:
         print(f"Historia: nowe {stats.history_fetched}, uzupełnione {stats.history_backfilled}, "
               f"błędy {stats.history_failed}")
+    if stats.interest_refreshed or stats.interest_due:
+        print(f"Liczniki zainteresowania: odświeżone {stats.interest_refreshed} z {stats.interest_due} "
+              f"zaległych, błędy {stats.interest_failed}")
     if not rows:
         _log_run(conn, source, started, "error", 0, stats, "0 wierszy")
         print(f"{name}: BŁĄD: 0 wierszy.")

@@ -113,6 +113,7 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
     rows = client.get("/api/municipality/9900011/offers", params={"sort": "saved"}).json()
     o = rows[0]
     assert o["saved"] == 3 and o["views"] == 228 and o["relists"] == 1
+    assert o["views_source"] == "otodom"
     assert o["price_change"] == -20.0           # 625 000 -> 500 000 z historii Otodom
     assert o["start_date"] == "2013-05-08" and len(o["otodom_history"]) == 5
     assert o["land_use_source"] == "tytuł"
@@ -131,3 +132,28 @@ def test_overview_reports_failed_attempt(client, pg_conn):
     assert d["last_run"]["status"] == "ok" and d["latest_attempt"]["status"] == "blocked"
     by_src = {x["source"]: x for x in d["sources"]}
     assert by_src["otodom"]["latest"]["status"] == "blocked" and by_src["otodom"]["last_ok"] is not None
+
+
+def test_gratka_views_and_rate(client, pg_conn, tmp_path):
+    import json
+
+    csv = ("source_listing_id,observed_at,municipality_teryt,municipality_name,area_m2,price_pln,listed_at\n"
+           "g1,2026-06-29,9900011,Syntetyczna Rozwojowa,1000,500000,2026-06-19\n"
+           "g2,2026-06-29,9900011,Syntetyczna Rozwojowa,1200,400000,2026-06-09\n")
+    f = tmp_path / "g.csv"
+    f.write_text(csv)
+    db.add_source(pg_conn, "gratka", "Gratka")
+    db.approve_source(pg_conn, "gratka", "test", "pytest")
+    db.import_csv(pg_conn, "gratka", f)
+    # g1: dwa pomiary -> przyrost 60 w 3 dni = 20/dzień; g2: jeden pomiar 100 po 20 dniach = 5/dzień
+    logs = {"g1": [{"date": "2026-06-26", "views": 40}, {"date": "2026-06-29", "views": 100}],
+            "g2": [{"date": "2026-06-29", "views": 100}]}
+    for aid, lg in logs.items():
+        pg_conn.execute("INSERT INTO scrape.portal_details (source_id, ad_id, url, detail) VALUES ('gratka', %s, 'u', %s)",
+                        (aid, json.dumps({"views_log": lg, "stats": {"views": lg[-1]["views"], "at": lg[-1]["date"]}})))
+    pg_conn.commit()
+    run_id, _ = db.run_dedup(pg_conn)
+    db.run_metrics(pg_conn, run_id)
+    rows = client.get("/api/municipality/9900011/offers", params={"sort": "views_rate"}).json()
+    top = [r for r in rows if r["views_source"] == "gratka"]
+    assert [(r["views"], float(r["views_per_day"])) for r in top[:2]] == [(100, 20.0), (100, 5.0)]

@@ -132,6 +132,7 @@ SORTS = {
     "pushed": "pushed_up_at DESC NULLS LAST",
     "saved": "saved DESC NULLS LAST",
     "views": "views DESC NULLS LAST",
+    "views_rate": "views_per_day DESC NULLS LAST",
 }
 
 
@@ -197,6 +198,8 @@ def municipality_offers(
                    max(pushed_up_at)                                    AS pushed_up_at,
                    (array_agg(source_listing_id ORDER BY observed_at DESC)
                         FILTER (WHERE source_id = 'otodom'))[1]          AS otodom_id,
+                   (array_agg(source_listing_id ORDER BY observed_at DESC)
+                        FILTER (WHERE source_id = 'gratka'))[1]          AS gratka_id,
                    (array_agg(source_id ORDER BY observed_at DESC, source_id))[1]          AS source,
                    (array_agg(source_listing_id ORDER BY observed_at DESC, source_id))[1]  AS source_listing_id,
                    array_agg(DISTINCT source_id)                         AS sources
@@ -218,6 +221,7 @@ def municipality_offers(
             SELECT p.property_key, d.detail->'history' AS otodom_history,
                    d.detail->>'land_use_source' AS land_use_source,
                    (d.detail->'stats'->>'views')::int AS views, (d.detail->'stats'->>'saved')::int AS saved,
+                   d.detail->'views_log' AS views_log,
                    (SELECT (e->>'price')::numeric FROM jsonb_array_elements(d.detail->'history') e
                      WHERE e->>'price' IS NOT NULL ORDER BY e->>'date' LIMIT 1) AS hist_first_price,
                    (SELECT (e->>'date')::date FROM jsonb_array_elements(d.detail->'history') e
@@ -226,8 +230,18 @@ def municipality_offers(
                      WHERE e->'changes' ? 'ACTIVATED')::int AS relists
             FROM p JOIN scrape.otodom_details d ON d.ad_id = p.otodom_id
         ),
+        -- liczba odsłon z Gratki (gdy oferty nie ma na Otodomie albo brak tam statystyk)
+        gv AS (
+            SELECT p.property_key, (g.detail->'stats'->>'views')::int AS views, g.detail->'views_log' AS views_log
+            FROM p JOIN scrape.portal_details g ON g.source_id = 'gratka' AND g.ad_id = p.gratka_id
+        ),
         f AS (
-            SELECT p.*, c.history, oh.otodom_history, oh.views, oh.saved, coalesce(oh.relists, 0) AS relists,
+            SELECT p.*, c.history, oh.otodom_history,
+                   coalesce(oh.views, gv.views) AS views,
+                   CASE WHEN oh.views IS NOT NULL THEN 'otodom' WHEN gv.views IS NOT NULL THEN 'gratka' END
+                        AS views_source,
+                   CASE WHEN oh.views IS NOT NULL THEN oh.views_log ELSE gv.views_log END AS views_log,
+                   oh.saved, coalesce(oh.relists, 0) AS relists,
                    coalesce(oh.land_use_source, pd.detail->>'land_use_source') AS land_use_source,
                    round(price / area, 1) AS ppm2,
                    -- zmiana ceny od pierwszej znanej: z historii Otodom, a bez niej od pierwszej obserwacji
@@ -235,13 +249,14 @@ def municipality_offers(
                    least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS start_date,
                    last_seen - least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS age_days
             FROM p LEFT JOIN changes c USING (property_key) LEFT JOIN oh USING (property_key)
+                   LEFT JOIN gv USING (property_key)
                    LEFT JOIN scrape.portal_details pd
                           ON pd.source_id = p.source AND pd.ad_id = p.source_listing_id
         )
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise, source, sources,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
-               otodom_history, views, saved, relists, land_use_source
-        FROM f WHERE {' AND '.join(where)}
+               otodom_history, views, views_source, views_per_day, saved, relists, land_use_source
+        FROM (SELECT *, scrape.views_per_day(views_log, start_date) AS views_per_day FROM f) f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)
     return rows
