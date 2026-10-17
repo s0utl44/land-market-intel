@@ -100,3 +100,26 @@ def test_scrape_end_to_end():
     web.calls.clear()
     adresowo.scrape(web.get, cache, date(2026, 10, 18))
     assert not any("/o/" in c for c in web.calls)  # szczegóły tylko raz
+
+
+def test_offer_without_pin_and_odd_pages_do_not_stop_the_run():
+    no_geo = ('<script type="application/ld+json">{"@graph": [{"@type": "Offer", "price": "1000", '
+              '"url": "https://adresowo.pl/o/dzialka-x"}]}</script>')
+    d = adresowo.parse_detail_page(no_geo)
+    assert d["lat"] is None and d["price_pln"] == 1000.0
+    web = Web(pages=[search_page([card("1"), card("2"), card("3")], pages=())],
+              details={"1": "<html>strona dewelopera</html>", "2": no_geo, "3": detail_page()},
+              communes={"17.322521,50.862365": "0\n021503_2|Oława"})
+    cache = otodom.MemoryCache()
+    rows, stats = adresowo.scrape(web.get, cache, date(2026, 10, 17))
+    assert [r["source_listing_id"] for r in rows] == ["3"]
+    assert stats.details_failed == 1 and cache.get_detail("1")["unparsable"]   # zapamiętana, bez ponownego pobierania
+
+
+def test_many_odd_pages_in_a_row_mean_layout_change():
+    from lmi.scrapers import gratka
+    n = gratka.LAYOUT_STREAK_LIMIT
+    web = Web(pages=[search_page([card(str(i)) for i in range(n)], pages=())],
+              details={str(i): "<html>inny wygląd</html>" for i in range(n)}, communes={})
+    with pytest.raises(otodom.LayoutChanged):
+        adresowo.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))

@@ -110,9 +110,10 @@ def _decimals(v) -> int:
 
 def parse_detail_page(page_html: str, title: str | None = None, description: str | None = None) -> dict:
     graph = _ld_graph(page_html)
-    place = next((g for g in graph if g.get("@type") == "Place" and g.get("geo")), None)
-    if place is None:
-        raise LayoutChanged("adresowo: brak Place/geo w JSON-LD")
+    if not any(g.get("@type") in ("Offer", "Place") for g in graph):
+        raise LayoutChanged("adresowo: brak Offer/Place w JSON-LD")
+    # oferta bez pinezki (właściciel nie podał położenia): bez współrzędnych, pominięta przy imporcie
+    place = next((g for g in graph if g.get("@type") == "Place"), {})
     geo = place.get("geo") or {}
     lat, lon = geo.get("latitude"), geo.get("longitude")
     lat = float(lat) if lat not in (None, "") else None

@@ -43,13 +43,40 @@ def test_helpers():
         (date(2025, 11, 15), date(2025, 12, 1)), (date(2025, 12, 1), date(2026, 1, 1)), (date(2026, 1, 1), date(2026, 2, 1))]
 
 
+class CappedService:
+    """Fałszywa usługa, która przy dużym wyniku oddaje tylko pierwszą stronę (jak geoportal), dalej pusto."""
+
+    def __init__(self, feats_by_day, cap=4):
+        self.feats, self.cap, self.calls = feats_by_day, cap, 0
+
+    def get(self, url):
+        import re
+        import urllib.parse
+        self.calls += 1
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        flt = q["FILTER"][0]
+        teryt = re.search(r"<fes:Literal>(\d+)\*</fes:Literal>", flt).group(1)
+        a, b = re.findall(r"(\d{4}-\d{2}-\d{2})</fes:Literal>", flt)
+        feats = [f for d, pw, f in self.feats if a <= d < b and pw.startswith(teryt)]
+        if q.get("RESULTTYPE") == ["hits"]:
+            return f'<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" numberMatched="{len(feats)}"/>'
+        start = int(q["STARTINDEX"][0])
+        return collection(*feats[:self.cap]) if start == 0 else collection()
+
+
+def test_capped_service_is_split_until_complete():
+    feats = [(f"2025-01-{d:02d}", "0223", feature(f"T{d}{i}", f"022302_2.0001.{d}{i}", day=f"2025-01-{d:02d}", gid=d * 10 + i))
+             for d in range(1, 29) for i in range(3)]
+    svc = CappedService(feats, cap=4)
+    rows, matched = rcn.fetch_period(svc.get, "02", date(2025, 1, 1), date(2025, 2, 1))
+    assert matched == 84 and len(rows) == 84 and len({r[0] for r in rows}) == 84
+
+
 def test_incomplete_download_is_refused():
-    def get(url):
-        if "RESULTTYPE=hits" in url:
-            return '<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" numberMatched="5"/>'
-        return collection(feature("T", "022302_2.0001.1")) if "STARTINDEX=0" in url else collection()
+    # jeden dzień i jeden powiat ponad limit: dalej dzielić się nie da
+    feats = [("2025-01-05", "0223", feature(f"T{i}", f"022302_2.0001.{i}", day="2025-01-05", gid=i)) for i in range(6)]
     with pytest.raises(rcn.Incomplete):
-        rcn.fetch_period(get, "02", date(2025, 1, 1), date(2025, 2, 1))
+        rcn.fetch_period(CappedService(feats, cap=4).get, "02", date(2025, 1, 5), date(2025, 1, 6))
 
 
 def test_service_error_is_raised():

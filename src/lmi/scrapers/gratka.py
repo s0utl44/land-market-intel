@@ -209,6 +209,9 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     return rows, stats
 
 
+LAYOUT_STREAK_LIMIT = 20  # tyle nietypowych stron ofert z rzędu = zmiana wyglądu portalu
+
+
 def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_details: int | None, geo_get,
                stats: ScrapeStats, parse_detail, label: str, price_from_detail: bool = False) -> list[dict]:
     """Wspólne dla portali z listą + stroną oferty: brakujące szczegóły (raz na ofertę), gmina z ULDK, wiersze CSV.
@@ -219,6 +222,7 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
     """
     names: dict[str, str] = {}
     rows = []
+    layout_streak = 0
     for it in items:
         if it.price_pln is None and not price_from_detail:
             stats.skipped_no_price += 1
@@ -230,9 +234,21 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
                 continue
             try:
                 detail = parse_detail(get(it.url), it.title, it.description)
+                layout_streak = 0
             except FetchError as exc:
                 stats.details_failed += 1
                 log.warning("%s: szczegóły %s: %s", label, it.ad_id, exc)
+                continue
+            except LayoutChanged as exc:
+                # pojedyncza nietypowa strona (np. oferta dewelopera, zdjęta w trakcie) nie zatrzymuje przebiegu;
+                # dopiero seria takich stron oznacza, że portal zmienił wygląd
+                layout_streak += 1
+                stats.details_failed += 1
+                log.warning("%s: nietypowa strona oferty %s: %s", label, it.ad_id, exc)
+                if layout_streak >= LAYOUT_STREAK_LIMIT:
+                    raise LayoutChanged(f"{label}: {layout_streak} stron ofert z rzędu bez oczekiwanych danych "
+                                        f"(ostatnia: {exc})") from exc
+                cache.put_detail(it.ad_id, it.url, {"lat": None, "lon": None, "unparsable": str(exc)[:200]})
                 continue
             stats.details_fetched += 1
             if "views" in detail:  # pierwszy pomiar licznika (portale, które go pokazują)

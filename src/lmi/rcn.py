@@ -177,20 +177,49 @@ def months(since: date, until: date):
         d = nxt
 
 
-def fetch_period(get, teryt_prefix: str, since: date | None, until: date | None) -> tuple[list[tuple], int]:
-    """Wszystkie rekordy okresu. Najpierw pyta usługę, ile ich jest (numberMatched), potem stronicuje,
-    aż liczba się zgadza — serwer może oddawać mniej niż PAGE na stronę. Zwraca (wiersze, zadeklarowane)."""
-    matched = parse_hits(get(hits_url(teryt_prefix, since, until)))
-    recs_all: list[dict] = []
+def _powiaty(prefix: str) -> list[str]:
+    return POWIATY_02 if prefix == "02" else [f"{prefix}{n:02d}" for n in list(range(1, 41)) + list(range(61, 66))]
+
+
+def _pages(get, prefix: str, since: date | None, until: date | None, matched: int) -> list[dict]:
+    recs: list[dict] = []
     start = 0
-    while len(recs_all) < matched:
-        recs = parse_features(get(page_url(teryt_prefix, since, until, start)))
-        if not recs:
+    while len(recs) < matched:
+        page = parse_features(get(page_url(prefix, since, until, start)))
+        if not page:
             break
-        recs_all.extend(recs)
-        start += len(recs)
-    if len(recs_all) < matched:
-        raise Incomplete(f"{since}–{until}: pobrano {len(recs_all)} z {matched} rekordów")
+        recs.extend(page)
+        start += len(page)
+    return recs
+
+
+def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[list[dict], int]:
+    """Rekordy okresu; gdy usługa przestaje oddawać kolejne strony (zdarza się przy dużych wynikach),
+    dzieli zapytanie: najpierw okres na połowy (do pojedynczego dnia), potem województwo na powiaty.
+    Suma części musi się zgadzać z liczbą zadeklarowaną dla całości."""
+    matched = parse_hits(get(hits_url(prefix, since, until)))
+    if matched == 0:
+        return [], 0
+    recs = _pages(get, prefix, since, until, matched)
+    if len(recs) >= matched:
+        return recs, matched
+    log.info("rcn: %s %s–%s: usługa oddała %d z %d, dzielę zapytanie", prefix, since, until, len(recs), matched)
+    if since is not None and until is not None and (until - since).days > 1:
+        mid = since + (until - since) // 2
+        parts = [_fetch(get, prefix, since, mid), _fetch(get, prefix, mid, until)]
+    elif len(prefix) == 2:
+        parts = [_fetch(get, pw, since, until) for pw in _powiaty(prefix)]
+    else:
+        raise Incomplete(f"{prefix} {since}–{until}: pobrano {len(recs)} z {matched} rekordów")
+    got = [r for part, _ in parts for r in part]
+    if sum(n for _, n in parts) != matched or len(got) < matched:
+        raise Incomplete(f"{prefix} {since}–{until}: części dały {len(got)} rekordów, usługa deklaruje {matched}")
+    return got, matched
+
+
+def fetch_period(get, teryt_prefix: str, since: date | None, until: date | None) -> tuple[list[tuple], int]:
+    """Wszystkie rekordy okresu z kontrolą kompletności. Zwraca (wiersze, liczba zadeklarowana przez usługę)."""
+    recs_all, matched = _fetch(get, teryt_prefix, since, until)
     rows = [r for r in map(to_row, recs_all) if r]
     log.info("rcn: %s – %s: %d rekordów (usługa: %d, bez numeru transakcji/działki: %d)",
              since or "bez daty", until or "", len(rows), matched, len(recs_all) - len(rows))
