@@ -332,7 +332,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   <section id="changes" aria-labelledby="h-ch">
     <div class="head">
       <div><h2 id="h-ch">Co się zmieniło</h2>
-        <p id="ch-note">Nowe i zniknięte oferty, obniżki i ceny w całym województwie. Okres wybierasz nad kafelkami.</p></div>
+        <p id="ch-note">Nowe i wycofane oferty, obniżki i ceny w całym województwie. Okres wybierasz nad kafelkami.</p></div>
     </div>
     <div class="ch-charts" id="ch-charts"><div class="panel empty" style="grid-column:1/-1">Ładowanie…</div></div>
     <div class="ch-lists" id="ch-lists"></div>
@@ -572,7 +572,7 @@ async function loadChanges(){
   const lab=series.map(x=>daily?dPL(x.d):wkPL(x.week));
   const box=$('#ch-charts'); box.innerHTML='';
   if(!series.length){box.innerHTML='<div class="panel empty" style="grid-column:1/-1">Zmiany pojawią się po drugim dniu pobierania.</div>';$('#ch-lists').innerHTML='';return}
-  miniChart(box,{title:'Nowe i zniknięte oferty',sub:daily?'dziennie':'tygodniowo',labels:lab,
+  miniChart(box,{title:'Nowe i wycofane oferty',sub:daily?'dziennie':'tygodniowo',labels:lab,
     bars:[{name:'nowe',cls:'g',color:'var(--good)',vals:series.map(x=>x.new)},{name:'zniknęły',cls:'r',color:'var(--bad)',vals:series.map(x=>x.gone)}],fmt:v=>nf(v)});
   miniChart(box,{title:'Obniżki cen',sub:daily?'ofert z niższą ceną dziennie':'tygodniowo',labels:lab,
     bars:[{name:'obniżki',cls:'o',color:'var(--gold)',vals:series.map(x=>x.cuts)}],fmt:v=>nf(v)});
