@@ -8,6 +8,8 @@ Publiczny zakres RCN nie zawiera danych osobowych (strony transakcji nie są udo
 
 Użycie na serwerze (bez przebudowy obrazu, ok. 10 zapytań):
     docker compose run --rm -T -v "$PWD/scripts:/scripts:ro" --entrypoint python app /scripts/probe_rcn.py
+Próbki działek z filtrem (powiat wrocławski, od 2024) i liczniki dla województwa:
+    ... /scripts/probe_rcn.py --probki
 """
 import sys
 import time
@@ -44,7 +46,80 @@ def local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+def fes(teryt_prefix: str, since: str, extra: str = "") -> str:
+    """Filtr FES 2.0: TERYT zaczyna się od prefiksu, data aktu od `since` (+ dodatkowy warunek)."""
+    return ('<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:And>'
+            '<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="!"><fes:ValueReference>TERYT</fes:ValueReference>'
+            f'<fes:Literal>{teryt_prefix}*</fes:Literal></fes:PropertyIsLike>'
+            '<fes:PropertyIsGreaterThanOrEqualTo><fes:ValueReference>DOK_DATA</fes:ValueReference>'
+            f'<fes:Literal>{since}</fes:Literal></fes:PropertyIsGreaterThanOrEqualTo>{extra}'
+            '</fes:And></fes:Filter>')
+
+
+def records(body: bytes) -> list[dict]:
+    out = []
+    for m in ET.fromstring(body).iter():
+        if local(m.tag) in ("member", "featureMember"):
+            obj = next(iter(m), None)
+            if obj is not None:
+                out.append({local(c.tag): (c.text or "").strip() for c in obj if len(c) == 0})
+    return out
+
+
+def probki() -> None:
+    from collections import Counter
+
+    print("### ms:dzialki: 300 rekordów z powiatu wrocławskiego (TERYT 0223*), akty od 2024-01-01")
+    status, body = get({"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature", "TYPENAMES": "ms:dzialki",
+                        "COUNT": "300", "FILTER": fes("0223", "2024-01-01")}, timeout=180)
+    if status != 200:
+        print(body[:800].decode("utf-8", "replace"))
+        return
+    try:
+        rows = records(body)
+    except ET.ParseError:
+        print(body[:800].decode("utf-8", "replace"))
+        return
+    print(f"   rekordów: {len(rows)}")
+    if not rows:
+        print(body[:800].decode("utf-8", "replace"))
+        return
+    for f in ("TERYT", "TRAN_RODZAJ_TRANS", "TRAN_RODZAJ_RYNKU", "TRAN_SPRZEDAJACY", "TRAN_KUPUJACY",
+              "NIER_RODZAJ", "NIER_PRAWO", "NIER_UDZIAL", "DZI_PRZEZN_WMPZP", "DZI_SPOSOB_UZYT", "DOK_TWORCA"):
+        c = Counter((r.get(f) or "")[:40] for r in rows)
+        print(f"   {f}: {c.most_common(10)}")
+    def stats(f):
+        v = sorted(float(r[f]) for r in rows if r.get(f) not in (None, ""))
+        return f"n={len(v)} min={v[0]:.0f} mediana={v[len(v)//2]:.0f} max={v[-1]:.0f}" if v else "brak"
+    for f in ("TRAN_CENA_BRUTTO", "NIER_CENA_BRUTTO", "DZI_CENA_BRUTTO", "NIER_POW_GRUNTU", "DZI_POW_EWID"):
+        print(f"   {f}: {stats(f)}")
+    tx = Counter(r.get("TRAN_LOKALNY_ID_IIP") for r in rows)
+    print(f"   transakcji: {len(tx)}, działek na transakcję (max): {max(tx.values())}")
+    print("   daty aktów:", min(r.get("DOK_DATA", "") for r in rows), "–", max(r.get("DOK_DATA", "") for r in rows))
+    safe = ("TERYT", "TRAN_RODZAJ_TRANS", "TRAN_RODZAJ_RYNKU", "TRAN_CENA_BRUTTO", "DOK_DATA", "NIER_RODZAJ",
+            "NIER_PRAWO", "NIER_POW_GRUNTU", "NIER_CENA_BRUTTO", "DZI_ID_DZIALKI", "DZI_PRZEZN_WMPZP", "DZI_POW_EWID",
+            "DZI_SPOSOB_UZYT", "DZI_CENA_BRUTTO", "DZI_ADRES")
+    for r in rows[:3]:
+        print("   -", {k: r.get(k, "")[:50] for k in safe})
+
+    print("\n### liczba rekordów działek w województwie (TERYT 02*) według roku aktu")
+    for since, until in (("2023-01-01", "2024-01-01"), ("2024-01-01", "2025-01-01"), ("2025-01-01", "2026-01-01"),
+                         ("2026-01-01", "2027-01-01")):
+        extra = ('<fes:PropertyIsLessThan><fes:ValueReference>DOK_DATA</fes:ValueReference>'
+                 f'<fes:Literal>{until}</fes:Literal></fes:PropertyIsLessThan>')
+        status, body = get({"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature", "TYPENAMES": "ms:dzialki",
+                            "RESULTTYPE": "hits", "FILTER": fes("02", since, extra)}, timeout=240)
+        try:
+            print(f"   {since[:4]}: {ET.fromstring(body).get('numberMatched')}")
+        except ET.ParseError:
+            print(f"   {since[:4]}: ", body[:300])
+    print("\nKONIEC")
+
+
 def main() -> None:
+    if "--probki" in sys.argv:
+        probki()
+        return
     print("### GetCapabilities")
     status, body = get({"SERVICE": "WFS", "REQUEST": "GetCapabilities"})
     if status != 200:
