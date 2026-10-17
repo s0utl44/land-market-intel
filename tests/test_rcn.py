@@ -111,7 +111,7 @@ def test_flaky_service_is_retried_before_gap(no_sleep):
             return super().get(url)
 
     rows, matched, gaps = rcn.fetch_period(Flaky(feats, cap=10).get, "02", date(2025, 1, 5), date(2025, 1, 6))
-    assert matched == 6 and len(rows) == 6 and gaps == [] and no_sleep == [30]
+    assert matched == 6 and len(rows) == 6 and gaps == [] and no_sleep == [20]
 
 
 def test_parts_short_without_gaps_is_recorded_not_raised():
@@ -212,3 +212,12 @@ def test_repair_refetches_only_gaps(pg_conn):
     assert svc.calls <= 4                                               # tylko ten jeden dzień i powiat
     assert pg_conn.execute("SELECT count(*) FROM scrape.rcn_parcels").fetchone()[0] == 6
     assert pg_conn.execute("SELECT saved, gaps FROM scrape.rcn_fetch_log WHERE period_start = '2025-01-01'").fetchone() == (6, None)
+
+
+def test_duplicate_records_in_service_are_not_a_gap(no_sleep):
+    # RCN ma dwa identyczne wpisy tej samej działki w akcie: usługa liczy 3, po usunięciu powtórzeń są 2
+    feats = [("2025-01-05", "0223", feature("T1", "022302_2.0001.1", day="2025-01-05", gid=1)),
+             ("2025-01-05", "0223", feature("T1", "022302_2.0001.1", day="2025-01-05", gid=2)),
+             ("2025-01-05", "0223", feature("T2", "022302_2.0001.2", day="2025-01-05", gid=3))]
+    rows, matched, gaps = rcn.fetch_period(CappedService(feats, cap=10).get, "02", date(2025, 1, 5), date(2025, 1, 6))
+    assert matched == 3 and len(rows) == 2 and gaps == [] and no_sleep == []

@@ -29,8 +29,8 @@ START = date(2024, 1, 1)        # pierwsze pobranie: od tego dnia (starsze lata 
 REFRESH_BACK_DAYS = 120         # starostwa dopisują akty z opóźnieniem: odświeżamy ostatnie miesiące
 PAGE = 1000
 # geoportal pod obciążeniem chwilowo oddaje puste strony (cały powiat "0 z 310"), a po chwili wszystko:
-# zanim uznamy lukę, czekamy i pytamy ponownie
-RETRY_WAITS = (30, 120, 300)
+# zanim uznamy lukę, chwilę czekamy i pytamy ponownie; resztę dociąga potem `repair`
+RETRY_WAITS = (20, 60)
 _sleep = time.sleep
 FIELDS = ["TERYT", "TRAN_LOKALNY_ID_IIP", "TRAN_RODZAJ_TRANS", "TRAN_RODZAJ_RYNKU", "TRAN_SPRZEDAJACY",
           "TRAN_KUPUJACY", "TRAN_CENA_BRUTTO", "DOK_DATA", "NIER_RODZAJ", "NIER_PRAWO", "NIER_UDZIAL",
@@ -227,42 +227,40 @@ def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[li
     matched = parse_hits(get(hits_url(prefix, since, until)))
     if matched == 0:
         return [], 0, []
-    recs = _unique(_pages(get, prefix, since, until, matched))
-    if len(recs) >= matched:
-        return recs, matched, []
-    log.info("rcn: %s %s–%s: usługa oddała %d z %d, dzielę zapytanie", prefix, since, until, len(recs), matched)
+    # kompletność liczymy na surowych rekordach: RCN bywa, że ma dwa identyczne wpisy tej samej działki w akcie
+    # (np. dwa lokale) — usługa liczy oba, a po usunięciu powtórzeń zostaje jeden; to nie jest brak
+    raw = _pages(get, prefix, since, until, matched)
+    if len(raw) >= matched:
+        return _unique(raw), matched, []
+    log.info("rcn: %s %s–%s: usługa oddała %d z %d, dzielę zapytanie", prefix, since, until, len(raw), matched)
     if since is not None and until is not None and (until - since).days > 1:
         mid = since + (until - since) // 2
         parts = [_fetch(get, prefix, since, mid), _fetch(get, prefix, mid, until)]
     elif len(prefix) == 2:
         parts = [_fetch(get, pw, since, until) for pw in _powiaty(prefix)]
     else:
-        best = recs
+        best = raw
         for wait in (0,) + RETRY_WAITS:
             if wait:
                 log.info("rcn: %s %s–%s: nadal %d z %d, czekam %d s i pytam ponownie",
                          prefix, since, until, len(best), matched, wait)
                 _sleep(wait)
-                best = max(best, _unique(_pages(get, prefix, since, until, matched)), key=len)
+                best = max(best, _pages(get, prefix, since, until, matched), key=len)
             if len(best) < matched:
-                best = max(best, _unique(_pages(get, prefix, since, until, matched, plain=True)), key=len)
+                best = max(best, _pages(get, prefix, since, until, matched, plain=True), key=len)
             if len(best) >= matched:
-                return best, matched, []
+                return _unique(best), matched, []
         gap = f"{prefix} {since or 'bez daty'}–{until or ''}: brak {matched - len(best)} z {matched}"
         log.warning("rcn: luka w usłudze: %s", gap)
-        return best, matched, [gap]
+        return _unique(best), matched, [gap]
     got = _unique([r for part, _, _ in parts for r in part])
     gaps = [g for _, _, gs in parts for g in gs]
     declared = sum(n for _, n, _ in parts)
     if declared < matched:
         # rekordy z TERYT spoza listy powiatów (albo bez TERYT): usługa je liczy, ale żaden powiat ich nie obejmuje
         gaps.append(f"{prefix} {since or 'bez daty'}–{until or ''}: {matched - declared} rekordów poza listą powiatów")
-    elif len(got) < matched and not gaps:
-        # części policzyły mniej niż całość, choć każda oddała swoje (usługa zmieniła zdanie w trakcie):
-        # zapisujemy jako lukę do naprawy, zamiast przerywać cały import
-        gaps.append(f"{prefix} {since or 'bez daty'}–{until or ''}: brak {matched - len(got)} z {matched}")
-        log.warning("rcn: luka w usłudze: %s", gaps[-1])
-    # nadmiar bywa (akt z dnia granicy liczony w obu częściach) i znika przy usuwaniu powtórzeń
+    # każda część sama pilnuje kompletności (i zapisuje swoje luki); nadmiar bywa (akt z dnia granicy
+    # liczony w obu częściach), a powtórzenia znikają przy zapisie
     return got, matched, gaps
 
 
