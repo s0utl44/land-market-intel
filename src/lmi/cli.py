@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("dedup", help="uruchom deduplikację")
     sub.add_parser("metrics", help="przelicz metryki (mart.*)")
+    sub.add_parser("refresh-page", help="przelicz od razu gotowe dane strony (Co się zmieniło, transakcje RCN)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
     s.add_argument("--new", type=int, help="run_id nowszej (domyślnie ostatnia)")
@@ -158,6 +159,12 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"        {e['a']} + {e['b']}: {e['areas'][0]:.0f}/{e['areas'][1]:.0f} m², "
                               f"{e['prices'][0]:.0f}/{e['prices'][1]:.0f} zł, typ {e['land_use'][0]}/{e['land_use'][1]}, "
                               f"pinezki {e['dist_m'] if e['dist_m'] is not None else '–'} m · {e['why']}")
+            elif args.cmd == "refresh-page":
+                from . import rcn, web
+
+                rcn.refresh_land(conn)
+                web.refresh_changes(conn)
+                print("Dane strony przeliczone (transakcje RCN i Co się zmieniło dla 1 / 7 / 30 dni).")
             elif args.cmd == "metrics":
                 weekly, scores = db.run_metrics(conn)
                 print(f"Zapisano {len(weekly)} wierszy tygodniowych.\n")
