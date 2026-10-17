@@ -37,6 +37,11 @@ HISTORY_BACKFILL_PER_RUN = 150  # ~300 zapytań API dziennie; ~3300 ofert uzupe�
 # Gratka więcej (strona oferty). Nieruchomości-online i Adresowo nie pokazują liczników.
 INTEREST_BUDGET = {"otodom": int(os.environ.get("LMI_INTEREST_OTODOM", 100)),
                    "gratka": int(os.environ.get("LMI_INTEREST_GRATKA", 600))}
+# Uzupełnianie parametrów (media, dojazd, sprzedający...) ofert pobranych przed ich zbieraniem: tyle
+# stron ofert na przebieg. Gratka uzupełnia się przy pomiarach odsłon (i tak pobiera stronę oferty).
+FEATURES_BUDGET = {"otodom": int(os.environ.get("LMI_FEATURES_OTODOM", 60)),
+                   "nieruchomosci-online": int(os.environ.get("LMI_FEATURES_NONLINE", 300)),
+                   "adresowo": int(os.environ.get("LMI_FEATURES_ADRESOWO", 300))}
 
 
 def _log_run(conn, source, started, status, rows=None, stats=None, message=None):
@@ -218,9 +223,12 @@ def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, c
             rows, stats = otodom.scrape(client.get, PgCache(conn), observed_at, region_slug=region_slug,
                                         teryt_prefix=teryt_prefix, max_details=max_details,
                                         geo_get=geo_client.get, api=api, history_backfill=history_backfill,
-                                        interest_budget=INTEREST_BUDGET["otodom"])
+                                        interest_budget=INTEREST_BUDGET["otodom"],
+                                        max_features_refetch=FEATURES_BUDGET["otodom"])
         else:
             extra = {"interest_budget": INTEREST_BUDGET[source]} if source in INTEREST_BUDGET else {}
+            if source in FEATURES_BUDGET:
+                extra["features_budget"] = FEATURES_BUDGET[source]
             rows, stats = PORTAL_SCRAPERS[source](client.get, PgCache(conn, source), observed_at,
                                                   region_slug=region_slug, teryt_prefix=teryt_prefix,
                                                   max_details=max_details, geo_get=geo_client.get, **extra)

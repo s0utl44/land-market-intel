@@ -209,6 +209,8 @@ def municipality_offers(
     max_area: float | None = Query(None, ge=0),
     max_ppm2: float | None = Query(None, ge=0),
     min_age_days: int | None = Query(None, ge=0),
+    seller: str | None = Query(None, pattern="^(prywatny|biuro|deweloper)$"),
+    media: str | None = Query(None, pattern="^(prąd|woda|gaz|kanalizacja|prąd\\+woda)$"),
     sort: str = "ppm2",
     limit: int = Query(300, ge=1, le=1000),
 ):
@@ -232,6 +234,13 @@ def municipality_offers(
     if min_age_days is not None:
         where.append("age_days >= %(min_age)s")
         params["min_age"] = min_age_days
+    if seller:
+        where.append("(features_raw @> jsonb_build_array(jsonb_build_object('seller', %(seller)s::text)) "
+                     "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', %(seller)s::text)))")
+        params["seller"] = seller
+    for i, m in enumerate((media or "").split("+") if media else []):
+        where.append(f"features_raw @> jsonb_build_array(jsonb_build_object('media', jsonb_build_array(%(m{i})s::text)))")
+        params[f"m{i}"] = m
     params["me"] = _user(request)
     return _offers("o.municipality_teryt = %(t)s", where, params, sort)
 
@@ -331,7 +340,7 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise, source, sources,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
                otodom_history, views, views_source, views_per_day, saved, relists, land_use_source,
-               active, municipality, teryt, listing_keys,
+               active, municipality, teryt, listing_keys, features_raw,
                -- zespół: ulubione (moje / ile osób, kto) i liczba komentarzy do tej działki
                EXISTS (SELECT 1 FROM app.favorites fv WHERE fv.user_email = %(me)s
                          AND fv.source_id || ':' || fv.source_listing_id = ANY(listing_keys)) AS fav,
@@ -339,10 +348,45 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
                  WHERE fv.source_id || ':' || fv.source_listing_id = ANY(listing_keys)) AS fav_users,
                (SELECT count(*) FROM app.comments c WHERE c.deleted_at IS NULL
                  AND c.source_id || ':' || c.source_listing_id = ANY(listing_keys))::int AS comments
-        FROM (SELECT *, scrape.views_per_day(views_log, start_date) AS views_per_day FROM f) f WHERE {' AND '.join(where)}
+        FROM (SELECT *, scrape.views_per_day(views_log, start_date) AS views_per_day,
+                     -- parametry ze wszystkich portali, na których jest ta działka (media, dojazd, sprzedający...)
+                     (SELECT coalesce(jsonb_agg(x.f || jsonb_build_object('src', x.src)), '[]'::jsonb) FROM (
+                         SELECT 'otodom' AS src, d.detail->'features' || jsonb_strip_nulls(jsonb_build_object(
+                                    'list_seller', d.detail->'list_seller')) AS f
+                         FROM unnest(listing_keys) k JOIN scrape.otodom_details d
+                           ON split_part(k, ':', 1) = 'otodom' AND d.ad_id = substr(k, 8)
+                         WHERE d.detail ? 'features' OR d.detail ? 'list_seller'
+                         UNION ALL
+                         SELECT pd.source_id, pd.detail->'features'
+                         FROM unnest(listing_keys) k JOIN scrape.portal_details pd
+                           ON pd.source_id = split_part(k, ':', 1) AND pd.ad_id = substr(k, strpos(k, ':') + 1)
+                         WHERE pd.detail ? 'features') x) AS features_raw
+              FROM f) f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)
+    for r in rows:
+        r["features"] = merge_features(r.pop("features_raw") or [])
     return rows
+
+
+def merge_features(parts: list[dict]) -> dict:
+    """Jedna działka, kilka portali: suma mediów i dróg, sprzedający z pierwszego portalu, który go podaje."""
+    out = {"seller": None, "negotiable": None, "media": [], "access": [], "fence": None, "vicinity": [],
+           "updated_at": None, "params": {}}
+    for f in parts:
+        if not isinstance(f, dict):
+            continue
+        out["seller"] = out["seller"] or f.get("seller") or f.get("list_seller")
+        for k in ("media", "access", "vicinity"):
+            out[k] = sorted(set(out[k]) | set(f.get(k) or []))
+        for k in ("negotiable", "fence"):
+            if f.get(k) is not None:
+                out[k] = bool(out[k]) or f[k]
+        if f.get("updated_at") and (out["updated_at"] is None or f["updated_at"] > out["updated_at"]):
+            out["updated_at"] = f["updated_at"]
+        if f.get("params"):
+            out["params"][f.get("src") or "portal"] = f["params"]
+    return out
 
 
 # --- status systemu (administrator) --------------------------------------------------------------

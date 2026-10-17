@@ -119,6 +119,17 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
     assert o["land_use_source"] == "tytuł"
     assert o["source"] == "otodom" and o["sources"] == ["otodom"]
 
+    assert o["features"]["seller"] is None
+    pg_conn.execute("""UPDATE scrape.otodom_details SET detail = detail || %s WHERE ad_id = '777'""",
+                    (json.dumps({"features": {"seller": "prywatny", "media": ["prąd", "woda"], "access": [],
+                                              "params": {"dimensions": "20x50"}}}),))
+    pg_conn.commit()
+    priv = client.get("/api/municipality/9900011/offers", params={"seller": "prywatny", "media": "prąd+woda"}).json()
+    assert [r["id"] for r in priv] == [o["id"]] and priv[0]["features"]["media"] == ["prąd", "woda"]
+    assert priv[0]["features"]["params"] == {"otodom": {"dimensions": "20x50"}}
+    assert client.get("/api/municipality/9900011/offers", params={"media": "gaz"}).json() == []
+    assert client.get("/api/municipality/9900011/offers", params={"seller": "x"}).status_code == 422
+
 
 def test_overview_reports_failed_attempt(client, pg_conn):
     db.add_source(pg_conn, "otodom", "Otodom")
@@ -274,3 +285,16 @@ def test_job_tracking_writes_progress(pg_conn):
         pass
     assert pg_conn.execute("SELECT state, message FROM scrape.job_status WHERE job = 'rcn'").fetchone() == \
         ("error", "RuntimeError: geoportal padł")
+
+
+def test_merge_features_across_portals():
+    from lmi.web import merge_features
+
+    f = merge_features([
+        {"src": "otodom", "seller": None, "list_seller": "biuro", "media": ["prąd"], "access": ["asfaltowy"],
+         "fence": None, "updated_at": "2026-10-01", "params": {"dimensions": "30x50"}},
+        {"src": "gratka", "seller": "prywatny", "media": ["woda", "prąd"], "negotiable": True,
+         "updated_at": "2026-10-05", "params": {"Media": "prąd, woda"}},
+    ])
+    assert f["seller"] == "biuro" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True
+    assert f["updated_at"] == "2026-10-05" and set(f["params"]) == {"otodom", "gratka"}

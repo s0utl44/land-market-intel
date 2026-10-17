@@ -50,4 +50,7 @@ def detail_page(lat=50.960144, lon=17.407703, radius=0, land_type="building", ar
             "address": {"street": {"name": "x", "number": None}, "city": None},
         },
         "owner": {"name": "Jan", "phones": ["600100200"]},
-    }}}})
+        "attributes": {"media_types": ["electricity", "water"], "access_types": ["asphalt"], "fence": "y",
+                       "vicinity_types": ["forest"], "price_per_m": "201", "dimensions": "30x55"},
+        "advertType": "PRIVATE", "advertiserType": "private", "modifiedAt": "2025-04-02T10:00:00Z",
+    }, "unifiedAd": {"price": {"isNegotiable": True}}}}})

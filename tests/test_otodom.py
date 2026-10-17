@@ -15,12 +15,17 @@ def test_parse_search_page():
         total_pages=58))
     assert pages == 58
     assert [i.ad_id for i in items] == ["1", "2", "3"]  # mieszkanie odrzucone
-    assert items[0] == otodom.SearchItem("1", "dzialka-1-ID1", 329000.0, 1636.0, date(2025, 3, 14), None, "Działka")
+    assert items[0] == otodom.SearchItem("1", "dzialka-1-ID1", 329000.0, 1636.0, date(2025, 3, 14), None, "Działka",
+                                         items[0].seller)
     assert items[1].price_pln is None and items[2].price_pln is None
 
 
 def test_parse_detail_page():
     d = otodom.parse_detail_page(detail_page())
+    f = d.pop("features")
+    assert f["media"] == ["prąd", "woda"] and f["access"] == ["asfaltowy"] and f["fence"] is True
+    assert f["vicinity"] == ["las"] and f["seller"] == "prywatny" and f["negotiable"] is True
+    assert f["updated_at"] == "2025-04-02" and f["params"] == {"dimensions": "30x55"}
     assert d == {"lat": 50.960144, "lon": 17.407703, "precise": True, "land_use": "budowlana",
                  "land_use_source": "otodom", "area_m2": 1636.0, "municipality_hint": "Oława"}
 

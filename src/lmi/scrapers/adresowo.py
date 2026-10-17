@@ -13,6 +13,7 @@ import logging
 import re
 from datetime import date
 
+from . import features
 from .gratka import GratkaItem as Item, build_rows
 from .http import FetchError
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
@@ -136,11 +137,35 @@ def parse_detail_page(page_html: str, title: str | None = None, description: str
         "area_m2": None,
         "price_pln": _number(str(offer.get("price") or "")),
         "municipality_hint": None,
+        "features": _features(page_html, place.get("description") or description or ""),
     }
 
 
+def _features(page_html: str, description: str, today: date | None = None) -> dict:
+    """Oznaczenia przy ogłoszeniu (właściciel/biuro, negocjacja, aktualizacja) i media z opisu."""
+    today = today or date.today()
+    f = features.empty()
+    marks = " ".join(_text(m) for m in re.findall(r'<div class="min-w-0">(.*?)<span', page_html, re.S))
+    if re.search(r"bezpośrednio od właściciela", marks, re.I):
+        f["seller"] = "prywatny"
+    elif re.search(r"biur|pośredni|agencj", marks, re.I):
+        f["seller"] = "biuro"
+    if re.search(r"Cena do negocjacji", marks):
+        f["negotiable"] = True
+    m = re.search(r"zaktualizowana ([^<]{1,30})", page_html)
+    if m and (d := features.relative_date(m.group(1), today)):
+        f["updated_at"] = d.isoformat()
+    # Adresowo nie ma pól parametrów: media i dojazd tylko z opisu (słowa kluczowe)
+    text = re.sub(r"<[^>]+>", " ", description)
+    f["media"] = features._words(text, features.MEDIA_WORDS)
+    f["access"] = features._words(text, [w for w in features.ACCESS_WORDS if w[0] != "polny"])
+    f["params"] = {"źródło parametrów": "opis"} if f["media"] or f["access"] else {}
+    return f
+
+
 def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
-           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None) -> tuple[list[dict], ScrapeStats]:
+           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None,
+           features_budget: int = 0) -> tuple[list[dict], ScrapeStats]:
     """Wszystkie strony wyników + brakujące strony ofert (raz na ofertę) + gminy z ULDK."""
     geo_get = geo_get or get
     stats = ScrapeStats()
@@ -175,7 +200,7 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     stats.unique_ads = len(ads)
     log.info("adresowo: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
-                      parse_detail_page, "adresowo", price_from_detail=True)
+                      parse_detail_page, "adresowo", price_from_detail=True, features_budget=features_budget)
     return rows, stats
 
 

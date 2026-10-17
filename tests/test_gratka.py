@@ -118,3 +118,24 @@ def test_views_are_measured_and_refreshed():
     assert not any("/ob/" in c for c in web.calls)
     gratka.scrape(web.get, cache, date(2026, 10, 24), interest_budget=50)
     assert cache.get_detail("1")["stats"]["views"] == 19
+
+
+def test_detail_features_from_params():
+    d = gratka.parse_detail_page(detail_page(params=[
+        {"label": "Media", "value": ["prąd", "woda", "kanalizacja"]}, {"label": "Dojazd", "value": "asfaltowy"},
+        {"label": "Ogrodzenie", "value": "brak"}, {"label": "Aktualizacja", "value": "21.05.2026"},
+        {"label": "Telefon", "value": "600100200"}]))
+    f = d["features"]
+    assert f["media"] == ["kanalizacja", "prąd", "woda"] and f["access"] == ["asfaltowy"] and f["fence"] is False
+    assert f["updated_at"] == "2026-05-21" and "600100200" not in str(f)
+
+
+def test_old_details_get_features_within_budget():
+    web = Web(pages=[search_page([node(1), node(2)], total=2)], details={"1": detail_page(), "2": detail_page()},
+              communes={"16.155000,51.285100": "0\n020905_2|Miłkowice"})
+    cache = otodom.MemoryCache()
+    for i in ("1", "2"):  # pobrane przed zbieraniem parametrów
+        cache.put_detail(i, "u", {"lat": 51.2851, "lon": 16.155, "precise": False, "land_use": "rolna"})
+    gratka.build_rows(gratka.parse_search_page(web.pages[0])[0], web.get, cache, date(2026, 10, 17), "02", None,
+                      web.get, otodom.ScrapeStats(), gratka.parse_detail_page, "gratka", features_budget=1)
+    assert sum("features" in cache.get_detail(i) for i in ("1", "2")) == 1

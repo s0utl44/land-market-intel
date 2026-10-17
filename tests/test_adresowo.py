@@ -123,3 +123,14 @@ def test_many_odd_pages_in_a_row_mean_layout_change():
               details={str(i): "<html>inny wygląd</html>" for i in range(n)}, communes={})
     with pytest.raises(otodom.LayoutChanged):
         adresowo.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
+
+
+def test_adresowo_marks_and_relative_update():
+    from datetime import date as _d
+
+    html = ('<div class="min-w-0"> Oferta bezpośrednio od właściciela <span>x</span></div>'
+            '<div class="min-w-0"> Cena do negocjacji <span>y</span></div>'
+            '<span>dodana ponad miesiąc temu i zaktualizowana 6 dni temu</span>')
+    f = adresowo._features(html, "Prąd i woda w drodze, dojazd asfaltowy. Tel. 600100200", today=_d(2026, 10, 17))
+    assert f["seller"] == "prywatny" and f["negotiable"] is True and f["updated_at"] == "2026-10-11"
+    assert f["media"] == ["prąd", "woda"] and f["access"] == ["asfaltowy"] and "600100200" not in str(f)

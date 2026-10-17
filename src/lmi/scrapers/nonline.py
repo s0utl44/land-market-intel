@@ -15,6 +15,7 @@ import logging
 import re
 from datetime import date
 
+from . import features
 from .gratka import GratkaItem as Item, _date, _num, build_rows
 from .http import FetchError
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
@@ -121,11 +122,29 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         "area_m2": area,
         "listed_at": posted.isoformat() if posted else None,
         "municipality_hint": ((listing.get("address") or {}).get("addressLocality")),
+        "features": _features(listing, html),
     }
 
 
+def _features(listing: dict, html: str) -> dict:
+    pairs = {str(p.get("name")): p.get("value") for p in listing.get("additionalProperty") or []
+             if isinstance(p, dict) and p.get("name")}
+    f = features.from_params(pairs)
+    modified = _date(listing.get("dateModified"))
+    if modified:
+        f["updated_at"] = modified.isoformat()
+    if f["seller"] is None:
+        # oznaczenie przy ogłoszeniu, nie w menu strony
+        m = re.search(r"(oferta prywatna|bezpośrednio od właściciela|oferta biura|biuro nieruchomości)\s*<", html, re.I)
+        f["seller"] = features.seller_from_text(m.group(1)) if m else None
+    if f["negotiable"] is None and re.search(r">\s*Cena do negocjacji\s*<", html):
+        f["negotiable"] = True
+    return f
+
+
 def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
-           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None) -> tuple[list[dict], ScrapeStats]:
+           max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None,
+           features_budget: int = 0) -> tuple[list[dict], ScrapeStats]:
     """Wszystkie strony wyników + brakujące strony ofert (raz na ofertę) + gminy z ULDK."""
     geo_get = geo_get or get
     stats = ScrapeStats()
@@ -155,7 +174,7 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     stats.unique_ads = len(ads)
     log.info("nieruchomosci-online: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
-                      parse_detail_page, "nieruchomosci-online")
+                      parse_detail_page, "nieruchomosci-online", features_budget=features_budget)
     return rows, stats
 
 

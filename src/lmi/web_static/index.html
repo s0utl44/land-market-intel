@@ -135,6 +135,7 @@ th.l,td.l{text-align:left}
 .filters label{display:flex;flex-direction:column;gap:3px}
 .ar{color:var(--muted);font-size:.78rem}
 .sub2{display:block;color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:2px}
+.sub2.feat{max-width:260px;white-space:normal}
 td.two-line{white-space:normal;min-width:120px}
 .ext{font-weight:700;text-decoration:none}
 /* ceny transakcyjne */
@@ -364,6 +365,10 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
         <label><span class="label">Maks. zł/m²</span><input type="number" id="f-ppm2" min="0" step="10" inputmode="numeric"></label>
         <label><span class="label">Na rynku dłużej niż</span>
           <select id="f-age"><option value="">dowolnie</option><option value="90">3 miesiące</option><option value="180">6 miesięcy</option><option value="365">rok</option><option value="730">2 lata</option></select></label>
+        <label><span class="label">Sprzedający</span>
+          <select id="f-seller"><option value="">dowolny</option><option value="prywatny">prywatnie</option><option value="biuro">biuro</option><option value="deweloper">deweloper</option></select></label>
+        <label><span class="label">Media</span>
+          <select id="f-media"><option value="">dowolnie</option><option value="prąd">jest prąd</option><option value="prąd+woda">prąd i woda</option><option value="gaz">jest gaz</option><option value="kanalizacja">kanalizacja</option></select></label>
         <label><span class="label">Sortuj</span>
           <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option><option value="pushed">ostatnio podbite</option><option value="saved">najczęściej zapisywane</option><option value="views">najczęściej oglądane</option><option value="views_rate">najszybciej rośnie zainteresowanie</option></select></label>
       </div>
@@ -629,7 +634,7 @@ function drawCharts(data){
 
 /* ---------- oferty ---------- */
 let offersTimer=null, offersReq=0;
-['#f-use','#f-sort','#f-age'].forEach(s=>$(s).onchange=loadOffers);
+['#f-use','#f-sort','#f-age','#f-seller','#f-media'].forEach(s=>$(s).onchange=loadOffers);
 ['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(loadOffers,350)});
 // --- wiersz oferty (tabela gminy i "Moje ulubione") ---------------------------------------------
 const ROWS={}; let ME={user:'zespół'};
@@ -639,6 +644,20 @@ function teamCell(r){
   const users=r.fav_users||[], others=users.filter(u=>u!==ME.user);
   const names=users.map(who).join(', ');
   return `<button type="button" class="star${r.fav?' on':''}" data-act="fav" aria-pressed="${!!r.fav}" title="${r.fav?'Usuń z moich ulubionych':'Dodaj do moich ulubionych'}${names?' · oznaczyli: '+names:''}">${r.fav?'★':'☆'}</button>${others.length?`<span class="cnt" title="Oznaczyli też: ${others.map(who).join(', ')}">+${others.length}</span>`:''}<button type="button" class="cmb${r.comments?' has':''}" data-act="cm" aria-expanded="false" title="Komentarze zespołu">${ICON_CM}${r.comments?r.comments:''}</button>`}
+const PNAME={dimensions:'wymiary',location:'położenie',building_types:'zabudowa',plot_type:'rodzaj',terrain_type:'teren'};
+function featLine(f){
+  if(!f)return '';
+  const bits=[];
+  if(f.seller)bits.push(`<b>${esc(f.seller)}</b>`);
+  if(f.media&&f.media.length)bits.push(esc(f.media.join(', ')));
+  if(f.access&&f.access.length)bits.push('dojazd '+esc(f.access.join('/')));
+  if(f.fence===true)bits.push('ogrodzona');
+  if(f.vicinity&&f.vicinity.length)bits.push('okolica: '+esc(f.vicinity.join(', ')));
+  if(f.negotiable)bits.push('do negocjacji');
+  const params=Object.entries(f.params||{}).map(([src,ps])=>`${SRC[src]||src}:\n`+Object.entries(ps).map(([k,v])=>`  ${PNAME[k]||k}: ${v}`).join('\n')).join('\n');
+  const tip=[f.updated_at?'aktualizacja ogłoszenia: '+dFull(f.updated_at):'',params].filter(Boolean).join('\n');
+  if(!bits.length&&!tip)return '';
+  return `<span class="sub2 feat" title="${esc(tip)}">${bits.join(' · ')||'parametry ⓘ'}${f.updated_at?` · akt. ${dFull(f.updated_at)}`:''}</span>`}
 function offerRow(r,opts={}){
     const lastDay=OV.last_observed;
 
@@ -654,7 +673,7 @@ function offerRow(r,opts={}){
     ROWS[r.id]=r;
     return `<tr data-id="${esc(r.id)}">
     <td class="l team">${teamCell(r)}</td>
-    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}</td>${opts.gmina?`\n    <td class="l">${esc(r.municipality||'–')}</td>`:''}
+    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}${featLine(r.features)}</td>${opts.gmina?`\n    <td class="l">${esc(r.municipality||'–')}</td>`:''}
     <td>${nf(r.area)} m² <span class="ar">(${nf(r.area/100,1)} ar)</span></td>
     <td>${nf(r.price)} zł</td>
     <td><b>${nf(r.ppm2)}</b></td>
@@ -726,6 +745,8 @@ async function loadOffers(){
   if($('#f-max').value)p.set('max_area',$('#f-max').value);
   if($('#f-ppm2').value)p.set('max_ppm2',$('#f-ppm2').value);
   if($('#f-age').value)p.set('min_age_days',$('#f-age').value);
+  if($('#f-seller').value)p.set('seller',$('#f-seller').value);
+  if($('#f-media').value)p.set('media',$('#f-media').value);
   const id=++offersReq, body=$('#offers-body');
   body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
   let rows;

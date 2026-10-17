@@ -19,6 +19,7 @@ from datetime import date, datetime
 from typing import Callable, Protocol
 
 from . import interest, uldk
+from . import features
 from .http import FetchError
 from .otodom_api import OtodomApi, SessionExpired
 
@@ -102,6 +103,7 @@ class SearchItem:
     listed_at: date | None = None      # pierwsze dodanie oferty na Otodom (createdAtFirst)
     pushed_up_at: date | None = None   # ostatnie płatne podbicie ogłoszenia
     title: str | None = None           # tylko do ustalenia rodzaju działki, nie zapisujemy
+    seller: str | None = None          # prywatny / biuro / deweloper (z wyników, bez nazwy)
 
 
 def _date(v) -> date | None:
@@ -132,8 +134,13 @@ def parse_search_page(html: str) -> tuple[list[SearchItem], int]:
         price = None if it.get("hidePrice") else _num(it.get("totalPrice"))
         area = _num(it.get("areaInSquareMeters")) or _num(it.get("terrainAreaInSquareMeters"))
         listed = _date(it.get("createdAtFirst")) or _date(it.get("dateCreated"))
+        seller = None
+        if it.get("isPrivateOwner") is True:
+            seller = "prywatny"
+        elif it.get("agency") or it.get("isPrivateOwner") is False:
+            seller = "biuro"
         items.append(SearchItem(str(it["id"]), it["slug"], price, area, listed, _date(it.get("pushedUpAt")),
-                                it.get("title")))
+                                it.get("title"), seller))
     return items, total_pages
 
 
@@ -147,7 +154,8 @@ def _first(v):
 def parse_detail_page(html: str) -> dict:
     """Wyciąga ze strony oferty to, czego nie ma w wynikach. Zwraca dict do cache."""
     try:
-        ad = next_data(html)["props"]["pageProps"]["ad"]
+        page_props = next_data(html)["props"]["pageProps"]
+        ad = page_props["ad"]
     except (KeyError, TypeError) as exc:
         raise LayoutChanged(f"brak pageProps.ad ({exc})") from exc
     if not isinstance(ad, dict):
@@ -185,7 +193,36 @@ def parse_detail_page(html: str) -> dict:
         "land_use_source": source,
         "area_m2": _num(target.get("Area")),
         "municipality_hint": municipality_hint,
+        "features": parse_features(ad, page_props.get("unifiedAd") if isinstance(page_props, dict) else None),
     }
+
+
+def _as_list(v) -> list:
+    return v if isinstance(v, list) else ([] if v in (None, "") else [v])
+
+
+def parse_features(ad: dict, unified: dict | None = None) -> dict:
+    """Parametry działki z `ad.attributes` (media, dojazd, ogrodzenie, okolica) i typ ogłoszeniodawcy."""
+    attrs = ad.get("attributes") if isinstance(ad.get("attributes"), dict) else {}
+    unified = unified if isinstance(unified, dict) else {}
+    f = features.empty()
+    f["media"] = sorted({features.MEDIA.get(m, m) for m in _as_list(attrs.get("media_types"))})
+    f["access"] = sorted({features.ACCESS.get(a, a) for a in _as_list(attrs.get("access_types"))})
+    f["vicinity"] = sorted({features.VICINITY.get(v, v) for v in _as_list(attrs.get("vicinity_types"))})
+    if attrs.get("fence") in ("y", "n"):
+        f["fence"] = attrs["fence"] == "y"
+    kind = str(ad.get("advertType") or "").upper()
+    f["seller"] = ("deweloper" if kind == "DEVELOPER" else "biuro" if kind == "AGENCY" else
+                   "prywatny" if kind == "PRIVATE" or str(ad.get("advertiserType")).lower() == "private" else None)
+    negotiable = (unified.get("price") or {}).get("isNegotiable")
+    f["negotiable"] = negotiable if isinstance(negotiable, bool) else None
+    modified = _date(ad.get("modifiedAt"))
+    f["updated_at"] = modified.isoformat() if modified else None
+    # pozostałe parametry (np. wymiary, położenie, rodzaj zabudowy) jako surowe wartości
+    skip = {"media_types", "access_types", "vicinity_types", "fence", "price_per_m", "extended_seller_type"}
+    f["params"] = {k: ", ".join(map(str, _as_list(v))) for k, v in attrs.items()
+                   if k not in skip and not features.PERSONAL.search(k) and v not in (None, "", [])}
+    return f
 
 
 # --------------------------------------------------------------------------- przebieg
@@ -239,7 +276,29 @@ class ScrapeStats:
     interest_refreshed: int = 0    # ponowne pomiary wyświetleń/zapisań (interest.refresh)
     interest_failed: int = 0
     interest_due: int = 0          # ofert z minionym terminem pomiaru (przed budżetem)
+    features_refetched: int = 0    # stron ofert pobranych ponownie dla parametrów (media, dojazd...)
     notes: list[str] = field(default_factory=list)
+
+
+def _fill_features(get, it: SearchItem, detail: dict, stats: ScrapeStats, max_refetch: int) -> bool:
+    """Parametry (media, dojazd, sprzedający...) dla oferty pobranej przed ich zbieraniem: jednorazowo
+    ze strony oferty, najwyżej `max_refetch` w przebiegu. True, jeśli `detail` się zmienił."""
+    changed = False
+    if it.seller and detail.get("list_seller") != it.seller:
+        detail["list_seller"] = it.seller
+        changed = True
+    if "features" in detail or stats.features_refetched >= max_refetch:
+        return changed
+    try:
+        fresh = parse_detail_page(get(DETAIL_URL.format(slug=it.slug)))
+    except (FetchError, LayoutChanged):
+        return changed
+    stats.features_refetched += 1
+    detail["features"] = fresh["features"]
+    if not detail.get("land_use") and fresh.get("land_use"):
+        detail["land_use"], detail["land_use_source"] = fresh["land_use"], fresh["land_use_source"]
+    detail["land_use_checked"] = True
+    return True
 
 
 def _fill_land_use(get, it: SearchItem, detail: dict, stats: ScrapeStats, max_refetch: int) -> bool:
@@ -333,6 +392,7 @@ def scrape(
     history_backfill: int = 0,
     max_type_refetch: int = 100,
     interest_budget: int = 0,
+    max_features_refetch: int = 0,
 ) -> tuple[list[dict], ScrapeStats]:
     """Jeden przebieg: wszystkie strony wyników + brakujące szczegóły + gminy.
 
@@ -342,6 +402,7 @@ def scrape(
     `api` — API zalogowanego konta (historia, statystyki); None = bez historii.
     `history_backfill` — ile ofert pobranych wcześniej uzupełnić o historię w tym przebiegu.
     `interest_budget` — ile ofert z historią odświeżyć o wyświetlenia/zapisania (lekkie zapytanie API).
+    `max_features_refetch` — ile wcześniej pobranych ofert uzupełnić o parametry (strona oferty).
     """
     geo_get = geo_get or get
     stats = ScrapeStats()
@@ -379,6 +440,8 @@ def scrape(
                 log.warning("otodom: szczegóły %s: %s", it.ad_id, exc)
                 continue
             stats.details_fetched += 1
+            if it.seller:
+                detail["list_seller"] = it.seller
             _add_history(api, it, detail, observed_at, stats, new=True)
             cache.put_detail(it.ad_id, it.slug, detail)
             if stats.details_fetched % 100 == 0:
@@ -389,6 +452,8 @@ def scrape(
             if _add_history(api, it, detail, observed_at, stats, new=False):
                 cache.put_detail(it.ad_id, it.slug, detail)
 
+        if _fill_features(get, it, detail, stats, max_features_refetch):
+            cache.put_detail(it.ad_id, it.slug, detail)
         if not detail.get("land_use"):
             if _fill_land_use(get, it, detail, stats, max_type_refetch):
                 cache.put_detail(it.ad_id, it.slug, detail)

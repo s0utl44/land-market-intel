@@ -8,13 +8,14 @@ Danych kontaktowych (contact.person / contact.company) nie odczytujemy.
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from . import interest, uldk
+from . import features, interest, uldk
 from .http import FetchError
 from .nuxt import find_first, nuxt_data
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
@@ -171,12 +172,50 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         "municipality_hint": loc.get("commune"),
         "county_hint": loc.get("county"),
         "views": parse_views(html),
+        "features": parse_features(nd, pd, html),
     }
+
+
+def _label_pairs(nd) -> dict:
+    """Wszystkie pary {label, value} z danych Nuxt (tabela informacji i parametry oferty)."""
+    out = {}
+
+    def walk(o, depth=0):
+        if depth > 12:
+            return
+        if isinstance(o, dict):
+            label, value = o.get("label"), o.get("value")
+            if isinstance(label, str) and isinstance(value, (str, int, float, list)) and label.strip():
+                out.setdefault(label.strip(), value)
+            for v in o.values():
+                walk(v, depth + 1)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, depth + 1)
+    walk(nd)
+    return out
+
+
+def parse_features(nd, pd: dict, html: str) -> dict:  # noqa: ARG001 - html na przyszłe pola
+    pairs = {k: v for k, v in _label_pairs(nd).items()
+             if not re.search(r"numer ogłoszenia|liczba odsłon|^cena", k, re.I)}
+    f = features.from_params(pairs)
+    if (d := features.pl_date(str(pairs.get("Aktualizacja") or ""))):
+        f["updated_at"] = d.isoformat()
+    # typ ogłoszeniodawcy tylko z danych oferty: w menu strony są słowa "biuro", "deweloper" dla wszystkich ofert
+    seller = find_first(nd, lambda d: isinstance(d.get("isPrivate"), bool) or isinstance(d.get("isAgency"), bool))
+    if f["seller"] is None and seller is not None:
+        f["seller"] = "prywatny" if seller.get("isPrivate") is True or seller.get("isAgency") is False else "biuro"
+    if not f["media"]:
+        media = pd.get("media") or pd.get("utilities")
+        if media:
+            f["media"] = features._words(json.dumps(media, ensure_ascii=False), features.MEDIA_WORDS)
+    return f
 
 
 def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", teryt_prefix: str = "02",
            max_details: int | None = None, max_pages: int = MAX_PAGES, geo_get=None,
-           interest_budget: int = 0) -> tuple[list[dict], ScrapeStats]:
+           interest_budget: int = 0, features_budget: int = 0) -> tuple[list[dict], ScrapeStats]:
     """Wszystkie strony wyników + brakujące strony ofert (raz na ofertę) + gminy z ULDK
     + ponowny pomiar liczby odsłon dla ofert, którym minął termin (najwyżej `interest_budget`)."""
     geo_get = geo_get or get
@@ -204,9 +243,17 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     stats.unique_ads = len(ads)
     log.info("gratka: %d stron, %d unikalnych ogłoszeń", stats.pages, len(ads))
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
-                      parse_detail_page, "gratka")
-    interest.refresh(ads.values(), cache, observed_at, interest_budget,
-                     lambda it, detail: (parse_views(get(it.url)), None), stats, "gratka",
+                      parse_detail_page, "gratka", features_budget=features_budget)
+    def remeasure(it, detail):
+        # pomiar odsłon i tak pobiera stronę oferty: przy okazji odświeżamy parametry
+        html = get(it.url)
+        try:
+            detail["features"] = parse_detail_page(html, it.title, it.description)["features"]
+        except LayoutChanged:
+            pass
+        return parse_views(html), None
+
+    interest.refresh(ads.values(), cache, observed_at, interest_budget, remeasure, stats, "gratka",
                      GRATKA_NEW_EVERY, GRATKA_OLD_EVERY)
     return rows, stats
 
@@ -215,12 +262,14 @@ LAYOUT_STREAK_LIMIT = 20  # tyle nietypowych stron ofert z rzędu = zmiana wygl�
 
 
 def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_details: int | None, geo_get,
-               stats: ScrapeStats, parse_detail, label: str, price_from_detail: bool = False) -> list[dict]:
+               stats: ScrapeStats, parse_detail, label: str, price_from_detail: bool = False,
+               features_budget: int = 0) -> list[dict]:
     """Wspólne dla portali z listą + stroną oferty: brakujące szczegóły (raz na ofertę), gmina z ULDK, wiersze CSV.
 
     `parse_detail(html, title, description)` zwraca słownik z lat/lon/precise/land_use/area_m2
     (opcjonalnie listed_at, gdy data dodania jest tylko na stronie oferty, i price_pln,
     gdy `price_from_detail` i na liście ceny zabrakło).
+    `features_budget`: ile ofert pobranych wcześniej (bez `features`) uzupełnić o parametry w tym przebiegu.
     """
     names: dict[str, str] = {}
     rows = []
@@ -258,6 +307,19 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
             cache.put_detail(it.ad_id, it.url, detail)
             if stats.details_fetched % 100 == 0:
                 log.info("%s: pobrano szczegóły %d nowych ofert", label, stats.details_fetched)
+        elif ("features" not in detail and not detail.get("unparsable")
+              and stats.features_refetched < features_budget):
+            try:
+                fresh = parse_detail(get(it.url), it.title, it.description)
+            except (FetchError, LayoutChanged) as exc:
+                log.info("%s: parametry %s: %s", label, it.ad_id, exc)
+                detail["features"] = features.empty()  # nie próbujemy w kółko
+            else:
+                detail["features"] = fresh.get("features") or features.empty()
+            stats.features_refetched += 1
+            cache.put_detail(it.ad_id, it.url, detail)
+            if stats.features_refetched % 100 == 0:
+                log.info("%s: uzupełniono parametry %d ofert", label, stats.features_refetched)
 
         price = it.price_pln or detail.get("price_pln")
         if price is None:
