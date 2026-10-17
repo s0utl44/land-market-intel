@@ -66,6 +66,21 @@ więc dawałby same duplikaty przy podwójnej liczbie zapytań.
 Codzienny przebieg obejmuje wszystkie zatwierdzone portale z listy `LMI_SOURCES`
 (domyślnie `otodom,gratka,nieruchomosci-online,adresowo`; niezatwierdzone są pomijane). Jeden portal można uruchomić osobno: `lmi daily --sources gratka`.
 
+## 4c. Ceny transakcyjne (RCN, geoportal GUGiK)
+
+Bezpłatne od 13.02.2026. Pierwsze pobranie (akty od 2020, całe województwo, bez geometrii) i kontrola kompletności:
+
+```bash
+docker compose run --rm -T app init-db
+systemd-run --unit lmi-rcn-init --working-directory=/opt/lmi /usr/bin/docker compose run --rm -T app rcn
+journalctl -u lmi-rcn-init -f                    # miesiąc po miesiącu: "N rekordów (usługa: N ...)"
+docker compose run --rm -T app rcn-coverage     # per powiat: rekordy w usłudze vs w bazie
+```
+
+Import dla każdego miesiąca najpierw pyta usługę o liczbę rekordów i przerywa (`Incomplete`), jeśli pobierze mniej.
+Akty bez daty pobiera osobno. Dalej odświeża się sam w poniedziałki (ostatnie 120 dni, bo starostwa dopisują akty
+z opóźnieniem); wyłączenie: `LMI_RCN=0`.
+
 ## 5. Pierwsze pełne pobranie
 
 Około 4100 ofert. Każdą stronę oferty pobieramy raz, z przerwą 2–4 s. Całość zajmuje około 4 godzin.

@@ -5,6 +5,8 @@ import pytest
 
 from lmi import csv_import, synthetic
 
+os.environ.setdefault("LMI_RCN", "0")  # testy nie odpytują geoportalu (RCN odświeża się w poniedziałki)
+
 
 @pytest.fixture(scope="session")
 def synthetic_data(tmp_path_factory):

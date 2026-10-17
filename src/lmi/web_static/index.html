@@ -137,6 +137,17 @@ th.l,td.l{text-align:left}
 .sub2{display:block;color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:2px}
 td.two-line{white-space:normal;min-width:120px}
 .ext{font-weight:700;text-decoration:none}
+/* ceny transakcyjne */
+.tx-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.tx-cards .panel{padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.tx-cards b{font-size:1.5rem;font-weight:300}
+.tx-cards small{color:var(--muted);font-size:.8rem}
+.tx-cards .gap.good b{color:var(--good)} .tx-cards .gap.warn b{color:var(--warn)}
+.qbars{display:flex;align-items:flex-end;gap:6px;height:64px;padding:8px 2px 0}
+.qbars span{flex:1;background:var(--gold);opacity:.85;border-radius:3px 3px 0 0;min-height:2px;position:relative}
+.qbars span:hover{opacity:1}
+.qlab{display:flex;justify-content:space-between;color:var(--muted);font-size:.72rem}
+@media (max-width:760px){.tx-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* zespół: ulubione i komentarze */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 td.team{white-space:nowrap;width:1%}
@@ -238,6 +249,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
             <th data-k="discounted" aria-sort="none"><button type="button">Z obniżką</button></th>
             <th data-k="days" aria-sort="none"><button type="button">Dni do zniknięcia</button></th>
             <th data-k="age" aria-sort="none"><button type="button">Wiek ofert</button></th>
+            <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu pod zabudowę w ostatnich 12 miesiącach"><button type="button">Transakcje 12 mies.</button></th>
             <th class="l">Rynek</th>
           </tr></thead>
           <tbody id="rank-body"></tbody>
@@ -255,6 +267,12 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       <div class="facts" id="gm-facts"></div>
     </div>
     <div class="charts" id="charts"></div>
+
+    <div class="head" style="margin-top:12px">
+      <div><h2>Ceny transakcyjne</h2>
+        <p>Akty notarialne z Rejestru Cen Nieruchomości (geoportal GUGiK): sprzedaże samego gruntu niezabudowanego w całości, na wolnym rynku lub w przetargu. Starostwa dopisują akty z opóźnieniem kilku tygodni.</p></div>
+    </div>
+    <div id="tx"></div>
 
     <div class="head" style="margin-top:12px">
       <div><h2>Aktywne oferty</h2>
@@ -318,7 +336,7 @@ async function load(){
     [OV,RANK]=await Promise.all([api('/api/overview'),api('/api/ranking')]);
   }catch(e){
     $('#status').innerHTML='<span><i class="dot bad"></i>Nie udało się pobrać danych. Odśwież stronę za chwilę.</span>';
-    $('#rank-body').innerHTML='<tr><td class="l" colspan="11"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
+    $('#rank-body').innerHTML='<tr><td class="l" colspan="12"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank();
@@ -391,7 +409,7 @@ function marketPill(r){
 function renderRank(){
   const rows=rankRows(), max=Math.max(0.01,...RANK.map(r=>Math.abs(r.score||0)));
   const body=$('#rank-body');
-  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="11"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="12"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
   body.innerHTML=rows.slice(0,rankLimit).map(r=>{
     const sc=r.score, w=sc==null?0:Math.abs(sc)/max*50;
     return `<tr data-t="${r.teryt}" tabindex="0" aria-selected="${r.teryt===selected}">
@@ -405,6 +423,7 @@ function renderRank(){
       <td>${pct(r.discounted,0)}</td>
       <td>${nf(r.days)}</td>
       <td title="mediana: jak długo wiszą aktywne oferty">${age(r.age==null?null:Math.round(r.age))}</td>
+      <td title="${r.tx_ppm2!=null?'mediana transakcyjna '+nf(r.tx_ppm2)+' zł/m²':''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td>
       <td class="l">${marketPill(r)}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
@@ -435,9 +454,41 @@ async function select(teryt,scroll){
   $('#charts').innerHTML='<div class="panel empty">Ładowanie wykresów…</div>';
   try{ drawCharts(await api(`/api/municipality/${teryt}/weekly`)); }
   catch(e){ $('#charts').innerHTML='<div class="panel empty">Nie udało się pobrać wykresów dla tej gminy.</div>'; }
+  loadTx(teryt);
   loadOffers();
 }
 
+const MPZP={budownictwoMieszkanioweJednorodzinne:'MN jednorodzinna',budownictwoMieszkanioweWielorodzinne:'MW wielorodzinna',terenRolniczy:'rolny',terenDrogWewnetrznych:'droga wewn.',terenDrogPublicznych:'droga publ.',terenZieleniUrzadzonej:'zieleń',brakMPZPLubWZ:'brak planu/WZ',terenUslug:'usługi',terenLasu:'las'};
+const mpzpTxt=v=>(v||'').split(';').filter(Boolean).map(x=>MPZP[x]||x.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase()).join(', ')||'–';
+async function loadTx(teryt,limit=15){
+  const box=$('#tx'); box.innerHTML='<div class="panel empty">Ładowanie transakcji…</div>';
+  let d; try{d=await api(`/api/municipality/${teryt}/transactions?limit=${limit}`)}catch(e){box.innerHTML='<div class="panel empty">Nie udało się pobrać transakcji.</div>';return}
+  if(teryt!==selected)return;
+  const s=d.summary;
+  if(!s.data_until){box.innerHTML='<div class="panel empty">Ceny transakcyjne pojawią się po pierwszym pobraniu z RCN.</div>';return}
+  if(!d.recent.length){box.innerHTML=`<div class="panel empty">Brak transakcji samym gruntem w tej gminie (dane RCN do ${dFull(s.data_until)}).</div>`;return}
+  const r=RANK.find(x=>x.teryt===teryt), ask=r&&r.ppm2, deal=s.ppm2_build_12m;
+  const gap=ask&&deal?(ask/deal-1)*100:null;
+  const q=d.quarters.slice(-12), qmax=Math.max(1,...q.map(x=>x.tx));
+  box.innerHTML=`<div class="tx-cards">
+    <div class="panel"><span class="label">Transakcje (12 mies.)</span><b>${nf(s.tx_12m)}</b><small>w tym pod zabudowę: ${nf(s.tx_build_12m)}</small></div>
+    <div class="panel"><span class="label">Mediana transakcyjna</span><b>${deal!=null?nf(deal)+' zł/m²':'–'}</b><small>grunty pod zabudowę, 12 mies.</small></div>
+    <div class="panel gap ${gap==null?'':gap>15?'warn':'good'}"><span class="label">Ogłoszenia vs akty</span><b>${gap==null?'–':(gap>0?'+':'')+nf(gap,0)+'%'}</b><small>${ask?`mediana ofert ${nf(ask)} zł/m²`:'brak mediany ofert'}</small></div>
+    <div class="panel"><span class="label">Transakcje na kwartał</span>
+      <div class="qbars">${q.map(x=>`<span style="height:${Math.round(x.tx/qmax*100)}%" title="${x.quarter.slice(0,4)} Q${Math.floor(+x.quarter.slice(5,7)/3)+1}: ${x.tx} transakcji${x.ppm2_build?', mediana '+nf(x.ppm2_build)+' zł/m²':''}"></span>`).join('')}</div>
+      <div class="qlab"><span>${q.length?q[0].quarter.slice(0,4):''}</span><span>${q.length?q[q.length-1].quarter.slice(0,4):''}</span></div></div>
+  </div>
+  <div class="panel"><div class="scroll"><table>
+    <thead><tr><th class="l">Data aktu</th><th class="l">Miejscowość</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th class="l">Plan miejscowy</th><th class="l">Rynek</th><th class="l">Działki</th></tr></thead>
+    <tbody>${d.recent.map(t=>`<tr>
+      <td class="l">${dFull(t.doc_date)}</td><td class="l">${esc(t.locality||'–')}</td>
+      <td>${nf(t.area)} m² <span class="ar">(${nf(t.area/100,1)} ar)</span></td><td>${nf(t.price)} zł</td><td><b>${nf(t.ppm2)}</b></td>
+      <td class="l">${esc(mpzpTxt(t.mpzp))}${t.buildable?'':' <span class="pill mute">nie pod zabudowę</span>'}</td>
+      <td class="l">${t.tender?'<span class="pill info">przetarg</span>':t.market==='rynekPierwotny'?'pierwotny':'wtórny'}</td>
+      <td class="l" title="${esc((t.parcel_ids||[]).join(', '))}">${t.parcels>1?t.parcels+' działki':esc((t.parcel_ids||[''])[0].split('.').slice(-1)[0])}</td></tr>`).join('')}</tbody>
+  </table></div><div class="more"><span>Ostatnie ${d.recent.length} transakcji · dane RCN do ${dFull(s.data_until)}</span>${d.recent.length===limit?'<button class="btn" id="tx-more" type="button">Pokaż więcej</button>':''}</div></div>`;
+  const more=$('#tx-more'); if(more)more.onclick=()=>loadTx(teryt,limit*5>500?500:limit*5);
+}
 const METRICS=[
   {k:'supply',t:'Oferty w sprzedaży',f:v=>nf(v),axis:v=>nf(v),zero:true},
   {k:'ppm2',t:'Mediana ceny za m²',f:v=>nf(v)+' zł',axis:v=>nf(v)},

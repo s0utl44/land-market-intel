@@ -103,9 +103,54 @@ def ranking():
                avg_absorption_rate AS absorption, price_trend_pct AS price_trend,
                avg_discounted_share AS discounted, median_days_to_disappear AS days,
                latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks,
-               latest_median_listing_age_days AS age
+               latest_median_listing_age_days AS age, t.tx_12m, t.tx_ppm2
         FROM mart.region_scores
-        ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""")
+        LEFT JOIN (
+            -- transakcje samym gruntem pod zabudowę z ostatnich 12 miesięcy danych RCN
+            SELECT gmina_teryt, count(*) AS tx_12m,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) AS tx_ppm2
+            FROM mart.rcn_land_transactions
+            WHERE buildable AND ppm2 BETWEEN %(lo)s AND %(hi)s
+              AND doc_date > (SELECT max(doc_date) FROM scrape.rcn_parcels) - 365
+            GROUP BY gmina_teryt
+        ) t ON t.gmina_teryt = municipality_teryt
+        ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""", PPM2_RANGE)
+
+
+# zł/m² poza tym zakresem to zwykle drogi, udziały albo błędy w rejestrze
+PPM2_RANGE = {"lo": 5, "hi": 5000}
+
+
+@app.get("/api/municipality/{teryt}/transactions")
+def municipality_transactions(teryt: str, limit: int = Query(50, ge=1, le=500)):
+    """Ceny transakcyjne gruntów z RCN: podsumowanie 12 miesięcy, kwartały i ostatnie akty."""
+    _check_teryt(teryt)
+    p = {"t": teryt, "limit": limit, **PPM2_RANGE}
+    summary = _rows("""
+        WITH last AS (SELECT max(doc_date) AS d FROM scrape.rcn_parcels)
+        SELECT (SELECT d FROM last) AS data_until,
+               count(*) FILTER (WHERE doc_date > (SELECT d FROM last) - 365)            AS tx_12m,
+               count(*) FILTER (WHERE buildable AND doc_date > (SELECT d FROM last) - 365) AS tx_build_12m,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2)
+                   FILTER (WHERE buildable AND doc_date > (SELECT d FROM last) - 365)     AS ppm2_build_12m,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2)
+                   FILTER (WHERE doc_date > (SELECT d FROM last) - 365)                  AS ppm2_12m
+        FROM mart.rcn_land_transactions
+        WHERE gmina_teryt = %(t)s AND ppm2 BETWEEN %(lo)s AND %(hi)s""", p)[0]
+    quarters = _rows("""
+        SELECT date_trunc('quarter', doc_date)::date AS quarter, count(*) AS tx,
+               count(*) FILTER (WHERE buildable) AS tx_build,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) FILTER (WHERE buildable) AS ppm2_build
+        FROM mart.rcn_land_transactions
+        WHERE gmina_teryt = %(t)s AND ppm2 BETWEEN %(lo)s AND %(hi)s
+        GROUP BY 1 ORDER BY 1""", p)
+    recent = _rows("""
+        SELECT doc_date, price, area_m2 AS area, ppm2, parcels, mpzp, land_use, buildable, tender, market,
+               seller_type, buyer_type, locality, parcel_ids
+        FROM mart.rcn_land_transactions
+        WHERE gmina_teryt = %(t)s AND ppm2 BETWEEN %(lo)s AND %(hi)s
+        ORDER BY doc_date DESC NULLS LAST, tx_id LIMIT %(limit)s""", p)
+    return {"summary": summary, "quarters": quarters, "recent": recent}
 
 
 @app.get("/api/municipality/{teryt}/weekly")

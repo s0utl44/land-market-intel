@@ -52,6 +52,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--if-needed", action="store_true",
                    help="uruchom tylko, jeśli dzisiejsze pobieranie jeszcze się nie udało (ponowna próba)")
 
+    s = sub.add_parser("rcn", help="ceny transakcyjne z RCN (geoportal): pierwsze pobranie albo odświeżenie")
+    s.add_argument("--teryt-prefix", default="02", help="województwo (TERYT), domyślnie dolnośląskie")
+    s.add_argument("--since", help="od daty aktu RRRR-MM-DD (domyślnie: od ostatniego znanego minus 120 dni)")
+
+    s = sub.add_parser("rcn-coverage", help="kompletność RCN per powiat: usługa vs baza (do porównań)")
+    s.add_argument("--since", default="2020-01-01")
+
     s = sub.add_parser("check-otodom", help="szybki test scrapera bez bazy (wypisuje tylko liczby)")
     s.add_argument("--region", default="dolnoslaskie")
 
@@ -135,6 +142,31 @@ def main(argv: list[str] | None = None) -> int:
                 return run_daily(conn, args.out_dir, args.max_details, args.region, args.teryt_prefix,
                                  history_backfill=args.history_backfill, if_needed=args.if_needed,
                                  sources=tuple(args.sources.split(",")) if args.sources else None)
+            elif args.cmd == "rcn":
+                from datetime import date as _date
+
+                from . import rcn
+
+                n = rcn.refresh(conn, teryt_prefix=args.teryt_prefix,
+                                since=_date.fromisoformat(args.since) if args.since else None)
+                land = conn.execute("SELECT count(*), max(doc_date) FROM mart.rcn_land_transactions "
+                                    "WHERE gmina_teryt LIKE %s", (args.teryt_prefix + "%",)).fetchone()
+                print(f"RCN: zapisano {n} rekordów działek; transakcji samym gruntem w bazie: {land[0]} "
+                      f"(ostatni akt: {land[1]})")
+            elif args.cmd == "rcn-coverage":
+                from datetime import date as _date
+
+                from . import rcn
+
+                print(f"{'powiat':<7}{'w usłudze':>11}{'w bazie':>10}{'transakcji':>12}{'gruntowych':>12}  uwagi")
+                tot = [0, 0, 0, 0]
+                for c in rcn.coverage(conn, since=_date.fromisoformat(args.since)):
+                    note = "BRAK W USŁUDZE" if c["service"] == 0 else (
+                        "niepełne w bazie" if c["db_rows"] < c["service"] else "")
+                    print(f"{c['powiat']:<7}{c['service']:>11}{c['db_rows']:>10}{c['db_tx']:>12}{c['land_tx']:>12}  {note}")
+                    for i, k in enumerate(("service", "db_rows", "db_tx", "land_tx")):
+                        tot[i] += c[k]
+                print(f"{'razem':<7}{tot[0]:>11}{tot[1]:>10}{tot[2]:>12}{tot[3]:>12}")
             elif args.cmd == "demo":
                 return _demo(conn, args.out_dir, args.regions, args.weeks)
         except db.ImportRejected as exc:

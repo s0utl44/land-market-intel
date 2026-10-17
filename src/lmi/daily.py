@@ -105,6 +105,20 @@ class _SourceLock:
             self.f = None
 
 
+def _refresh_rcn(conn, today: date, teryt_prefix: str) -> None:
+    """Ceny transakcyjne (RCN) raz w tygodniu, w poniedziałek. Błąd nie psuje przebiegu portali."""
+    if os.environ.get("LMI_RCN", "1") == "0" or today.weekday() != 0:
+        return
+    from . import rcn
+
+    try:
+        n = rcn.refresh(conn, teryt_prefix=teryt_prefix, today=today)
+        print(f"RCN: odświeżono {n} rekordów działek z aktów notarialnych.")
+    except Exception as exc:  # noqa: BLE001 - usługa geoportalu bywa niestabilna
+        conn.rollback()
+        print(f"RCN: odświeżenie nie powiodło się ({type(exc).__name__}: {exc}); spróbujemy za tydzień.")
+
+
 def _approved(conn, source: str) -> bool:
     row = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (source,)).fetchone()
     return bool(row and row[0])
@@ -160,6 +174,7 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
         codes.append(code)
         imported = imported or did_import
 
+    _refresh_rcn(conn, observed_at, teryt_prefix)
     if imported:
         run_id, links = db.run_dedup(conn)
         _, scores = db.run_metrics(conn, run_id)
