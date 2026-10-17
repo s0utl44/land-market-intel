@@ -150,7 +150,7 @@ def main():
     for p, n in pats.most_common(25):
         print(f"   {n:3d}  {p}")
     print("\n  paginacja:", sorted({re.sub(r'\d{5,}', 'N', l)[:120] for l in links
-                                    if re.search(r"[?&,](p|page|strona|pn)=?\d", l)})[:8])
+                                    if re.search(r"[?&,](p|page|strona|pn)=?\d|/_l\d", l)})[:8])
     counts = re.findall(r"(\d[\d\s ]{1,})\s*(?:ogłosze|ofert|wynik|działek)", html)[:6]
     print("  liczby ofert w tekście:", counts)
 
@@ -160,7 +160,8 @@ def main():
     if tiles:
         el = element_at(html, tiles[0])
         print("\n### szkielet pierwszego kafelka\n" + skeleton(el))
-    offer_links = [l for l in links if re.search(r"\d{6,}", l) and not re.search(r"[?&]", l)]
+    offer_links = [l for l in links if re.search(r"\d{6,}", l) and not re.search(r"[?&]", l)] or \
+        [l for l in links if re.match(r"(https?://[^/]+)?/(o|oferta|ogloszenie)/", l)]
     if not offer_links:
         print("\nbrak linków do ofert\nKONIEC")
         return
