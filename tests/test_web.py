@@ -236,3 +236,41 @@ def test_feedback_flow(client, monkeypatch):
     assert client.post(f"/api/feedback/{fid}/status", headers=admin, json={"status": "zrobione"}).status_code == 200
     assert client.get("/api/feedback", headers=admin).json() == []
     assert len(client.get("/api/feedback", headers=admin, params={"status": "wszystkie"}).json()) == 1
+
+
+def test_admin_status(client, pg_conn, monkeypatch):
+    monkeypatch.setenv("LMI_ADMINS", "x")
+    admin = {"X-Auth-Request-User": "x"}
+    assert client.get("/api/admin/status").status_code == 403
+    db.add_source(pg_conn, "otodom", "Otodom")
+    db.approve_source(pg_conn, "otodom", "test", "pytest")
+    pg_conn.execute("""INSERT INTO scrape.runs (source_id, started_at, finished_at, status, message)
+                       VALUES ('otodom', now(), now(), 'blocked', '403 dla https://www.otodom.pl')""")
+    pg_conn.execute("""INSERT INTO scrape.job_status (job, state, started_at, updated_at, message)
+                       VALUES ('gratka', 'running', now() - interval '2 hours', now() - interval '1 hour', 'lista, strona 40')""")
+    pg_conn.commit()
+    d = client.get("/api/admin/status", headers=admin).json()
+    titles = [i["title"] for i in d["issues"]]
+    assert "Otodom: ostatnie pobieranie nie przeszło" in titles
+    assert any("gratka: zadanie nie daje znaku życia" in t for t in titles)
+    assert d["problems"] >= 2 and d["jobs"][0]["stale"] is True
+
+
+def test_job_tracking_writes_progress(pg_conn):
+    import logging
+
+    from lmi import jobs
+
+    with jobs.tracked(pg_conn, "rcn", "start") as job:
+        logging.getLogger("lmi.rcn").info("rcn: 2020-01: 100 rekordów")
+        job.progress("ręczny postęp", force=True)
+        job.finish("ok", "zapisano 100 rekordów")
+    row = pg_conn.execute("SELECT state, message, finished_at IS NOT NULL FROM scrape.job_status WHERE job = 'rcn'").fetchone()
+    assert row == ("ok", "zapisano 100 rekordów", True)
+    try:
+        with jobs.tracked(pg_conn, "rcn"):
+            raise RuntimeError("geoportal padł")
+    except RuntimeError:
+        pass
+    assert pg_conn.execute("SELECT state, message FROM scrape.job_status WHERE job = 'rcn'").fetchone() == \
+        ("error", "RuntimeError: geoportal padł")

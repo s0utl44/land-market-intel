@@ -18,7 +18,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from . import db
+from . import db, jobs
 from .scrapers import adresowo, gratka, nonline, otodom
 from .scrapers.http import Blocked, PoliteClient
 from .scrapers.otodom_api import OtodomApi, load_cookie
@@ -112,7 +112,9 @@ def _refresh_rcn(conn, today: date, teryt_prefix: str) -> None:
     from . import rcn
 
     try:
-        n = rcn.refresh(conn, teryt_prefix=teryt_prefix, today=today)
+        with jobs.tracked(conn, "rcn", "cotygodniowe odświeżenie") as job:
+            n = rcn.refresh(conn, teryt_prefix=teryt_prefix, today=today)
+            job.finish("ok", f"odświeżono {n} rekordów")
         print(f"RCN: odświeżono {n} rekordów działek z aktów notarialnych.")
     except Exception as exc:  # noqa: BLE001 - usługa geoportalu bywa niestabilna
         conn.rollback()
@@ -160,16 +162,27 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
             print(f"{SOURCE_NAMES[source]}: inny przebieg tego źródła jeszcze trwa, pomijam.")
             continue
         started = datetime.now(timezone.utc)
+        job = jobs.Job(conn, source).start("pobieranie listy ofert")
+        handler = jobs.JobLogHandler(job)
+        logging.getLogger("lmi").addHandler(handler)
         try:
             code, did_import = _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix,
                                            client, observed_at, geo_client, history_backfill, api, started)
+            last = conn.execute("""SELECT status, rows_written, message FROM scrape.runs WHERE source_id = %s
+                                   ORDER BY run_id DESC LIMIT 1""", (source,)).fetchone()
+            if last:
+                job.finish(last[0], f"{last[1]} wierszy" if last[1] is not None else (last[2] or ""))
+            else:
+                job.finish("error" if code else "ok", "")
         except Exception as exc:  # każdy nieprzewidziany błąd zostaje w dzienniku i na stronie
             conn.rollback()
             _log_run(conn, source, started, "error", message=f"{type(exc).__name__}: {exc}"[:500])
+            job.finish("error", f"{type(exc).__name__}: {exc}")
             print(f"{SOURCE_NAMES[source]}: BŁĄD {type(exc).__name__}: {exc}")
             first_error = first_error or exc
             code, did_import = 1, False
         finally:
+            logging.getLogger("lmi").removeHandler(handler)
             lock.release()
         codes.append(code)
         imported = imported or did_import

@@ -345,6 +345,79 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
     return rows
 
 
+# --- status systemu (administrator) --------------------------------------------------------------
+
+STALE_MINUTES = 30      # zadanie "running" bez znaku życia dłużej = pewnie przerwane
+STATUS_TEXT = {"ok": "OK", "warning": "z ostrzeżeniem", "error": "błąd", "blocked": "blokada portalu (403)",
+               "layout_changed": "portal zmienił wygląd strony", "running": "trwa"}
+
+
+@app.get("/api/admin/status")
+def admin_status(request: Request):
+    """Wszystko, co admin powinien wiedzieć: co trwa, co nie przeszło, kompletność RCN, stan pamięci ofert."""
+    _require_admin(request)
+    jobs = _rows("""SELECT job, state, started_at, updated_at, finished_at, message,
+                           state = 'running' AND updated_at < now() - make_interval(mins => %(m)s) AS stale
+                    FROM scrape.job_status ORDER BY job""", {"m": STALE_MINUTES})
+    sources = _rows("""
+        SELECT s.source_id AS source, s.name,
+               (SELECT finished_at FROM scrape.runs r WHERE r.source_id = s.source_id AND r.status IN ('ok', 'warning')
+                 ORDER BY run_id DESC LIMIT 1) AS last_ok,
+               (SELECT row_to_json(x) FROM (SELECT started_at, finished_at, status, rows_written, message
+                   FROM scrape.runs r WHERE r.source_id = s.source_id ORDER BY run_id DESC LIMIT 1) x) AS latest,
+               (SELECT count(*) FROM scrape.portal_details d WHERE d.source_id = s.source_id)
+                 + CASE WHEN s.source_id = 'otodom' THEN (SELECT count(*) FROM scrape.otodom_details) ELSE 0 END
+                 AS cached_offers
+        FROM core.sources s WHERE s.approved ORDER BY s.source_id""")
+    runs = _rows("""SELECT run_id, source_id AS source, started_at, finished_at, status, rows_written, message
+                    FROM scrape.runs ORDER BY run_id DESC LIMIT 20""")
+    rcn = _rows("""SELECT count(*) AS rows, min(doc_date) AS since, max(doc_date) AS until,
+                          (SELECT count(*) FROM mart.rcn_land_transactions) AS land_tx,
+                          (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS last_fetch,
+                          (SELECT coalesce(json_agg(gaps), '[]') FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL) AS gaps
+                   FROM scrape.rcn_parcels""")[0]
+    feedback_open = _rows("SELECT count(*) AS n FROM app.feedback WHERE status = 'nowe'")[0]["n"]
+
+    issues = []
+    names = {x["source"]: x["name"] for x in sources}
+    running = {j["job"] for j in jobs if j["state"] == "running" and not j["stale"]}
+    for x in sources:
+        lt = x["latest"]
+        if lt and lt["status"] not in ("ok", "warning"):
+            again = x["source"] in running
+            issues.append({"level": "warn" if again else "bad",
+                           "title": f"{x['name']}: ostatnie pobieranie nie przeszło"
+                                    + (" (trwa ponowne)" if again else ""),
+                           "detail": f"{STATUS_TEXT.get(lt['status'], lt['status'])}"
+                                     + (f": {lt['message']}" if lt.get("message") else ""),
+                           "when": lt["started_at"]})
+        elif lt and lt["status"] == "warning" and lt.get("message"):
+            issues.append({"level": "warn", "title": f"{x['name']}: ostrzeżenie", "detail": lt["message"],
+                           "when": lt["started_at"]})
+    for x in sources:
+        if x["last_ok"] is not None:
+            stale = _rows("SELECT %(t)s::timestamptz < now() - interval '26 hours' AS old", {"t": x["last_ok"]})[0]["old"]
+            if stale:
+                issues.append({"level": "warn", "title": f"{x['name']}: brak udanego pobrania od ponad doby",
+                               "detail": "ostatnie udane", "when": x["last_ok"]})
+    for j in jobs:
+        label = names.get(j["job"], "RCN (ceny transakcyjne)" if j["job"] == "rcn" else j["job"])
+        if j["stale"]:
+            issues.append({"level": "warn", "title": f"{label}: zadanie nie daje znaku życia",
+                           "detail": f"ostatni komunikat: {j['message'] or '–'}", "when": j["updated_at"]})
+        elif j["state"] == "error" and j["job"] == "rcn":
+            issues.append({"level": "bad", "title": f"{label}: zadanie przerwane błędem",
+                           "detail": j["message"] or "", "when": j["finished_at"] or j["updated_at"]})
+    if rcn["gaps"]:
+        issues.append({"level": "info", "title": f"RCN: luki w usłudze geoportalu ({len(rcn['gaps'])})",
+                       "detail": "; ".join(rcn["gaps"][:5]), "when": rcn["last_fetch"]})
+    if feedback_open:
+        issues.append({"level": "info", "title": f"Nowe zgłoszenia od zespołu: {feedback_open}",
+                       "detail": "przycisk „Zgłoszenia”", "when": None})
+    return {"issues": issues, "jobs": jobs, "sources": sources, "runs": runs, "rcn": rcn,
+            "problems": sum(1 for i in issues if i["level"] in ("bad", "warn"))}
+
+
 # --- zgłoszenia błędów i poprawek ----------------------------------------------------------------
 
 FEEDBACK_KINDS = ("błąd", "poprawka danych", "pomysł")

@@ -76,7 +76,8 @@ echo "LMI_ADMINS=<twój-login>,<twój-email>" >> .env && docker compose up -d we
 docker compose run --rm -T app feedback        # otwarte zgłoszenia jako tekst do skopiowania
 ```
 
-Na stronie administrator ma przycisk „Zgłoszenia”: lista, „Kopiuj wszystkie” i oznaczanie jako zrobione.
+Na stronie administrator ma przycisk „Zgłoszenia”: lista, „Kopiuj wszystkie” i oznaczanie jako zrobione,
+oraz „Status”: powiadomienia o nieudanych przebiegach, zadania na bieżąco, portale, RCN (czerwona liczba = problemy).
 
 ## 4c. Ceny transakcyjne (RCN, geoportal GUGiK)
 

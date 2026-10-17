@@ -165,6 +165,24 @@ body.picking .pickable{cursor:crosshair}
 .fb-areas li span{flex:1;overflow-wrap:anywhere}
 .fb-areas li button{all:unset;cursor:pointer;color:var(--muted);font-weight:700;padding:0 4px}
 .fb-areas .none{background:none;border:0;color:var(--muted);padding:0}
+/* status systemu */
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font-size:.72rem;font-weight:700}
+.sys-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sys-grid .panel{padding:14px 16px}
+.sys-grid h3{margin:0 0 8px;font-size:1rem;font-weight:600}
+.issue{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.issue:first-of-type{border-top:0}
+.issue i{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--info)}
+.issue.bad i{background:var(--bad)} .issue.warn i{background:var(--warn)}
+.issue b{display:block;font-weight:600} .issue span{color:var(--ink-2);font-size:.86rem;overflow-wrap:anywhere}
+.issue small{color:var(--muted);font-size:.76rem}
+.sys-ok{color:var(--good);font-weight:600}
+.job{padding:8px 0;border-top:1px solid var(--line)} .job:first-of-type{border-top:0}
+.job .msg{color:var(--muted);font-size:.82rem;overflow-wrap:anywhere}
+.st{font-weight:700;font-size:.78rem;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.st.ok{background:var(--good-bg);color:var(--good)} .st.running{background:var(--info-bg);color:var(--info)}
+.st.bad{background:var(--bad-bg);color:var(--bad)} .st.warn{background:var(--warn-bg);color:var(--warn)}
+@media (max-width:760px){.sys-grid{grid-template-columns:minmax(0,1fr)}}
 /* zgłoszenia */
 .top-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn.primary{background:var(--gold);border-color:var(--gold);color:#1f2a36}
@@ -201,7 +219,7 @@ tr.cm-row td{background:var(--bg);white-space:normal;text-align:left;padding:12p
 .cm-item p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-form{display:flex;gap:8px;align-items:flex-start;max-width:760px}
 .cm-form textarea{flex:1;min-height:58px;resize:vertical;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
-#fav-btn.on,#fbl-btn.on{border-color:var(--gold);color:var(--gold-ink)}
+#fav-btn.on,#fbl-btn.on,#sys-btn.on{border-color:var(--gold);color:var(--gold-ink)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
 footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
@@ -228,6 +246,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
     <div class="status" id="status"><span>Ładowanie danych…</span></div>
     <div class="top-actions">
       <button type="button" class="btn" id="fb-btn" aria-haspopup="dialog">Zgłoś uwagę</button>
+      <button type="button" class="btn" id="sys-btn" aria-controls="sys" aria-expanded="false" hidden>Status<span class="badge" id="sys-badge" hidden></span></button>
       <button type="button" class="btn" id="fbl-btn" aria-controls="fbl" aria-expanded="false" hidden>Zgłoszenia</button>
       <button type="button" class="btn" id="fav-btn" aria-controls="favs" aria-expanded="false">★ Ulubione</button>
     </div>
@@ -244,8 +263,16 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 </div>
 
 <main class="wrap">
-  <div class="notice warn" id="alert" role="alert" hidden></div>
   <div class="notice" id="early" hidden></div>
+
+  <section id="sys" aria-labelledby="h-sys" hidden>
+    <div class="head">
+      <div><h2 id="h-sys">Status systemu</h2>
+        <p>Pobierania z portali i z RCN: co trwa teraz, co się nie udało, kompletność danych. Widoczne tylko dla administratora, odświeża się co minutę.</p></div>
+      <div class="tools"><span class="ar" id="sys-time"></span><button type="button" class="btn" id="sys-refresh">Odśwież</button></div>
+    </div>
+    <div id="sys-body"></div>
+  </section>
 
   <section id="fbl" aria-labelledby="h-fbl" hidden>
     <div class="head">
@@ -410,24 +437,14 @@ async function load(){
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank();
-  api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
+  api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
 }
 
 function renderAttempt(){
-  // każde źródło osobno: pokazujemy te, których ostatnia próba się nie udała
-  const failed=(OV.sources||[]).filter(x=>x.latest&&!['ok','warning'].includes(x.latest.status));
-  if(!failed.length)return;
-  const why=a=>({blocked:'portal zablokował dostęp z serwera (403); następna próba odbędzie się automatycznie',
-    layout_changed:'portal zmienił wygląd strony i scraper wymaga poprawki',
-    error:'błąd: '+(a.message||'nieznany')}[a.status]||(a.message||a.status));
-  const n=$('#alert');n.hidden=false;n.classList.add('bad');
-  n.innerHTML=`<span aria-hidden="true">⛔</span><div>${failed.map(x=>{
-    const t=new Date(x.latest.started_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-    const last=x.last_ok?new Date(x.last_ok).toLocaleString('pl-PL',{day:'numeric',month:'short'}):'nigdy';
-    return `<div><b>${esc(x.name)}: pobieranie z ${t} nie powiodło się</b> (${esc(why(x.latest))}). Oferty z tego portalu są z ${last}.</div>`}).join('')}</div>`;
+  // problemy z pobieraniem nie są już banerem dla wszystkich: administrator widzi je w panelu „Status”
 }
 function renderStatus(){
   const r=OV.last_run;
@@ -437,7 +454,6 @@ function renderStatus(){
   const cls=r.status!=='ok'?'warn':age>30?'bad':'';
   const when=t.toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   $('#status').innerHTML=`<span><i class="dot ${cls}"></i>Aktualizacja: ${when}${age>30?' (ponad dobę temu)':''}</span><a href="/metabase/">Metabase ↗</a>`;
-  if(r.status==='warning'&&r.message){const n=$('#alert');n.hidden=false;n.innerHTML=`<span aria-hidden="true">⚠️</span><div><b>Uwaga:</b> ${esc(r.message)}</div>`}
 }
 
 function renderSummary(){
@@ -813,6 +829,41 @@ $('#fbl-copy').addEventListener('click',async()=>{
 $('#fbl-btn').addEventListener('click',()=>{
   const sec=$('#fbl'), open=sec.hidden; sec.hidden=!open; $('#fbl-btn').classList.toggle('on',open);
   $('#fbl-btn').setAttribute('aria-expanded',String(open)); if(open){loadFbl();sec.scrollIntoView({block:'start'})}});
+// --- status systemu (administrator) ---------------------------------------------------------------
+const SRCN={...SRC,rcn:'RCN (ceny transakcyjne)'};
+const ST={ok:['ok','OK'],warning:['warn','ostrzeżenie'],running:['running','trwa'],error:['bad','błąd'],blocked:['bad','blokada 403'],layout_changed:['bad','zmiana strony']};
+const stPill=(state,stale)=>{const [c,t]=stale?['warn','bez znaku życia']:(ST[state]||['warn',state]);return `<span class="st ${c}">${t}</span>`};
+const ago=t=>{if(!t)return '–';const m=Math.round((Date.now()-new Date(t))/6e4);return m<1?'przed chwilą':m<60?`${m} min temu`:m<1440?`${Math.round(m/60)} godz. temu`:new Date(t).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})};
+let sysTimer=null;
+async function loadSys(badgeOnly){
+  let d; try{d=await api('/api/admin/status')}catch(e){if(!badgeOnly)$('#sys-body').innerHTML='<div class="panel empty">Nie udało się pobrać statusu.</div>';return}
+  const b=$('#sys-badge'); b.hidden=!d.problems; b.textContent=d.problems;
+  if(badgeOnly)return;
+  $('#sys-time').textContent='stan z '+new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'});
+  const issues=d.issues.length?d.issues.map(i=>`<div class="issue ${i.level}"><i></i><div><b>${esc(i.title)}</b><span>${esc(i.detail||'')}</span>${i.when?`<br><small>${ago(i.when)}</small>`:''}</div></div>`).join('')
+    :'<div class="sys-ok">Wszystko w porządku: ostatnie pobierania przeszły.</div>';
+  const jobs=d.jobs.length?d.jobs.map(j=>`<div class="job"><b>${esc(SRCN[j.job]||j.job)}</b> ${stPill(j.state,j.stale)} <small class="ar">${j.state==='running'?'od '+ago(j.started_at):'zakończone '+ago(j.finished_at)}</small><div class="msg">${esc(j.message||'')}${j.state==='running'?` · aktualizacja ${ago(j.updated_at)}`:''}</div></div>`).join('')
+    :'<div class="na">Brak zapisanych zadań. Pojawią się przy najbliższym pobieraniu.</div>';
+  const srcs=`<table><thead><tr><th class="l">Portal</th><th class="l">Ostatnia próba</th><th class="l">Wynik</th><th>Wiersze</th><th class="l">Ostatnie udane</th><th>Oferty w pamięci</th></tr></thead><tbody>${d.sources.map(x=>{const l=x.latest||{};
+    return `<tr><td class="l"><b>${esc(x.name)}</b></td><td class="l">${ago(l.started_at)}</td><td class="l">${l.status?stPill(l.status):'–'}${l.message&&l.status!=='ok'?`<span class="sub2">${esc(l.message.slice(0,90))}</span>`:''}</td><td>${l.rows_written!=null?nf(l.rows_written):'–'}</td><td class="l">${ago(x.last_ok)}</td><td>${nf(x.cached_offers)}</td></tr>`}).join('')}</tbody></table>`;
+  const r=d.rcn;
+  const rcn=`<div><b>${nf(r.rows)}</b> rekordów działek z aktów · <b>${nf(r.land_tx)}</b> transakcji samym gruntem</div>
+    <div class="msg">Zakres: ${r.since?dFull(r.since):'–'} – ${r.until?dFull(r.until):'–'} · ostatnie pobranie ${ago(r.last_fetch)}</div>
+    ${r.gaps&&r.gaps.length?`<div class="msg">Luki w usłudze geoportalu: ${r.gaps.length} (${esc(r.gaps.slice(0,3).join('; '))}${r.gaps.length>3?'…':''})</div>`:'<div class="msg">Bez luk w usłudze.</div>'}`;
+  const runs=`<table><thead><tr><th class="l">Kiedy</th><th class="l">Portal</th><th class="l">Wynik</th><th>Wiersze</th><th class="l">Uwagi</th></tr></thead><tbody>${d.runs.map(x=>`<tr><td class="l">${ago(x.started_at)}</td><td class="l">${esc(SRCN[x.source]||x.source)}</td><td class="l">${stPill(x.status)}</td><td>${x.rows_written!=null?nf(x.rows_written):'–'}</td><td class="l">${esc((x.message||'').slice(0,80))}</td></tr>`).join('')}</tbody></table>`;
+  $('#sys-body').innerHTML=`<div class="sys-grid">
+    <div class="panel"><h3>Powiadomienia</h3>${issues}</div>
+    <div class="panel"><h3>Zadania</h3>${jobs}</div>
+    <div class="panel" style="grid-column:1/-1"><h3>Portale</h3><div class="scroll">${srcs}</div></div>
+    <div class="panel"><h3>Ceny transakcyjne (RCN)</h3>${rcn}</div>
+    <div class="panel"><h3>Ostatnie przebiegi</h3><div class="scroll">${runs}</div></div></div>`;
+}
+$('#sys-btn').addEventListener('click',()=>{
+  const sec=$('#sys'), open=sec.hidden; sec.hidden=!open; $('#sys-btn').classList.toggle('on',open);
+  $('#sys-btn').setAttribute('aria-expanded',String(open)); clearInterval(sysTimer);
+  if(open){loadSys();sec.scrollIntoView({block:'start'});sysTimer=setInterval(()=>loadSys(),60000)}
+});
+$('#sys-refresh').addEventListener('click',()=>loadSys());
 teamClicks($('#offers-body')); teamClicks($('#favs-body'));
 $('#fav-btn').addEventListener('click',()=>{
   const sec=$('#favs'), open=sec.hidden; sec.hidden=!open;

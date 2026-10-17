@@ -150,8 +150,13 @@ def main(argv: list[str] | None = None) -> int:
 
                 from . import rcn
 
-                n = rcn.refresh(conn, teryt_prefix=args.teryt_prefix,
-                                since=_date.fromisoformat(args.since) if args.since else None)
+                from . import jobs
+
+                with jobs.tracked(conn, "rcn", "pobieranie aktów z geoportalu") as job:
+                    n = rcn.refresh(conn, teryt_prefix=args.teryt_prefix,
+                                    since=_date.fromisoformat(args.since) if args.since else None)
+                    gaps = conn.execute("SELECT count(*) FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL").fetchone()[0]
+                    job.finish("warning" if gaps else "ok", f"zapisano {n} rekordów" + (f", luki: {gaps}" if gaps else ""))
                 land = conn.execute("SELECT count(*), max(doc_date) FROM mart.rcn_land_transactions "
                                     "WHERE gmina_teryt LIKE %s", (args.teryt_prefix + "%",)).fetchone()
                 print(f"RCN: zapisano {n} rekordów działek; transakcji samym gruntem w bazie: {land[0]} "
