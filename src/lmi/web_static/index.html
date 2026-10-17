@@ -148,6 +148,23 @@ td.two-line{white-space:normal;min-width:120px}
 .qbars span:hover{opacity:1}
 .qlab{display:flex;justify-content:space-between;color:var(--muted);font-size:.72rem}
 @media (max-width:760px){.tx-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* zaznaczanie obszarów do zgłoszenia */
+body.picking .pickable{cursor:crosshair}
+.pick-hover{outline:2px dashed var(--gold)!important;outline-offset:2px}
+.pick-sel{outline:3px solid var(--gold)!important;outline-offset:2px;background-color:var(--gold-soft)!important}
+.pick-bar{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;width:min(760px,calc(100vw - 32px));
+  background:var(--brand);color:var(--brand-ink);border:1px solid var(--gold);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;box-shadow:0 14px 40px rgb(0 0 0 / .35)}
+.pick-bar b{display:block;font-weight:600}
+.pick-bar span{font-size:.84rem;color:var(--brand-muted)}
+.pick-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pick-bar .btn{background:transparent;color:var(--brand-ink);border-color:rgb(203 160 82 / .7)}
+.pick-bar .btn.primary{background:var(--gold);color:#1f2a36}
+.pick-bar .btn:disabled{opacity:.45;cursor:not-allowed}
+.fb-areas{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:170px;overflow:auto}
+.fb-areas li{display:flex;gap:8px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--line-2);border-radius:7px;padding:6px 8px;font-size:.84rem}
+.fb-areas li span{flex:1;overflow-wrap:anywhere}
+.fb-areas li button{all:unset;cursor:pointer;color:var(--muted);font-weight:700;padding:0 4px}
+.fb-areas .none{background:none;border:0;color:var(--muted);padding:0}
 /* zgłoszenia */
 .top-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn.primary{background:var(--gold);border-color:var(--gold);color:#1f2a36}
@@ -334,16 +351,22 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   </section>
 </main>
 
+<div class="pick-bar" id="pick-bar" role="region" aria-label="Zaznaczanie obszarów do zgłoszenia" hidden>
+  <div><b>Zaznacz obszary, których dotyczy uwaga</b><span id="pick-count">Kliknij jeden lub kilka elementów strony: wiersz, wykres, kafelek. Ponowne kliknięcie odznacza.</span></div>
+  <div class="pick-actions"><button type="button" class="btn" id="pick-cancel">Anuluj</button><button type="button" class="btn" id="pick-skip">Uwaga ogólna</button><button type="button" class="btn primary" id="pick-next" disabled>Dalej →</button></div>
+</div>
+
 <dialog id="fb-dialog" aria-labelledby="fb-title">
   <form method="dialog" id="fb-form">
     <h2 id="fb-title">Zgłoś uwagę</h2>
-    <p class="fb-hint">Błąd na stronie, zła liczba, brakująca oferta albo pomysł na usprawnienie. Dołączymy informację, którą gminę i widok masz otwarte.</p>
+    <p class="fb-hint">Opisz, co jest nie tak albo co poprawić. Zaznaczone obszary dołączymy do zgłoszenia.</p>
+    <div><span class="label">Zaznaczone obszary</span><ul class="fb-areas" id="fb-areas"></ul></div>
     <label><span class="label">Rodzaj</span>
       <select id="fb-kind"><option>błąd</option><option>poprawka danych</option><option>pomysł</option></select></label>
     <label><span class="label">Opis</span>
       <textarea id="fb-body" required minlength="3" maxlength="4000" rows="6" placeholder="Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”"></textarea></label>
     <p class="fb-ctx" id="fb-ctx"></p>
-    <div class="fb-actions"><button type="button" class="btn" id="fb-cancel">Anuluj</button><button type="submit" class="btn primary" id="fb-send">Wyślij</button></div>
+    <div class="fb-actions"><button type="button" class="btn" id="fb-back">← Zaznacz inne</button><span style="flex:1"></span><button type="button" class="btn" id="fb-cancel">Anuluj</button><button type="submit" class="btn primary" id="fb-send">Wyślij</button></div>
     <p class="fb-msg" id="fb-msg" role="status"></p>
   </form>
 </dialog>
@@ -703,18 +726,71 @@ function fbContext(){
   return {gmina:r?r.name:'',teryt:selected||'',widok:!$('#favs').hidden?'ulubione':selected?'karta gminy':'ranking',
           adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
 }
-$('#fb-btn').addEventListener('click',()=>{
-  const c=fbContext(); $('#fb-msg').textContent=''; $('#fb-send').disabled=false;
-  $('#fb-ctx').textContent=`Dołączymy: ${c.widok}${c.gmina?' · '+c.gmina:''}.`;
+// tryb zaznaczania: najpierw obszary strony, potem opis
+const PICKABLE='#rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
+let PICK=[], picking=false, hoverEl=null;
+const clean=t=>(t||'').replace(/\s+/g,' ').trim();
+function describe(el){
+  const gm=selected&&RANK.find(x=>x.teryt===selected), g=gm?` (gmina ${gm.name})`:'';
+  if(el.matches('#rank-body tr'))return 'Ranking gmin: wiersz '+clean(el.querySelector('.gm b')?.innerText);
+  if(el.matches('#offers-body tr, #favs-body tr')){const r=ROWS[el.dataset.id];
+    return 'Oferta'+g+': '+(r?`${r.land_use||'–'}, ${nf(r.area)} m², ${nf(r.price)} zł, ${nf(r.ppm2)} zł/m², ${r.url||''}`:clean(el.innerText).slice(0,160));}
+  if(el.matches('#tx tbody tr'))return 'Transakcja RCN'+g+': '+[...el.cells].slice(0,6).map(c=>clean(c.innerText)).join(' · ');
+  if(el.matches('.panel.chart'))return 'Wykres „'+clean(el.querySelector('h3')?.innerText)+'”'+g;
+  if(el.matches('.tx-cards > .panel'))return 'Ceny transakcyjne'+g+': '+clean(el.innerText).slice(0,120);
+  if(el.matches('.summary > div'))return 'Podsumowanie: '+clean(el.innerText).slice(0,120);
+  if(el.matches('#gm-facts .pill'))return 'Karta gminy'+g+': '+clean(el.innerText);
+  if(el.matches('.filters label'))return 'Filtr ofert: '+clean(el.querySelector('.label')?.innerText);
+  if(el.matches('section > .head'))return 'Sekcja „'+clean(el.querySelector('h2')?.innerText)+'”'+g;
+  return clean(el.innerText).slice(0,140)||el.tagName.toLowerCase();
+}
+function pickCount(){
+  $('#pick-next').disabled=!PICK.length;
+  $('#pick-count').textContent=PICK.length?`Zaznaczono: ${PICK.length}. Kliknij kolejne albo „Dalej”.`:'Kliknij jeden lub kilka elementów strony: wiersz, wykres, kafelek. Ponowne kliknięcie odznacza.';
+}
+function pickStart(){
+  picking=true; document.body.classList.add('picking'); $('#pick-bar').hidden=false; pickCount();
+  document.querySelectorAll(PICKABLE).forEach(e=>e.classList.add('pickable'));
+}
+function pickStop(keep){
+  picking=false; document.body.classList.remove('picking'); $('#pick-bar').hidden=true;
+  if(hoverEl){hoverEl.classList.remove('pick-hover');hoverEl=null}
+  document.querySelectorAll('.pickable').forEach(e=>e.classList.remove('pickable'));
+  if(!keep){PICK.forEach(p=>p.el.classList.remove('pick-sel'));PICK=[]}
+}
+document.addEventListener('mouseover',ev=>{if(!picking||ev.target.closest('#pick-bar'))return;
+  const el=ev.target.closest(PICKABLE); if(el===hoverEl)return;
+  if(hoverEl)hoverEl.classList.remove('pick-hover'); hoverEl=el; if(el)el.classList.add('pick-hover');},true);
+document.addEventListener('click',ev=>{if(!picking||ev.target.closest('#pick-bar'))return;
+  const el=ev.target.closest(PICKABLE); ev.preventDefault(); ev.stopPropagation(); if(!el)return;
+  const i=PICK.findIndex(p=>p.el===el);
+  if(i>=0){PICK.splice(i,1);el.classList.remove('pick-sel')}else{PICK.push({el,text:describe(el)});el.classList.add('pick-sel')}
+  pickCount();},true);
+document.addEventListener('keydown',ev=>{if(picking&&ev.key==='Escape')pickStop(false)});
+function renderAreas(){
+  $('#fb-areas').innerHTML=PICK.length?PICK.map((p,i)=>`<li><span>${esc(p.text)}</span><button type="button" data-rm="${i}" aria-label="Usuń obszar">×</button></li>`).join('')
+    :'<li class="none">Uwaga ogólna, bez zaznaczonego obszaru.</li>';
+}
+$('#fb-areas').addEventListener('click',ev=>{const i=ev.target.dataset&&ev.target.dataset.rm; if(i==null)return;
+  PICK[+i].el.classList.remove('pick-sel'); PICK.splice(+i,1); renderAreas();});
+function openFbDialog(){
+  pickStop(true); renderAreas(); const c=fbContext(); $('#fb-msg').textContent=''; $('#fb-send').disabled=false;
+  $('#fb-ctx').textContent=`Dołączymy też: ${c.widok}${c.gmina?' · '+c.gmina:''}.`;
   $('#fb-dialog').showModal(); $('#fb-body').focus();
-});
-$('#fb-cancel').addEventListener('click',()=>$('#fb-dialog').close());
+}
+$('#fb-btn').addEventListener('click',ev=>{ev.stopPropagation(); if(picking){pickStop(false);return} PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[]; pickStart()});
+$('#pick-cancel').addEventListener('click',()=>pickStop(false));
+$('#pick-skip').addEventListener('click',()=>{PICK.forEach(p=>p.el.classList.remove('pick-sel'));PICK=[];openFbDialog()});
+$('#pick-next').addEventListener('click',openFbDialog);
+$('#fb-back').addEventListener('click',()=>{$('#fb-dialog').close();pickStart();PICK.forEach(p=>p.el.classList.add('pick-sel'))});
+$('#fb-dialog').addEventListener('close',()=>{if(!picking){PICK.forEach(p=>p.el.classList.remove('pick-sel'))}});
+$('#fb-cancel').addEventListener('click',()=>{$('#fb-dialog').close();PICK=[]});
 $('#fb-form').addEventListener('submit',async ev=>{
   ev.preventDefault(); const body=$('#fb-body').value.trim(); if(body.length<3)return;
   $('#fb-send').disabled=true; $('#fb-msg').textContent='Wysyłanie…';
   try{
-    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:fbContext()});
-    $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value='';
+    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | ')}});
+    $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value=''; PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[];
     setTimeout(()=>$('#fb-dialog').close(),1400); if(ME.is_admin&&!$('#fbl').hidden)loadFbl();
   }catch(e){$('#fb-msg').textContent='Nie udało się wysłać. Spróbuj ponownie.';$('#fb-send').disabled=false}
 });
@@ -723,7 +799,7 @@ async function loadFbl(){
   let rows; try{rows=await api('/api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
   $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
   list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
-    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div><p>${esc(r.body)}</p></div>
+    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div><p>${esc(r.body)}</p>${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
     <div><button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
 }
 $('#fbl-list').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-fb]');if(!b)return;

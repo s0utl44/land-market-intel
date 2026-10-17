@@ -221,7 +221,8 @@ def test_feedback_flow(client, monkeypatch):
     admin = {"X-Auth-Request-User": "dlys"}
     r = client.post("/api/feedback", headers=kasia, json={
         "kind": "błąd", "body": "  Oferta za 450 tys. jest podwójnie  ",
-        "context": {"gmina": "Kąty Wrocławskie", "widok": "karta gminy", "haslo": "nie zapisuj"}})
+        "context": {"gmina": "Kąty Wrocławskie", "widok": "karta gminy", "haslo": "nie zapisuj",
+                    "obszary": "Wykres „Mediana ceny za m²” | Oferta: budowlana, 1050 m²"}})
     fid = r.json()["id"]
     assert client.post("/api/feedback", headers=kasia, json={"kind": "inne", "body": "abc"}).status_code == 400
     assert client.get("/api/feedback", headers=kasia).status_code == 403           # nie admin
@@ -231,6 +232,7 @@ def test_feedback_flow(client, monkeypatch):
     assert "haslo" not in rows[0]["context"] and rows[0]["context"]["gmina"] == "Kąty Wrocławskie"
     txt = client.get("/api/feedback/export", headers=admin).text
     assert f"#{fid} [błąd]" in txt and "gmina: Kąty Wrocławskie" in txt
+    assert "  - Wykres „Mediana ceny za m²”\n  - Oferta: budowlana, 1050 m²" in txt
     assert client.post(f"/api/feedback/{fid}/status", headers=admin, json={"status": "zrobione"}).status_code == 200
     assert client.get("/api/feedback", headers=admin).json() == []
     assert len(client.get("/api/feedback", headers=admin, params={"status": "wszystkie"}).json()) == 1

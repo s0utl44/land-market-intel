@@ -358,8 +358,9 @@ def feedback_add(request: Request, kind: str = Body(...), body: str = Body(...),
     if not 3 <= len(body) <= 4000:
         raise HTTPException(400, "opis: od 3 do 4000 znaków")
     # kontekst tylko z dozwolonych, krótkich pól (bez dowolnych danych z przeglądarki)
-    ctx = {k: str(v)[:300] for k, v in (context or {}).items()
-           if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta") and v not in (None, "")}
+    ctx = {k: str(v)[:1500 if k == "obszary" else 300] for k, v in (context or {}).items()
+           if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta", "obszary")
+           and v not in (None, "")}
     import json as _json
     with _conn() as conn:
         row = conn.execute("""INSERT INTO app.feedback (user_email, kind, body, context) VALUES (%s, %s, %s, %s)
@@ -379,10 +380,15 @@ def feedback_text(rows: list[dict]) -> str:
         return "Brak zgłoszeń."
     out = [f"Zgłoszenia z Radaru Działek ({len(rows)}):", ""]
     for r in rows:
-        ctx = ", ".join(f"{k}: {v}" for k, v in (r["context"] or {}).items())
+        c = dict(r["context"] or {})
+        areas = c.pop("obszary", None)
+        c.pop("przegladarka", None)
+        ctx = ", ".join(f"{k}: {v}" for k, v in c.items())
         when = r["created_at"].strftime("%Y-%m-%d %H:%M") if hasattr(r["created_at"], "strftime") else r["created_at"]
         out.append(f"#{r['id']} [{r['kind']}] {when} · {r['author']}" + (f" · {r['status']}" if r["status"] != "nowe" else ""))
         out.append(r["body"])
+        if areas:
+            out.extend(f"  - {a.strip()}" for a in areas.split(" | "))
         if ctx:
             out.append(f"(gdzie: {ctx})")
         out.append("")
