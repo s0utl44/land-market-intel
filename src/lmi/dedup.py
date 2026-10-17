@@ -9,7 +9,8 @@ Reguły (od najmocniejszej):
                    wystawienie), powierzchnia <= price_area_area_tol. Punkty: zgodna powierzchnia 2,
                    nieokrągła powierzchnia (np. 1636 m²) +1, cena <= 0,5% +2 albo <= 3% +1, ten sam typ
                    działki +1; łączymy od PRICE_AREA_MIN_SCORE i tylko jednoznacznie (jeden kandydat
-                   z danego portalu). Inny typ działki albo cena różna o > 3% wyklucza.
+                   z danego portalu, albo kilku bliźniaczych — to samo ogłoszenie wystawione dwa razy).
+                   Cena różna o > 3% wyklucza; inny typ działki nie (portale różnie go nazywają).
 Dwa ogłoszenia z RÓŻNYMI parcel_id nigdy nie trafiają do jednej nieruchomości (także pośrednio).
 Ogłoszenia z jednego portalu widoczne w tym samym czasie łączymy tylko, gdy są niemal identyczne
 (metraż <= 1%, cena <= 2%) — inaczej to zwykle sąsiednie działki z jednego podziału.
@@ -25,7 +26,7 @@ from datetime import date, timedelta
 from itertools import combinations
 from typing import Iterable
 
-ALGORITHM_VERSION = "dedup-v2"
+ALGORITHM_VERSION = "dedup-v3"
 PRICE_AREA_MIN_SCORE = 4
 
 METHOD_CONFIDENCE = {
@@ -195,8 +196,7 @@ def attribute_score(a: Listing, b: Listing, params: DedupParams) -> int:
     gap = _price_gap(a, b)
     if gap > params.price_area_price_tol:
         return 0
-    if a.land_use and b.land_use and a.land_use != b.land_use:
-        return 0
+    # inny typ działki nie wyklucza: portale różnie nazywają to samo (budowlana / rolno-budowlana / inwestycyjna)
     score = 2
     if round(a.area_m2) % 100 and round(b.area_m2) % 100:
         score += 1                       # nieokrągły metraż rzadko się powtarza przypadkiem
@@ -270,9 +270,27 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
                 if attribute_score(a, b, params) >= need:
                     ok[i][b.source_id].append(j)
                     ok[j][a.source_id].append(i)
-    # tylko pary jednoznaczne z obu stron: jeden kandydat z danego portalu
+    # tylko pary jednoznaczne z obu stron: jeden kandydat z danego portalu albo dwa bliźniacze
+    # (to samo ogłoszenie wystawione w portalu dwa razy: ten sam metraż i cena, pinezki do 30 m albo brak)
+    def twins(x: int, y: int) -> bool:
+        a, b = listings[x], listings[y]
+        if a.has_coords and b.has_coords and haversine_m(a.lat, a.lon, b.lat, b.lon) > 30:
+            return False                 # dwie dokładne pinezki w różnych miejscach: dwie działki
+        return _rel_diff(a.area_m2, b.area_m2) <= 0.005 and _price_gap(a, b) <= 0.005
+
+    def unambiguous(cands: list[int]) -> bool:
+        # najwyżej dwa identyczne ogłoszenia: przy większej serii (np. osiedle równych działek) nie zgadujemy
+        return len(cands) == 1 or (len(cands) == 2 and twins(*cands))
+
     price_area = {(min(i, j), max(i, j)) for i, per_src in ok.items() for src, cands in per_src.items()
-                  if len(cands) == 1 for j in cands if ok[j][listings[i].source_id] == [i]}
+                  if unambiguous(cands) for j in cands
+                  if j != i and listings[j].source_id != listings[i].source_id
+                  and i in ok[j][listings[i].source_id] and unambiguous(ok[j][listings[i].source_id])}
+    # bliźniacze ogłoszenia z jednego portalu (podwójne wystawienie) też łączymy
+    price_area |= {(min(i, j), max(i, j)) for i, per_src in ok.items()
+                   for j in per_src.get(listings[i].source_id, [])
+                   if j != i and len(per_src[listings[i].source_id]) == 1 and twins(i, j)
+                   and ok[j][listings[i].source_id] == [i]}
     pairs.extend((i, j, "price_area") for i, j in sorted(price_area))
     return pairs
 
@@ -288,7 +306,15 @@ def deduplicate(listings: list[Listing], params: DedupParams | None = None) -> l
                    for x in members[ra] for y in members[rb])
 
     # od najmocniejszych par: słabsze nie mogą skleić grup, które się wykluczają
-    for i, j, method in sorted(candidate_pairs(listings, params), key=lambda p: -_METHOD_RANK[p[2]]):
+    def strength(p):
+        # najpierw mocniejsza metoda, w jej obrębie pary najbardziej zgodne (cena, metraż, odległość):
+        # słabsze dopasowanie nie może zająć miejsca dokładnego bliźniaka
+        a, b = listings[p[0]], listings[p[1]]
+        dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else 0.0
+        return (-_METHOD_RANK[p[2]], round(_price_gap(a, b), 3), round(_rel_diff(a.area_m2, b.area_m2), 3), dist,
+                a.key, b.key)
+
+    for i, j, method in sorted(candidate_pairs(listings, params), key=strength):
         ra, rb = uf.find(i), uf.find(j)
         if ra == rb:
             continue

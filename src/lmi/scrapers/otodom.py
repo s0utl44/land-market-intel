@@ -38,6 +38,7 @@ LAND_USE = {
     "forest": "leśna",
     "investment": "inwestycyjna",
     "habitat": "siedliskowa",
+    "commercial": "inwestycyjna",
 }
 
 
@@ -166,7 +167,7 @@ def parse_detail_page(html: str) -> dict:
     target = ad.get("target") or {}
 
     land_type = _first(target.get("Type"))
-    if land_type:
+    if land_type and land_type != "other":  # "inna": rodzaj ustalamy z tytułu/opisu
         land_use, source = LAND_USE.get(str(land_type), land_type), "otodom"
     elif (land_use := classify_land_use(ad.get("title") or target.get("Title"))):
         source = "tytuł"
@@ -278,6 +279,13 @@ class ScrapeStats:
     interest_due: int = 0          # ofert z minionym terminem pomiaru (przed budżetem)
     features_refetched: int = 0    # stron ofert pobranych ponownie dla parametrów (media, dojazd...)
     notes: list[str] = field(default_factory=list)
+
+
+def _land_use_label(value: str | None, title: str | None) -> str:
+    """Rodzaj działki do zapisu; surowe kody Otodomu z wcześniej pobranych ofert ("commercial", "other")."""
+    if value == "other" or not value:
+        return classify_land_use(title) or ""
+    return LAND_USE.get(value, value)
 
 
 def _fill_features(get, it: SearchItem, detail: dict, stats: ScrapeStats, max_refetch: int) -> bool:
@@ -500,7 +508,7 @@ def scrape(
             "lon": f"{detail['lon']:.6f}" if detail.get("precise") else "",
             "area_m2": f"{area:.2f}",
             "price_pln": f"{it.price_pln:.2f}",
-            "land_use": detail.get("land_use") or "",
+            "land_use": _land_use_label(detail.get("land_use"), it.title),
             "url": DETAIL_URL.format(slug=it.slug),
             "title": "",
             "listed_at": it.listed_at.isoformat() if it.listed_at else "",

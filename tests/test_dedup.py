@@ -123,10 +123,27 @@ def test_round_area_with_different_price_is_not_enough():
     assert groups(dedup.deduplicate([L("a", "1", lat=52.0, lon=21.0), L("b", "2", prices=(102_000.0,))])) == [["1"], ["2"]]
 
 
-def test_different_land_use_blocks_attribute_match():
-    a, b = L("a", "1", area=1636, lat=52.0, lon=21.0), L("b", "2", area=1636)
-    a.land_use, b.land_use = "budowlana", "rolna"
-    assert groups(dedup.deduplicate([a, b])) == [["1"], ["2"]]
+def test_different_land_use_names_do_not_block_identical_offer():
+    # Otodom "commercial" i Gratka "inwestycyjna": ten sam metraż i cena co do złotówki
+    a, b = L("otodom", "1", area=25915, prices=(1_150_000.0,)), L("gratka", "2", area=25915, prices=(1_150_000.0,))
+    a.land_use, b.land_use = "commercial", "budowlana"
+    assert groups(dedup.deduplicate([a, b])) == [["1", "2"]]
+
+
+def test_double_post_on_one_portal_does_not_make_match_ambiguous():
+    o = L("otodom", "1", area=800, prices=(280_000.0,))
+    g1 = L("gratka", "2", area=800, prices=(280_000.0,))
+    g2 = L("gratka", "3", area=799, prices=(279_650.0,), lat=52.0, lon=21.0)
+    assert groups(dedup.deduplicate([o, g1, g2])) == [["1", "2", "3"]]
+
+
+def test_exact_twin_wins_over_weaker_neighbour():
+    # dokładny bliźniak (ta sama pinezka, cena, metraż) łączy się, choć obok jest inna oferta tego portalu
+    exact_o = L("otodom", "1", area=10760, prices=(2_690_000.0,), lat=51.0, lon=17.0)
+    other_o = L("otodom", "2", area=10745, prices=(2_200_000.0,), lat=51.0012, lon=17.0)
+    g = L("gratka", "3", area=10760, prices=(2_690_000.0,), lat=51.0, lon=17.0)
+    gs = groups(dedup.deduplicate([other_o, g, exact_o]))
+    assert ["1", "3"] in gs and ["2"] in gs
 
 
 def test_neighbouring_plots_from_one_subdivision_stay_separate():
@@ -153,9 +170,8 @@ def test_parcel_conflict_is_not_bridged_transitively():
 
 
 def test_diff_runs_explains_split_pairs():
-    a, b = L("a", "1", area=1636, lat=52.0, lon=21.0), L("b", "2", area=1636)
-    a.land_use, b.land_use = "budowlana", "rolna"
+    a, b = L("a", "1", area=1636, lat=52.0, lon=21.0), L("b", "2", area=1700)
     old = {a.key: "P1", b.key: "P1"}
     new = {a.key: "P1", b.key: "P2"}
     d = dedup.diff_runs([a, b], old, new)
-    assert list(d) == ["inny typ działki"] and d["inny typ działki"]["pairs"] == 1
+    assert list(d) == ["metraż różny"] and d["metraż różny"]["pairs"] == 1
