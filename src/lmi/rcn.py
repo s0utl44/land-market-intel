@@ -13,6 +13,8 @@ są w RCN tylko kategoriami (osoba fizyczna / prawna).
 from __future__ import annotations
 
 import logging
+import re
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta
@@ -26,6 +28,10 @@ LAYER = "ms:dzialki"
 START = date(2020, 1, 1)        # pierwsze pobranie: od tego dnia (pełna historia z ostatnich lat)
 REFRESH_BACK_DAYS = 120         # starostwa dopisują akty z opóźnieniem: odświeżamy ostatnie miesiące
 PAGE = 1000
+# geoportal pod obciążeniem chwilowo oddaje puste strony (cały powiat "0 z 310"), a po chwili wszystko:
+# zanim uznamy lukę, czekamy i pytamy ponownie
+RETRY_WAITS = (30, 120, 300)
+_sleep = time.sleep
 FIELDS = ["TERYT", "TRAN_LOKALNY_ID_IIP", "TRAN_RODZAJ_TRANS", "TRAN_RODZAJ_RYNKU", "TRAN_SPRZEDAJACY",
           "TRAN_KUPUJACY", "TRAN_CENA_BRUTTO", "DOK_DATA", "NIER_RODZAJ", "NIER_PRAWO", "NIER_UDZIAL",
           "NIER_CENA_BRUTTO", "DZI_ID_DZIALKI", "DZI_PRZEZN_WMPZP", "DZI_POW_EWID", "DZI_SPOSOB_UZYT",
@@ -82,7 +88,7 @@ def parse_hits(xml: str) -> int:
     return int(n)
 
 
-class Incomplete(Exception):
+class Incomplete(Exception):  # zostawione dla zgodności; import nie przerywa się już na brakach
     """Pobrano mniej rekordów, niż usługa deklaruje — nie zapisujemy okresu jako kompletnego."""
 
 
@@ -231,19 +237,32 @@ def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[li
     elif len(prefix) == 2:
         parts = [_fetch(get, pw, since, until) for pw in _powiaty(prefix)]
     else:
-        plain = _unique(_pages(get, prefix, since, until, matched, plain=True))
-        best = plain if len(plain) > len(recs) else recs
-        if len(best) >= matched:
-            return best, matched, []
+        best = recs
+        for wait in (0,) + RETRY_WAITS:
+            if wait:
+                log.info("rcn: %s %s–%s: nadal %d z %d, czekam %d s i pytam ponownie",
+                         prefix, since, until, len(best), matched, wait)
+                _sleep(wait)
+                best = max(best, _unique(_pages(get, prefix, since, until, matched)), key=len)
+            if len(best) < matched:
+                best = max(best, _unique(_pages(get, prefix, since, until, matched, plain=True)), key=len)
+            if len(best) >= matched:
+                return best, matched, []
         gap = f"{prefix} {since or 'bez daty'}–{until or ''}: brak {matched - len(best)} z {matched}"
         log.warning("rcn: luka w usłudze: %s", gap)
         return best, matched, [gap]
     got = _unique([r for part, _, _ in parts for r in part])
     gaps = [g for _, _, gs in parts for g in gs]
-    # nadmiar bywa (akt z dnia granicy liczony w obu częściach) i znika przy usuwaniu powtórzeń;
-    # brak jest dopuszczalny tylko wtedy, gdy wynika z zapisanych luk usługi
-    if len(got) < matched and not gaps:
-        raise Incomplete(f"{prefix} {since}–{until}: części dały {len(got)} rekordów, usługa deklaruje {matched}")
+    declared = sum(n for _, n, _ in parts)
+    if declared < matched:
+        # rekordy z TERYT spoza listy powiatów (albo bez TERYT): usługa je liczy, ale żaden powiat ich nie obejmuje
+        gaps.append(f"{prefix} {since or 'bez daty'}–{until or ''}: {matched - declared} rekordów poza listą powiatów")
+    elif len(got) < matched and not gaps:
+        # części policzyły mniej niż całość, choć każda oddała swoje (usługa zmieniła zdanie w trakcie):
+        # zapisujemy jako lukę do naprawy, zamiast przerywać cały import
+        gaps.append(f"{prefix} {since or 'bez daty'}–{until or ''}: brak {matched - len(got)} z {matched}")
+        log.warning("rcn: luka w usłudze: %s", gaps[-1])
+    # nadmiar bywa (akt z dnia granicy liczony w obu częściach) i znika przy usuwaniu powtórzeń
     return got, matched, gaps
 
 
@@ -258,12 +277,16 @@ def fetch_period(get, teryt_prefix: str, since: date | None,
     return rows, matched, gaps
 
 
+def _client():
+    # usługa publiczna, która pod obciążeniem gubi wyniki: spokojne tempo i dużo ponowień przy zerwanym połączeniu
+    return PoliteClient(min_delay=3.0, max_delay=6.0, timeout=180, retries=6).get
+
+
 def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
             since: date | None = None) -> int:
     """Dociąga akty od ostatniego znanego (minus REFRESH_BACK_DAYS) albo od START. Zwraca liczbę rekordów."""
     today = today or date.today()
-    # usługa publiczna: krótsze przerwy, ale więcej ponowień (geoportal czasem zrywa połączenia)
-    get = get or PoliteClient(min_delay=1.0, max_delay=2.0, timeout=180, retries=6).get
+    get = get or _client()
     if since is None:
         last = conn.execute("SELECT max(doc_date) FROM scrape.rcn_parcels WHERE gmina_teryt LIKE %s",
                             (teryt_prefix + "%",)).fetchone()[0]
@@ -281,6 +304,56 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
         total += len(rows)
     log.info("rcn: zapisano %d rekordów (od %s)", total, since)
     return total
+
+
+GAP = re.compile(r"^(\d+) (\d{4}-\d{2}-\d{2}|bez daty)–(\d{4}-\d{2}-\d{2})?: brak \d+ z \d+$")
+
+LATEST_WITH_GAPS = """
+SELECT fetched_at, teryt_prefix, period_start, gaps FROM (
+    SELECT DISTINCT ON (teryt_prefix, period_start) fetched_at, teryt_prefix, period_start, gaps
+    FROM scrape.rcn_fetch_log ORDER BY teryt_prefix, period_start, fetched_at DESC) last
+WHERE gaps IS NOT NULL AND teryt_prefix LIKE %s ORDER BY period_start NULLS LAST"""
+
+
+def repair(conn, get=None, teryt_prefix: str = "02") -> tuple[int, int]:
+    """Ponownie pobiera tylko kawałki zapisane jako luki (dzień × powiat) w ostatnim pobraniu każdego miesiąca.
+
+    Zwraca (naprawione luki, pozostałe luki). Luki "poza listą powiatów" zostają — ponowne pytanie ich nie zmieni."""
+    get = get or _client()
+    fixed = left = 0
+    for fetched_at, prefix, period, gaps in conn.execute(LATEST_WITH_GAPS, (teryt_prefix + "%",)).fetchall():
+        remaining = []
+        for gap in gaps.split("; "):
+            m = GAP.match(gap)
+            if not m:
+                remaining.append(gap)
+                continue
+            since = None if m.group(2) == "bez daty" else date.fromisoformat(m.group(2))
+            until = date.fromisoformat(m.group(3)) if m.group(3) else None
+            recs, _, still = _fetch(get, m.group(1), since, until)
+            rows = [r for r in map(to_row, recs) if r]
+            with conn.cursor() as cur:
+                cur.executemany(UPSERT, rows)
+            conn.commit()
+            remaining.extend(still)
+            if not still:
+                fixed += 1
+                log.info("rcn: naprawiono lukę %s (%d rekordów)", gap, len(rows))
+        if period is None:
+            saved = conn.execute("SELECT count(*) FROM scrape.rcn_parcels WHERE doc_date IS NULL AND gmina_teryt LIKE %s",
+                                 (prefix + "%",)).fetchone()[0]
+        else:
+            end = conn.execute("SELECT period_end FROM scrape.rcn_fetch_log WHERE fetched_at = %s AND teryt_prefix = %s "
+                               "AND period_start = %s", (fetched_at, prefix, period)).fetchone()[0]
+            saved = conn.execute("SELECT count(*) FROM scrape.rcn_parcels WHERE doc_date >= %s AND doc_date < %s "
+                                 "AND gmina_teryt LIKE %s", (period, end, prefix + "%")).fetchone()[0]
+        conn.execute("""UPDATE scrape.rcn_fetch_log SET gaps = %s, saved = greatest(saved, %s)
+                        WHERE fetched_at = %s AND teryt_prefix = %s AND period_start IS NOT DISTINCT FROM %s""",
+                     ("; ".join(remaining) or None, saved, fetched_at, prefix, period))
+        conn.commit()
+        left += len(remaining)
+    log.info("rcn: naprawa luk: naprawiono %d, zostało %d", fixed, left)
+    return fixed, left
 
 
 def coverage(conn, get=None, powiaty: list[str] | None = None, since: date = START) -> list[dict]:

@@ -374,7 +374,9 @@ def admin_status(request: Request):
     rcn = _rows("""SELECT count(*) AS rows, min(doc_date) AS since, max(doc_date) AS until,
                           (SELECT count(*) FROM mart.rcn_land_transactions) AS land_tx,
                           (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS last_fetch,
-                          (SELECT coalesce(json_agg(gaps), '[]') FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL) AS gaps
+                          (SELECT coalesce(json_agg(gaps), '[]') FROM (
+                              SELECT DISTINCT ON (teryt_prefix, period_start) gaps FROM scrape.rcn_fetch_log
+                              ORDER BY teryt_prefix, period_start, fetched_at DESC) l WHERE gaps IS NOT NULL) AS gaps
                    FROM scrape.rcn_parcels""")[0]
     feedback_open = _rows("SELECT count(*) AS n FROM app.feedback WHERE status = 'nowe'")[0]["n"]
 

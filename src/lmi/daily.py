@@ -114,7 +114,9 @@ def _refresh_rcn(conn, today: date, teryt_prefix: str) -> None:
     try:
         with jobs.tracked(conn, "rcn", "cotygodniowe odświeżenie") as job:
             n = rcn.refresh(conn, teryt_prefix=teryt_prefix, today=today)
-            job.finish("ok", f"odświeżono {n} rekordów")
+            fixed, left = rcn.repair(conn, teryt_prefix=teryt_prefix)
+            job.finish("warning" if left else "ok", f"odświeżono {n} rekordów, naprawiono luk: {fixed}"
+                       + (f", zostało: {left}" if left else ""))
         print(f"RCN: odświeżono {n} rekordów działek z aktów notarialnych.")
     except Exception as exc:  # noqa: BLE001 - usługa geoportalu bywa niestabilna
         conn.rollback()

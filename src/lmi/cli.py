@@ -55,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("rcn", help="ceny transakcyjne z RCN (geoportal): pierwsze pobranie albo odświeżenie")
     s.add_argument("--teryt-prefix", default="02", help="województwo (TERYT), domyślnie dolnośląskie")
     s.add_argument("--since", help="od daty aktu RRRR-MM-DD (domyślnie: od ostatniego znanego minus 120 dni)")
+    s.add_argument("--repair", action="store_true",
+                   help="tylko ponów kawałki zapisane jako luki (bez pobierania całych miesięcy)")
 
     s = sub.add_parser("rcn-coverage", help="kompletność RCN per powiat: usługa vs baza (do porównań)")
     s.add_argument("--since", default="2020-01-01")
@@ -152,18 +154,21 @@ def main(argv: list[str] | None = None) -> int:
 
                 from . import jobs
 
-                with jobs.tracked(conn, "rcn", "pobieranie aktów z geoportalu") as job:
-                    n = rcn.refresh(conn, teryt_prefix=args.teryt_prefix,
-                                    since=_date.fromisoformat(args.since) if args.since else None)
-                    gaps = conn.execute("SELECT count(*) FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL").fetchone()[0]
-                    job.finish("warning" if gaps else "ok", f"zapisano {n} rekordów" + (f", luki: {gaps}" if gaps else ""))
+                with jobs.tracked(conn, "rcn", "naprawa luk" if args.repair else "pobieranie aktów z geoportalu") as job:
+                    n = 0
+                    if not args.repair:
+                        n = rcn.refresh(conn, teryt_prefix=args.teryt_prefix,
+                                        since=_date.fromisoformat(args.since) if args.since else None)
+                    fixed, gaps = rcn.repair(conn, teryt_prefix=args.teryt_prefix)
+                    job.finish("warning" if gaps else "ok", f"zapisano {n} rekordów, naprawiono luk: {fixed}"
+                               + (f", zostało luk: {gaps}" if gaps else ""))
+                print(f"RCN: naprawiono luk: {fixed}, zostało: {gaps}")
                 land = conn.execute("SELECT count(*), max(doc_date) FROM mart.rcn_land_transactions "
                                     "WHERE gmina_teryt LIKE %s", (args.teryt_prefix + "%",)).fetchone()
                 print(f"RCN: zapisano {n} rekordów działek; transakcji samym gruntem w bazie: {land[0]} "
                       f"(ostatni akt: {land[1]})")
-                for (g,) in conn.execute("SELECT gaps FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL "
-                                         "AND fetched_at > now() - interval '1 day' ORDER BY fetched_at"):
-                    print("  luka w usłudze geoportalu:", g)
+                for *_, g in conn.execute(rcn.LATEST_WITH_GAPS, (args.teryt_prefix + "%",)):
+                    print("  luka w usłudze geoportalu:", g[:300] + ("…" if len(g) > 300 else ""))
             elif args.cmd == "rcn-coverage":
                 from datetime import date as _date
 

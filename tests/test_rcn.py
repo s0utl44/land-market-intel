@@ -57,8 +57,12 @@ class CappedService:
         q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
         flt = q["FILTER"][0]
         teryt = re.search(r"<fes:Literal>(\d+)\*</fes:Literal>", flt).group(1)
-        a, b = re.findall(r"(\d{4}-\d{2}-\d{2})</fes:Literal>", flt)
-        feats = [f for d, pw, f in self.feats if a <= d < b and pw.startswith(teryt)]
+        days = re.findall(r"(\d{4}-\d{2}-\d{2})</fes:Literal>", flt)
+        if not days:  # akty bez daty
+            feats = []
+        else:
+            a, b = days
+            feats = [f for d, pw, f in self.feats if a <= d < b and pw.startswith(teryt)]
         if q.get("RESULTTYPE") == ["hits"]:
             return f'<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" numberMatched="{len(feats)}"/>'
         start = int(q["STARTINDEX"][0])
@@ -87,6 +91,50 @@ def test_record_on_split_boundary_counted_twice_is_ok():
 
     rows, matched, gaps = rcn.fetch_period(Overlapping(feats, cap=4).get, "02", date(2025, 1, 1), date(2025, 2, 1))
     assert matched == 84 and len(rows) == 84 and gaps == []          # powtórzenia usunięte przed zapisem
+
+
+@pytest.fixture(autouse=True)
+def no_sleep(monkeypatch):
+    waits = []
+    monkeypatch.setattr(rcn, "_sleep", waits.append)
+    return waits
+
+
+def test_flaky_service_is_retried_before_gap(no_sleep):
+    # geoportal pod obciążeniem oddaje pusto, a po chwili całość: to nie jest luka
+    feats = [("2025-01-05", "0223", feature(f"T{i}", f"022302_2.0001.{i}", day="2025-01-05", gid=i)) for i in range(6)]
+
+    class Flaky(CappedService):
+        def get(self, url):
+            if "RESULTTYPE" not in url and not no_sleep:
+                return collection()
+            return super().get(url)
+
+    rows, matched, gaps = rcn.fetch_period(Flaky(feats, cap=10).get, "02", date(2025, 1, 5), date(2025, 1, 6))
+    assert matched == 6 and len(rows) == 6 and gaps == [] and no_sleep == [30]
+
+
+def test_parts_short_without_gaps_is_recorded_not_raised():
+    feats = [("2025-01-05", "0223", feature(f"T{i}", f"022302_2.0001.{i}", day="2025-01-05", gid=i)) for i in range(6)]
+
+    class Overcounting(CappedService):
+        def get(self, url):  # całe województwo liczy o 1 więcej niż suma powiatów oddaje
+            body = super().get(url)
+            if "RESULTTYPE" in url and "02*" in urllib.parse.unquote(url):
+                body = body.replace('numberMatched="6"', 'numberMatched="7"')
+            return body
+
+        # powiaty liczą razem 7 (0223 deklaruje 6 + 1 z 0201)
+    svc = Overcounting(feats, cap=4)
+    orig = svc.get
+
+    def get(url):
+        if "RESULTTYPE" in url and "0201*" in urllib.parse.unquote(url):
+            return '<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" numberMatched="1"/>'
+        return orig(url)
+
+    rows, matched, gaps = rcn.fetch_period(get, "02", date(2025, 1, 5), date(2025, 1, 6))
+    assert matched == 7 and len(rows) == 4 and gaps                     # bez wyjątku, luki zapisane
 
 
 def test_service_gap_on_single_day_is_recorded_not_fatal():
@@ -135,6 +183,7 @@ def test_refresh_and_land_view(pg_conn):
         return collection(*feats[start:start + page_size])
 
     n = rcn.refresh(pg_conn, get, today=date(2025, 6, 10), since=date(2025, 5, 1))
+    assert rcn.repair(pg_conn, get) == (0, 0)
     assert n == 7 and all("GEOMETRIA" not in c for c in calls)
     assert any("PropertyIsNull" in c for c in calls)                       # osobno akty bez daty
     log = pg_conn.execute("SELECT sum(matched), sum(saved) FROM scrape.rcn_fetch_log").fetchone()
@@ -144,3 +193,22 @@ def test_refresh_and_land_view(pg_conn):
     # ponowne pobranie tych samych aktów niczego nie dubluje
     rcn.refresh(pg_conn, get, today=date(2025, 6, 10), since=date(2025, 5, 1))
     assert pg_conn.execute("SELECT count(*) FROM scrape.rcn_parcels").fetchone()[0] == 7
+
+
+@pytest.mark.integration
+def test_repair_refetches_only_gaps(pg_conn):
+    from lmi import db
+
+    db.apply_schema(pg_conn)
+    pg_conn.execute("DELETE FROM scrape.rcn_fetch_log")
+    pg_conn.execute("DELETE FROM scrape.rcn_parcels")
+    feats = [("2025-01-05", "0223", feature(f"T{i}", f"022302_2.0001.{i}", day="2025-01-05", gid=i)) for i in range(6)]
+    # najpierw miesiąc pobrany z luką (usługa oddała 4 z 6), potem naprawa przy zdrowej usłudze
+    rcn.refresh(pg_conn, CappedService(feats, cap=4).get, today=date(2025, 1, 20), since=date(2025, 1, 1))
+    gaps = pg_conn.execute("SELECT gaps FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL").fetchall()
+    assert gaps == [("0223 2025-01-05–2025-01-06: brak 2 z 6",)]
+    svc = CappedService(feats, cap=10)
+    assert rcn.repair(pg_conn, svc.get) == (1, 0)
+    assert svc.calls <= 4                                               # tylko ten jeden dzień i powiat
+    assert pg_conn.execute("SELECT count(*) FROM scrape.rcn_parcels").fetchone()[0] == 6
+    assert pg_conn.execute("SELECT saved, gaps FROM scrape.rcn_fetch_log WHERE period_start = '2025-01-01'").fetchone() == (6, None)

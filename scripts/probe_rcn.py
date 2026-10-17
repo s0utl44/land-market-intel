@@ -116,7 +116,50 @@ def probki() -> None:
     print("\nKONIEC")
 
 
+def luka(powiat: str, day: str) -> None:
+    """Dlaczego usługa liczy rekordy, ale ich nie oddaje: ten sam dzień i powiat różnymi zapytaniami."""
+    from datetime import date, timedelta
+
+    d0 = date.fromisoformat(day)
+    d1 = d0 + timedelta(days=1)
+    when = ('<fes:PropertyIsGreaterThanOrEqualTo><fes:ValueReference>DOK_DATA</fes:ValueReference>'
+            f'<fes:Literal>{d0}</fes:Literal></fes:PropertyIsGreaterThanOrEqualTo>'
+            '<fes:PropertyIsLessThan><fes:ValueReference>DOK_DATA</fes:ValueReference>'
+            f'<fes:Literal>{d1}</fes:Literal></fes:PropertyIsLessThan>')
+    like = ('<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="!"><fes:ValueReference>TERYT</fes:ValueReference>'
+            f'<fes:Literal>{powiat}*</fes:Literal></fes:PropertyIsLike>')
+    equal = f'<fes:PropertyIsEqualTo><fes:ValueReference>TERYT</fes:ValueReference><fes:Literal>{powiat}</fes:Literal></fes:PropertyIsEqualTo>'
+    wrap = lambda inner: f'<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:And>{inner}</fes:And></fes:Filter>'
+    variants = [
+        ("TERYT LIKE + SORTBY + pola", {"FILTER": wrap(like + when), "SORTBY": "gid", "PROPERTYNAME": "TERYT,DOK_DATA,TRAN_LOKALNY_ID_IIP,SERWIS_RCN"}),
+        ("TERYT LIKE, bez sortowania i pól", {"FILTER": wrap(like + when)}),
+        ("TERYT =, bez sortowania", {"FILTER": wrap(equal + when)}),
+        ("tylko data (całe województwo), bez sortowania", {"FILTER": wrap(when + '<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="!"><fes:ValueReference>TERYT</fes:ValueReference><fes:Literal>02*</fes:Literal></fes:PropertyIsLike>')}),
+    ]
+    print(f"### luka: powiat {powiat}, dzień {d0}")
+    for name, extra in variants:
+        base = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature", "TYPENAMES": "ms:dzialki"}
+        _, hb = get({**base, "RESULTTYPE": "hits", "FILTER": extra["FILTER"]})
+        try:
+            hits = ET.fromstring(hb).get("numberMatched")
+        except ET.ParseError:
+            hits = hb[:120]
+        status, body = get({**base, "COUNT": "1000", **extra}, timeout=180)
+        try:
+            recs = records(body)
+            mine = [r for r in recs if (r.get("TERYT") or "").startswith(powiat)]
+            serw = sorted({(r.get("SERWIS_RCN") or "")[:70] for r in mine})[:3]
+            print(f"   {name}: usługa liczy {hits}, oddała {len(recs)} (z powiatu {powiat}: {len(mine)}), SERWIS_RCN: {serw}")
+        except ET.ParseError:
+            print(f"   {name}: usługa liczy {hits}, odpowiedź {status}: {body[:300]!r}")
+    print("KONIEC")
+
+
 def main() -> None:
+    if "--luka" in sys.argv:
+        i = sys.argv.index("--luka")
+        luka(sys.argv[i + 1], sys.argv[i + 2])
+        return
     if "--probki" in sys.argv:
         probki()
         return

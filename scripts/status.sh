@@ -38,4 +38,8 @@ psql -c "SELECT count(*) AS rekordy_dzialek, min(doc_date) AS od, max(doc_date) 
 psql -c "SELECT fetched_at::timestamp(0) AS kiedy, coalesce(period_start::text, 'bez daty') AS okres,
                 matched AS w_usludze, saved AS zapisane, left(coalesce(gaps, ''), 60) AS luki
          FROM scrape.rcn_fetch_log ORDER BY fetched_at DESC LIMIT 5" 2>/dev/null
-psql -c "SELECT count(*) AS miesiace_z_lukami, string_agg(gaps, ' | ') AS luki FROM scrape.rcn_fetch_log WHERE gaps IS NOT NULL" 2>/dev/null
+psql -c "SELECT count(*) AS miesiace_z_lukami,
+                coalesce(sum(array_length(string_to_array(gaps, '; '), 1)), 0) AS luk,
+                left(string_agg(gaps, ' | '), 400) AS przyklady
+         FROM (SELECT DISTINCT ON (teryt_prefix, period_start) gaps FROM scrape.rcn_fetch_log
+               ORDER BY teryt_prefix, period_start, fetched_at DESC) l WHERE gaps IS NOT NULL" 2>/dev/null
