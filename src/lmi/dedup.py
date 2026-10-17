@@ -420,8 +420,6 @@ def explain_pair(a: Listing, b: Listing, params: DedupParams | None = None) -> s
         return "nie były widoczne w tym samym czasie"
     if _rel_diff(a.area_m2, b.area_m2) > params.price_area_area_tol:
         return f"metraż różny o {_rel_diff(a.area_m2, b.area_m2) * 100:.1f}%" + (f", pinezki {dist:.0f} m" if dist else "")
-    if a.land_use and b.land_use and a.land_use != b.land_use:
-        return f"inny typ działki ({a.land_use} / {b.land_use})"
     if _price_gap(a, b) > params.price_area_price_tol:
         return f"cena różna o {_price_gap(a, b) * 100:.1f}%"
     score = attribute_score(a, b, params)
@@ -440,6 +438,10 @@ def diff_runs(listings: list[Listing], old: dict, new: dict, params: DedupParams
     for k, p in old.items():
         if k in by_key and k in new:
             old_groups[p].append(k)
+    new_members: dict[str, list] = defaultdict(list)
+    for k, p in new.items():
+        if k in by_key:
+            new_members[p].append(k)
     reasons: dict[str, list] = defaultdict(list)
     for keys in old_groups.values():
         if len({new[k] for k in keys}) < 2:
@@ -449,11 +451,24 @@ def diff_runs(listings: list[Listing], old: dict, new: dict, params: DedupParams
                 continue
             a, b = by_key[x], by_key[y]
             dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else None
-            reasons[explain_pair(a, b, params).split(" (")[0].split(" o ")[0]].append({
+            why = explain_pair(a, b, params)
+            if why.startswith(("niejednoznaczne", "spełnia regułę")):
+                # która para z obu grup się wyklucza (ten sam portal naraz albo różne numery działek)
+                clash = next(((x2, y2) for x2 in new_members[new[x]] for y2 in new_members[new[y]]
+                              if _parcel_conflict(by_key[x2], by_key[y2])
+                              or _same_source_clash(by_key[x2], by_key[y2], params)), None)
+                if clash:
+                    c1, c2 = by_key[clash[0]], by_key[clash[1]]
+                    why = (f"konflikt w grupie: {c1.source_id}:{c1.source_listing_id} ({c1.area_m2:.0f} m², "
+                           f"{min(c1.prices):.0f} zł) i {c2.source_id}:{c2.source_listing_id} ({c2.area_m2:.0f} m², "
+                           f"{min(c2.prices):.0f} zł) to różne oferty")
+                elif why.startswith("niejednoznaczne"):
+                    why = "niejednoznaczne: kilku równie pasujących kandydatów z jednego portalu"
+            reasons[why.split(":")[0].split(" (")[0].split(" o ")[0]].append({
                 "a": f"{a.source_id}:{a.source_listing_id}", "b": f"{b.source_id}:{b.source_listing_id}",
                 "areas": [a.area_m2, b.area_m2], "prices": [min(a.prices), min(b.prices)],
                 "land_use": [a.land_use, b.land_use], "dist_m": round(dist) if dist is not None else None,
-                "why": explain_pair(a, b, params)})
+                "why": why})
     return {k: {"pairs": len(v), "examples": v[:examples]} for k, v in sorted(reasons.items(), key=lambda kv: -len(kv[1]))}
 
 
