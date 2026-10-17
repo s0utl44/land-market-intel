@@ -212,8 +212,14 @@ def _fetch(get, prefix: str, since: date | None, until: date | None) -> tuple[li
     else:
         raise Incomplete(f"{prefix} {since}–{until}: pobrano {len(recs)} z {matched} rekordów")
     got = [r for part, _ in parts for r in part]
-    if sum(n for _, n in parts) != matched or len(got) < matched:
+    declared = sum(n for _, n in parts)
+    # błąd tylko przy braku; nadmiar bywa (akt z datą na granicy części liczony w obu) i znika przy zapisie,
+    # bo klucz rekordu (transakcja, działka, rodzaj, udział) jest unikalny
+    if declared < matched or len(got) < matched:
         raise Incomplete(f"{prefix} {since}–{until}: części dały {len(got)} rekordów, usługa deklaruje {matched}")
+    if len(got) > matched:
+        log.info("rcn: %s %s–%s: %d rekordów ponad deklarowane %d (podwójne na granicy części)",
+                 prefix, since, until, len(got) - matched, matched)
     return got, matched
 
 

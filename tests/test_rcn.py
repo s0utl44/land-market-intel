@@ -1,3 +1,4 @@
+import urllib.parse
 from datetime import date
 
 import pytest
@@ -70,6 +71,22 @@ def test_capped_service_is_split_until_complete():
     svc = CappedService(feats, cap=4)
     rows, matched = rcn.fetch_period(svc.get, "02", date(2025, 1, 1), date(2025, 2, 1))
     assert matched == 84 and len(rows) == 84 and len({r[0] for r in rows}) == 84
+
+
+def test_record_on_split_boundary_counted_twice_is_ok():
+    feats = [(f"2025-01-{d:02d}", "0223", feature(f"T{d}{i}", f"022302_2.0001.{d}{i}", day=f"2025-01-{d:02d}", gid=d * 10 + i))
+             for d in range(1, 29) for i in range(3)]
+
+    class Overlapping(CappedService):
+        def get(self, url):  # rekord z 2025-01-16 przychodzi także w pierwszej połowie (granica liczona dwa razy)
+            body = super().get(url)
+            if "STARTINDEX=0" in url and "2025-01-16" in urllib.parse.unquote(url) and "RESULTTYPE" not in url:
+                extra = feats[15 * 3][2]
+                body = body.replace("</wfs:FeatureCollection>", extra + "</wfs:FeatureCollection>")
+            return body
+
+    rows, matched = rcn.fetch_period(Overlapping(feats, cap=4).get, "02", date(2025, 1, 1), date(2025, 2, 1))
+    assert matched == 84 and len(rows) > 84 and len({(r[0], r[1]) for r in rows}) == 84
 
 
 def test_incomplete_download_is_refused():
