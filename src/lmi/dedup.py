@@ -378,6 +378,59 @@ def review(listings: list[Listing], links: list[Link], params: DedupParams | Non
     }
 
 
+def explain_pair(a: Listing, b: Listing, params: DedupParams | None = None) -> str:
+    """Dlaczego obecne reguły nie łączą wprost tej pary (do porównań wersji deduplikacji)."""
+    params = params or DedupParams()
+    if a.municipality_teryt != b.municipality_teryt:
+        return "inna gmina"
+    if _parcel_conflict(a, b):
+        return "różne numery działek"
+    if _same_source_clash(a, b, params):
+        return "ten sam portal, widoczne naraz, różna cena/metraż"
+    dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else None
+    if dist is not None and dist <= params.max_distance_m and _rel_diff(a.area_m2, b.area_m2) <= params.location_area_tol:
+        return "spełnia regułę pinezki (rozdzielone przez konflikt w grupie)"
+    if not _overlap(a, b, params.price_area_max_gap_days):
+        return "nie były widoczne w tym samym czasie"
+    if _rel_diff(a.area_m2, b.area_m2) > params.price_area_area_tol:
+        return f"metraż różny o {_rel_diff(a.area_m2, b.area_m2) * 100:.1f}%" + (f", pinezki {dist:.0f} m" if dist else "")
+    if a.land_use and b.land_use and a.land_use != b.land_use:
+        return f"inny typ działki ({a.land_use} / {b.land_use})"
+    if _price_gap(a, b) > params.price_area_price_tol:
+        return f"cena różna o {_price_gap(a, b) * 100:.1f}%"
+    score = attribute_score(a, b, params)
+    need = PRICE_AREA_MIN_SCORE + (1 if a.has_coords and b.has_coords else 0)
+    if score < need:
+        return f"za mało punktów ({score} z {need}: okrągły metraż / cena nie identyczna)"
+    return "niejednoznaczne (kilku kandydatów z jednego portalu) albo konflikt w grupie"
+
+
+def diff_runs(listings: list[Listing], old: dict, new: dict, params: DedupParams | None = None,
+              examples: int = 3) -> dict:
+    """Pary połączone w `old` (klucz ogłoszenia -> działka), a rozdzielone w `new`, z powodami."""
+    params = params or DedupParams()
+    by_key = {l.key: l for l in listings}
+    old_groups: dict[str, list] = defaultdict(list)
+    for k, p in old.items():
+        if k in by_key and k in new:
+            old_groups[p].append(k)
+    reasons: dict[str, list] = defaultdict(list)
+    for keys in old_groups.values():
+        if len({new[k] for k in keys}) < 2:
+            continue
+        for x, y in combinations(keys, 2):
+            if new[x] == new[y]:
+                continue
+            a, b = by_key[x], by_key[y]
+            dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else None
+            reasons[explain_pair(a, b, params).split(" (")[0].split(" o ")[0]].append({
+                "a": f"{a.source_id}:{a.source_listing_id}", "b": f"{b.source_id}:{b.source_listing_id}",
+                "areas": [a.area_m2, b.area_m2], "prices": [min(a.prices), min(b.prices)],
+                "land_use": [a.land_use, b.land_use], "dist_m": round(dist) if dist is not None else None,
+                "why": explain_pair(a, b, params)})
+    return {k: {"pairs": len(v), "examples": v[:examples]} for k, v in sorted(reasons.items(), key=lambda kv: -len(kv[1]))}
+
+
 @dataclass(frozen=True)
 class DedupQuality:
     precision: float

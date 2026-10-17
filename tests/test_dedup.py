@@ -150,3 +150,12 @@ def test_parcel_conflict_is_not_bridged_transitively():
           L("c", "3", parcel="X/2", lat=52.0006, lon=21.0)]
     assert all(len({l.source_listing_id for l in dedup.deduplicate(ls) if l.property_key == k}) <= 2
                for k in {l.property_key for l in dedup.deduplicate(ls)})
+
+
+def test_diff_runs_explains_split_pairs():
+    a, b = L("a", "1", area=1636, lat=52.0, lon=21.0), L("b", "2", area=1636)
+    a.land_use, b.land_use = "budowlana", "rolna"
+    old = {a.key: "P1", b.key: "P1"}
+    new = {a.key: "P1", b.key: "P2"}
+    d = dedup.diff_runs([a, b], old, new)
+    assert list(d) == ["inny typ działki"] and d["inny typ działki"]["pairs"] == 1

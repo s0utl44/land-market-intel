@@ -35,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("dedup", help="uruchom deduplikację")
     sub.add_parser("metrics", help="przelicz metryki (mart.*)")
+    s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
+    s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
+    s.add_argument("--new", type=int, help="run_id nowszej (domyślnie ostatnia)")
 
     s = sub.add_parser("generate-synthetic", help="wygeneruj dane syntetyczne")
     s.add_argument("out_dir", nargs="?", default="data/synthetic")
@@ -137,6 +140,24 @@ def main(argv: list[str] | None = None) -> int:
                 run_id, links = db.run_dedup(conn)
                 print(f"Dedup run {run_id}: {len(links)} ogłoszeń -> "
                       f"{len({l.property_key for l in links})} nieruchomości")
+            elif args.cmd == "dedup-diff":
+                from . import dedup
+
+                runs = [r for (r,) in conn.execute("SELECT run_id FROM core.dedup_runs ORDER BY run_id DESC LIMIT 2")]
+                new_id, old_id = args.new or runs[0], args.old or runs[1]
+                load = lambda rid: {(s_, l): p for s_, l, p in conn.execute(
+                    "SELECT source_id, source_listing_id, property_key FROM core.listing_property_links WHERE run_id = %s",
+                    (rid,))}
+                obs = db.load_observations(conn)
+                listings = dedup.listings_from_observations(obs.astype(object).where(obs.notna(), None).to_dict("records"))
+                diff = dedup.diff_runs(listings, load(old_id), load(new_id))
+                print(f"Pary połączone w run {old_id}, a rozdzielone w run {new_id}: {sum(v['pairs'] for v in diff.values())}")
+                for why, v in diff.items():
+                    print(f"\n{v['pairs']:>6}  {why}")
+                    for e in v["examples"]:
+                        print(f"        {e['a']} + {e['b']}: {e['areas'][0]:.0f}/{e['areas'][1]:.0f} m², "
+                              f"{e['prices'][0]:.0f}/{e['prices'][1]:.0f} zł, typ {e['land_use'][0]}/{e['land_use'][1]}, "
+                              f"pinezki {e['dist_m'] if e['dist_m'] is not None else '–'} m · {e['why']}")
             elif args.cmd == "metrics":
                 weekly, scores = db.run_metrics(conn)
                 print(f"Zapisano {len(weekly)} wierszy tygodniowych.\n")
