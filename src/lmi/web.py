@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 import psycopg
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
@@ -43,12 +43,22 @@ def healthz():
     return {"ok": True}
 
 
+TEAM_USER = "zespół"  # przy wspólnym haśle (bez logowania Google) wszyscy są jednym użytkownikiem
+
+
+def _email(request: Request) -> str | None:
+    """Nagłówek ustawia Traefik z odpowiedzi oauth2-proxy (logowanie Google); przy bramce z hasłem go nie ma."""
+    return request.headers.get("x-auth-request-email") or request.headers.get("x-auth-request-user")
+
+
+def _user(request: Request) -> str:
+    return (_email(request) or TEAM_USER).strip().lower()
+
+
 @app.get("/api/me")
 def me(request: Request):
-    """Kto jest zalogowany. Nagłówek ustawia Traefik z odpowiedzi oauth2-proxy (logowanie Google);
-    przy bramce z hasłem go nie ma."""
-    email = request.headers.get("x-auth-request-email") or request.headers.get("x-auth-request-user")
-    return {"email": email, "logout_url": "/oauth2/sign_out?rd=%2F" if email else None}
+    email = _email(request)
+    return {"email": email, "user": _user(request), "logout_url": "/oauth2/sign_out?rd=%2F" if email else None}
 
 
 @app.get("/api/overview")
@@ -138,6 +148,7 @@ SORTS = {
 
 @app.get("/api/municipality/{teryt}/offers")
 def municipality_offers(
+    request: Request,
     teryt: str,
     land_use: str | None = None,
     min_area: float | None = Query(None, ge=0),
@@ -167,6 +178,13 @@ def municipality_offers(
     if min_age_days is not None:
         where.append("age_days >= %(min_age)s")
         params["min_age"] = min_age_days
+    params["me"] = _user(request)
+    return _offers("o.municipality_teryt = %(t)s", where, params, sort)
+
+
+
+def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]:
+    """Działki (po deduplikacji) z ogłoszeń spełniających `scope` (warunek SQL na obserwacjach `o`)."""
     rows = _rows(f"""
         WITH links AS (
             SELECT source_id, source_listing_id, property_key FROM core.listing_property_links
@@ -181,7 +199,7 @@ def municipality_offers(
             FROM core.listing_observations o
             JOIN links l USING (source_id, source_listing_id)
             JOIN src_last sl USING (source_id)
-            WHERE o.municipality_teryt = %(t)s
+            WHERE {scope}
         ),
         p AS (
             SELECT property_key,
@@ -202,7 +220,10 @@ def municipality_offers(
                         FILTER (WHERE source_id = 'gratka'))[1]          AS gratka_id,
                    (array_agg(source_id ORDER BY observed_at DESC, source_id))[1]          AS source,
                    (array_agg(source_listing_id ORDER BY observed_at DESC, source_id))[1]  AS source_listing_id,
-                   array_agg(DISTINCT source_id)                         AS sources
+                   array_agg(DISTINCT source_id)                         AS sources,
+                   array_agg(DISTINCT source_id || ':' || source_listing_id) AS listing_keys,
+                   (array_agg(municipality_name ORDER BY observed_at DESC))[1] AS municipality,
+                   (array_agg(municipality_teryt ORDER BY observed_at DESC))[1] AS teryt
             FROM o GROUP BY property_key
         ),
         -- historia ceny: dni, w których cena (najniższa z portali) się zmieniła
@@ -255,12 +276,101 @@ def municipality_offers(
         )
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise, source, sources,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
-               otodom_history, views, views_source, views_per_day, saved, relists, land_use_source
+               otodom_history, views, views_source, views_per_day, saved, relists, land_use_source,
+               active, municipality, teryt, listing_keys,
+               -- zespół: ulubione (moje / ile osób, kto) i liczba komentarzy do tej działki
+               EXISTS (SELECT 1 FROM app.favorites fv WHERE fv.user_email = %(me)s
+                         AND fv.source_id || ':' || fv.source_listing_id = ANY(listing_keys)) AS fav,
+               (SELECT array_agg(DISTINCT fv.user_email ORDER BY fv.user_email) FROM app.favorites fv
+                 WHERE fv.source_id || ':' || fv.source_listing_id = ANY(listing_keys)) AS fav_users,
+               (SELECT count(*) FROM app.comments c WHERE c.deleted_at IS NULL
+                 AND c.source_id || ':' || c.source_listing_id = ANY(listing_keys))::int AS comments
         FROM (SELECT *, scrape.views_per_day(views_log, start_date) AS views_per_day FROM f) f WHERE {' AND '.join(where)}
         ORDER BY {SORTS[sort]}, property_key
         LIMIT %(limit)s""", params)
     return rows
 
+
+# --- zespół: ulubione i komentarze ---------------------------------------------------------------
+
+def _listing_key(key: str) -> tuple[str, str]:
+    source, _, listing = (key or "").partition(":")
+    if not source or not listing or len(key) > 200:
+        raise HTTPException(400, "klucz ogłoszenia: źródło:numer")
+    return source, listing
+
+
+def _keys(keys: str | list[str]) -> list[str]:
+    items = keys.split(",") if isinstance(keys, str) else keys
+    items = [k for k in (i.strip() for i in items) if k][:20]
+    for k in items:
+        _listing_key(k)
+    if not items:
+        raise HTTPException(400, "brak kluczy ogłoszeń")
+    return items
+
+
+@app.post("/api/favorites")
+def favorite_add(request: Request, key: str = Body(..., embed=True)):
+    source, listing = _listing_key(key)
+    with _conn() as conn:
+        conn.execute("""INSERT INTO app.favorites (user_email, source_id, source_listing_id) VALUES (%s, %s, %s)
+                        ON CONFLICT DO NOTHING""", (_user(request), source, listing))
+    return {"ok": True}
+
+
+@app.post("/api/favorites/remove")
+def favorite_remove(request: Request, keys: list[str] = Body(..., embed=True)):
+    """Zdejmuje gwiazdkę z całej działki (wszystkie jej ogłoszenia)."""
+    with _conn() as conn:
+        conn.execute("""DELETE FROM app.favorites WHERE user_email = %s
+                        AND source_id || ':' || source_listing_id = ANY(%s)""", (_user(request), _keys(keys)))
+    return {"ok": True}
+
+
+@app.get("/api/favorites")
+def favorites(request: Request, sort: str = "newest"):
+    """Moje ulubione działki ze wszystkich gmin, także te, które już zniknęły z portali."""
+    if sort not in SORTS:
+        raise HTTPException(400, f"sort: jedno z {', '.join(SORTS)}")
+    scope = """l.property_key IN (SELECT l2.property_key FROM links l2 JOIN app.favorites fv
+                 USING (source_id, source_listing_id) WHERE fv.user_email = %(me)s)"""
+    return _offers(scope, ["true"], {"me": _user(request), "limit": 1000}, sort)
+
+
+@app.get("/api/comments")
+def comments(request: Request, keys: str):
+    rows = _rows("""SELECT comment_id AS id, user_email AS author, body, created_at,
+                           user_email = %(me)s AS mine
+                    FROM app.comments WHERE deleted_at IS NULL
+                      AND source_id || ':' || source_listing_id = ANY(%(k)s)
+                    ORDER BY created_at""", {"k": _keys(keys), "me": _user(request)})
+    return rows
+
+
+@app.post("/api/comments")
+def comment_add(request: Request, key: str = Body(...), body: str = Body(...)):
+    source, listing = _listing_key(key)
+    body = body.strip()
+    if not 1 <= len(body) <= 2000:
+        raise HTTPException(400, "komentarz: od 1 do 2000 znaków")
+    with _conn() as conn:
+        row = conn.execute("""INSERT INTO app.comments (source_id, source_listing_id, user_email, body)
+                              VALUES (%s, %s, %s, %s) RETURNING comment_id AS id""",
+                           (source, listing, _user(request), body)).fetchone()
+    return row
+
+
+@app.delete("/api/comments/{comment_id}")
+def comment_delete(request: Request, comment_id: int):
+    """Usunąć można tylko własny komentarz (zostaje w bazie z datą usunięcia)."""
+    with _conn() as conn:
+        cur = conn.execute("""UPDATE app.comments SET deleted_at = now()
+                              WHERE comment_id = %s AND user_email = %s AND deleted_at IS NULL""",
+                           (comment_id, _user(request)))
+    if cur.rowcount == 0:
+        raise HTTPException(404, "nie ma takiego komentarza albo nie jest Twój")
+    return {"ok": True}
 
 def _check_teryt(teryt: str) -> None:
     if not (teryt.isdigit() and len(teryt) == 7):

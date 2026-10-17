@@ -128,6 +128,26 @@ th.l,td.l{text-align:left}
 .sub2{display:block;color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:2px}
 td.two-line{white-space:normal;min-width:120px}
 .ext{font-weight:700;text-decoration:none}
+/* zespół: ulubione i komentarze */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+td.team{white-space:nowrap;width:1%}
+.star,.cmb{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:3px 5px;border-radius:6px;color:var(--muted);font-size:.85rem;line-height:1}
+.star{font-size:1.05rem}
+.star:hover,.cmb:hover{background:var(--bg);color:var(--ink)}
+.star:focus-visible,.cmb:focus-visible{outline:2px solid var(--gold)}
+.star.on{color:var(--gold)}
+.cmb svg{width:15px;height:15px}
+.cmb.has{color:var(--ink-2);font-weight:700}
+.team .cnt{font-size:.72rem;font-weight:700;color:var(--gold-ink);margin-left:-2px}
+tr.cm-row td{background:var(--bg);white-space:normal;text-align:left;padding:12px 14px}
+.cm-list{display:grid;gap:8px;margin-bottom:10px;max-width:760px}
+.cm-item{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.cm-item .meta{font-size:.76rem;color:var(--muted);display:flex;gap:10px;align-items:center}
+.cm-item .meta button{all:unset;cursor:pointer;color:var(--bad);font-weight:700;margin-left:auto}
+.cm-item p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm-form{display:flex;gap:8px;align-items:flex-start;max-width:760px}
+.cm-form textarea{flex:1;min-height:58px;resize:vertical;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
+#fav-btn.on{border-color:var(--gold);color:var(--gold-ink)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
 footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
@@ -152,6 +172,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       <h1>Radar <span>Działek</span></h1>
     </div>
     <div class="status" id="status"><span>Ładowanie danych…</span></div>
+    <button type="button" class="btn" id="fav-btn" aria-controls="favs" aria-expanded="false">★ Ulubione</button>
   </div>
 </header>
 
@@ -167,6 +188,21 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 <main class="wrap">
   <div class="notice warn" id="alert" role="alert" hidden></div>
   <div class="notice" id="early" hidden></div>
+
+  <section id="favs" aria-labelledby="h-favs" hidden>
+    <div class="head">
+      <div><h2 id="h-favs">Moje ulubione</h2>
+        <p>Działki oznaczone gwiazdką, ze wszystkich gmin, z aktualną ceną. Oferty, które zniknęły z portali, zostają na liście z oznaczeniem. Komentarze widzi cały zespół.</p></div>
+    </div>
+    <div class="panel">
+      <div class="scroll">
+        <table>
+          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Typ</th><th class="l">Gmina</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th>Na rynku</th><th>Zainteresowanie</th><th>Portale</th><th class="l">Zmiana ceny</th><th class="l">Ogłoszenie</th></tr></thead>
+          <tbody id="favs-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
   <section aria-labelledby="h-rank">
     <div class="head">
@@ -229,7 +265,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th class="l">Typ</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th>Na rynku</th><th>Zainteresowanie</th><th>Portale</th><th class="l">Zmiana ceny</th><th class="l">Ogłoszenie</th></tr></thead>
+          <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Typ</th><th>Powierzchnia</th><th>Cena</th><th>zł/m²</th><th>Na rynku</th><th>Zainteresowanie</th><th>Portale</th><th class="l">Zmiana ceny</th><th class="l">Ogłoszenie</th></tr></thead>
           <tbody id="offers-body"></tbody>
         </table>
       </div>
@@ -277,7 +313,7 @@ async function load(){
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank();
-  api('/api/me').then(m=>{if(m.email){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email)}</span><a href="${m.logout_url}">Wyloguj</a>`)}}).catch(()=>{});
+  api('/api/me').then(m=>{ME=m;if(m.email){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email)}</span><a href="${m.logout_url}">Wyloguj</a>`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
@@ -421,7 +457,8 @@ function drawCharts(data){
     const st=tk.length>1?tk[1]-tk[0]:1;
     tk.forEach(v=>g+=`<line x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${M.l-6}" y="${y(v)+3}" text-anchor="end">${m.axis(v,st)}</text>`);
     const lab=n<=1?[0]:[...new Set([0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1])];
-    lab.forEach(i=>g+=`<text x="${x(i)}" y="${H-6}" text-anchor="middle">${wkPL(weeks[i])}</text>`);
+    // skrajne podpisy przy krawędziach wyrównane do środka wykresu, żeby zakres dat się nie ucinał
+    lab.forEach(i=>g+=`<text x="${x(i)}" y="${H-6}" text-anchor="${n>1&&i===0?'start':n>1&&i===n-1?'end':'middle'}">${wkPL(weeks[i])}</text>`);
     const path=(arr)=>{let d='',pen=false;arr.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);pen=true});return d};
     g+=`<path d="${path(ref)}" fill="none" stroke="var(--bench)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
     g+=`<path d="${path(own)}" fill="none" stroke="var(--gold-line)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -448,22 +485,17 @@ function drawCharts(data){
 let offersTimer=null, offersReq=0;
 ['#f-use','#f-sort','#f-age'].forEach(s=>$(s).onchange=loadOffers);
 ['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(loadOffers,350)});
-async function loadOffers(){
-  if(!selected)return;
-  const p=new URLSearchParams({sort:$('#f-sort').value,limit:'300'});
-  if($('#f-use').value)p.set('land_use',$('#f-use').value);
-  if($('#f-min').value)p.set('min_area',$('#f-min').value);
-  if($('#f-max').value)p.set('max_area',$('#f-max').value);
-  if($('#f-ppm2').value)p.set('max_ppm2',$('#f-ppm2').value);
-  if($('#f-age').value)p.set('min_age_days',$('#f-age').value);
-  const id=++offersReq, body=$('#offers-body');
-  body.innerHTML='<tr><td colspan="9" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
-  let rows;
-  try{rows=await api(`/api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="9" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
-  if(id!==offersReq)return;
-  if(!rows.length){body.innerHTML='<tr><td colspan="9" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
-  const lastDay=OV.last_observed;
-  body.innerHTML=rows.map(r=>{
+// --- wiersz oferty (tabela gminy i "Moje ulubione") ---------------------------------------------
+const ROWS={}; let ME={user:'zespół'};
+const ICON_CM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
+const who=e=>esc(String(e||'').split('@')[0]);
+function teamCell(r){
+  const users=r.fav_users||[], others=users.filter(u=>u!==ME.user);
+  const names=users.map(who).join(', ');
+  return `<button type="button" class="star${r.fav?' on':''}" data-act="fav" aria-pressed="${!!r.fav}" title="${r.fav?'Usuń z moich ulubionych':'Dodaj do moich ulubionych'}${names?' · oznaczyli: '+names:''}">${r.fav?'★':'☆'}</button>${others.length?`<span class="cnt" title="Oznaczyli też: ${others.map(who).join(', ')}">+${others.length}</span>`:''}<button type="button" class="cmb${r.comments?' has':''}" data-act="cm" aria-expanded="false" title="Komentarze zespołu">${ICON_CM}${r.comments?r.comments:''}</button>`}
+function offerRow(r,opts={}){
+    const lastDay=OV.last_observed;
+
     const fresh=r.start_date&&lastDay&&(new Date(lastDay)-new Date(r.start_date))/864e5<=7;
     const pushedDays=r.pushed_up_at&&lastDay?Math.round((new Date(lastDay)-new Date(r.pushed_up_at))/864e5):null;
     const CH={FIRST_PUBLISHED:'wystawienie',PRICE_DOWN:'obniżka',PRICE_UP:'podwyżka',PRICE:'zmiana ceny',ACTIVATED:'ponowne wystawienie',DEACTIVATED:'zdjęcie z portalu',IMAGE:'nowe zdjęcia'};
@@ -473,8 +505,10 @@ async function loadOffers(){
     const hist=oh.length?oh.filter(h=>h.price!=null).map(h=>({date:h.date,price:h.price})):ownHist;
     const histTxt=oh.length?'Historia ogłoszenia (Otodom):\n'+oh.map(h=>`${dFull(h.date)}: ${(h.changes||[]).map(c=>CH[c]||c.toLowerCase()).join(', ')}${h.price!=null?' · '+nf(h.price)+' zł':''}`).join('\n')
       :(ownHist.length>1?'Zmiany widziane przez Radar:\n'+ownHist.map(h=>`${dFull(h.date)}: ${nf(h.price)} zł`).join('\n'):'');
-    return `<tr>
-    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}</td>
+    ROWS[r.id]=r;
+    return `<tr data-id="${esc(r.id)}">
+    <td class="l team">${teamCell(r)}</td>
+    <td class="l">${esc(r.land_use||'–')}${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Otodom nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''}${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}</td>${opts.gmina?`\n    <td class="l">${esc(r.municipality||'–')}</td>`:''}
     <td>${nf(r.area)} m² <span class="ar">(${nf(r.area/100,1)} ar)</span></td>
     <td>${nf(r.price)} zł</td>
     <td><b>${nf(r.ppm2)}</b></td>
@@ -482,10 +516,86 @@ async function loadOffers(){
     <td class="two-line" title="${r.views!=null?`Licznik z portalu ${SRC[r.views_source]||r.views_source}`+(r.views_per_day!=null?'; tempo: przyrost między pomiarami albo średnia od wystawienia':''):''}">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${r.views_per_day!=null?nf(r.views_per_day,r.views_per_day<10?1:0)+'/dzień':''}${r.saved!=null?(r.views_per_day!=null?' · ':'')+nf(r.saved)+' '+(r.saved===1?'zapis':'zapisów'):''}</span>`:'<span class="na">–</span>'}</td>
     <td title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">${r.portals}</td>
     <td class="l two-line" title="${esc(histTxt)}">${r.price_change<=-1?`<span class="pill warn">▼ ${nf(-r.price_change,1)}%</span>`:r.price_change>=1?`<span class="pill mute">▲ ${nf(r.price_change,1)}%</span>`:'<span class="na">bez zmian</span>'}${hist.length>1&&hist[0].price!==hist[hist.length-1].price?`<span class="sub2">${nf(hist[0].price)} → ${nf(hist[hist.length-1].price)} zł</span>`:''}</td>
-    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}</td></tr>`}).join('');
+    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}</td></tr>`}
+async function send(u,body,method='POST'){
+  const r=await fetch(u,{method,headers:{'Content-Type':'application/json',Accept:'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined});
+  if(r.status===401||r.status===403){location.reload();throw new Error('sesja wygasła')}
+  if(!r.ok)throw new Error((await r.text())||r.status);
+  return r.json()}
+async function toggleFav(tr){
+  const r=ROWS[tr.dataset.id]; if(!r)return;
+  try{
+    if(r.fav)await send('/api/favorites/remove',{keys:r.listing_keys});
+    else await send('/api/favorites',{key:r.listing_keys[0]});
+  }catch(e){alert('Nie udało się zapisać ulubionych. Spróbuj ponownie.');return}
+  r.fav=!r.fav;
+  const users=new Set(r.fav_users||[]); r.fav?users.add(ME.user):users.delete(ME.user);
+  r.fav_users=[...users].sort();
+  document.querySelectorAll(`tr[data-id="${CSS.escape(r.id)}"] td.team`).forEach(td=>td.innerHTML=teamCell(r));
+  if(!$('#favs').hidden)loadFavs();
+}
+function cmItem(c){
+  return `<div class="cm-item"><div class="meta"><b>${who(c.author)}</b><span>${new Date(c.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span>${c.mine?`<button type="button" data-del="${c.id}">usuń</button>`:''}</div><p>${esc(c.body)}</p></div>`}
+async function toggleComments(tr,btn){
+  const next=tr.nextElementSibling;
+  if(next&&next.classList.contains('cm-row')){next.remove();btn.setAttribute('aria-expanded','false');return}
+  const r=ROWS[tr.dataset.id]; if(!r)return;
+  btn.setAttribute('aria-expanded','true');
+  const row=document.createElement('tr'); row.className='cm-row';
+  row.innerHTML=`<td colspan="${tr.children.length}"><div class="cm-list"><div class="na">Ładowanie komentarzy…</div></div>
+    <form class="cm-form"><textarea maxlength="2000" required placeholder="Komentarz dla zespołu, np. „dzwoniłem, właściciel zejdzie do 450 tys.”" aria-label="Nowy komentarz"></textarea><button class="btn" type="submit">Dodaj</button></form></td>`;
+  tr.after(row);
+  const list=row.querySelector('.cm-list');
+  const reload=async()=>{
+    try{const cs=await api('/api/comments?keys='+encodeURIComponent(r.listing_keys.join(',')));
+      list.innerHTML=cs.length?cs.map(cmItem).join(''):'<div class="na">Brak komentarzy. Dodaj pierwszy.</div>';
+      r.comments=cs.length;
+      document.querySelectorAll(`tr[data-id="${CSS.escape(r.id)}"] td.team`).forEach(td=>{td.innerHTML=teamCell(r);td.querySelector('.cmb').setAttribute('aria-expanded','true')});
+    }catch(e){list.innerHTML='<div class="na">Nie udało się pobrać komentarzy.</div>'}};
+  row.querySelector('form').addEventListener('submit',async ev=>{
+    ev.preventDefault(); const ta=row.querySelector('textarea'), body=ta.value.trim(); if(!body)return;
+    try{await send('/api/comments',{key:r.listing_keys[0],body}); ta.value=''; reload()}catch(e){alert('Nie udało się dodać komentarza.')}});
+  list.addEventListener('click',async ev=>{const id=ev.target.dataset&&ev.target.dataset.del; if(!id||!confirm('Usunąć ten komentarz?'))return;
+    try{await send('/api/comments/'+id,null,'DELETE'); reload()}catch(e){alert('Nie udało się usunąć komentarza.')}});
+  reload(); row.querySelector('textarea').focus();
+}
+function teamClicks(tbody){
+  tbody.addEventListener('click',ev=>{
+    const b=ev.target.closest('button[data-act]'); if(!b)return;
+    const tr=b.closest('tr'); b.dataset.act==='fav'?toggleFav(tr):toggleComments(tr,b)});
+}
+async function loadFavs(){
+  const body=$('#favs-body');
+  body.innerHTML='<tr><td colspan="11" class="l"><div class="empty">Ładowanie…</div></td></tr>';
+  let rows; try{rows=await api('/api/favorites')}catch(e){body.innerHTML='<tr><td colspan="11" class="l"><div class="empty">Nie udało się pobrać ulubionych.</div></td></tr>';return}
+  body.innerHTML=rows.length?rows.map(r=>offerRow(r,{gmina:true})).join(''):'<tr><td colspan="11" class="l"><div class="empty">Nie masz jeszcze ulubionych. Kliknij ☆ przy ofercie w tabeli gminy.</div></td></tr>';
+  $('#fav-btn').textContent=`★ Ulubione${rows.length?' ('+rows.length+')':''}`;
+}
+
+async function loadOffers(){
+  if(!selected)return;
+  const p=new URLSearchParams({sort:$('#f-sort').value,limit:'300'});
+  if($('#f-use').value)p.set('land_use',$('#f-use').value);
+  if($('#f-min').value)p.set('min_area',$('#f-min').value);
+  if($('#f-max').value)p.set('max_area',$('#f-max').value);
+  if($('#f-ppm2').value)p.set('max_ppm2',$('#f-ppm2').value);
+  if($('#f-age').value)p.set('min_age_days',$('#f-age').value);
+  const id=++offersReq, body=$('#offers-body');
+  body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
+  let rows;
+  try{rows=await api(`/api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
+  if(id!==offersReq)return;
+  if(!rows.length){body.innerHTML='<tr><td colspan="10" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
+  body.innerHTML=rows.map(r=>offerRow(r)).join('');
   $('#offers-more').innerHTML=`<span>${rows.length===300?'Pierwsze 300 ofert. Zawęź filtry, żeby zobaczyć resztę.':`Ofert: ${rows.length}`}</span>`;
 }
 
+teamClicks($('#offers-body')); teamClicks($('#favs-body'));
+$('#fav-btn').addEventListener('click',()=>{
+  const sec=$('#favs'), open=sec.hidden; sec.hidden=!open;
+  $('#fav-btn').classList.toggle('on',open); $('#fav-btn').setAttribute('aria-expanded',String(open));
+  if(open){loadFavs(); sec.scrollIntoView({block:'start'})}
+});
 load();
 })();
 </script>

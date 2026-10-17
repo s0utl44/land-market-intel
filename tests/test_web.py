@@ -65,7 +65,7 @@ def test_offers_rejects_bad_input(client):
 
 
 def test_me_reads_identity_from_proxy_header(client):
-    assert client.get("/api/me").json() == {"email": None, "logout_url": None}
+    assert client.get("/api/me").json() == {"email": None, "user": "zespół", "logout_url": None}
     d = client.get("/api/me", headers={"X-Auth-Request-Email": "jan@wrenieruchomosci.pl"}).json()
     assert d["email"] == "jan@wrenieruchomosci.pl" and d["logout_url"].startswith("/oauth2/sign_out")
 
@@ -157,3 +157,39 @@ def test_gratka_views_and_rate(client, pg_conn, tmp_path):
     rows = client.get("/api/municipality/9900011/offers", params={"sort": "views_rate"}).json()
     top = [r for r in rows if r["views_source"] == "gratka"]
     assert [(r["views"], float(r["views_per_day"])) for r in top[:2]] == [(100, 20.0), (100, 5.0)]
+
+
+def test_team_favorites_and_comments(client):
+    kasia = {"x-auth-request-email": "kasia@wrenieruchomosci.pl"}
+    piotr = {"x-auth-request-email": "Piotr@wrenieruchomosci.pl"}
+    offers = client.get("/api/municipality/9900011/offers", headers=kasia).json()
+    o = offers[0]
+    assert o["fav"] is False and o["fav_users"] is None and o["comments"] == 0 and o["listing_keys"]
+    key = o["listing_keys"][0]
+    assert client.post("/api/favorites", json={"key": key}, headers=kasia).status_code == 200
+    assert client.post("/api/favorites", json={"key": key}, headers=kasia).status_code == 200  # drugi raz bez błędu
+    client.post("/api/favorites", json={"key": o["listing_keys"][-1]}, headers=piotr)
+    r = client.post("/api/comments", json={"key": key, "body": "  Właściciel zejdzie do 450 tys.  "}, headers=piotr)
+    cid = r.json()["id"]
+
+    mine = {x["id"]: x for x in client.get("/api/municipality/9900011/offers", headers=kasia).json()}[o["id"]]
+    assert mine["fav"] is True and mine["comments"] == 1
+    assert mine["fav_users"] == ["kasia@wrenieruchomosci.pl", "piotr@wrenieruchomosci.pl"]
+
+    cs = client.get("/api/comments", params={"keys": ",".join(o["listing_keys"])}, headers=kasia).json()
+    assert [(c["author"], c["body"], c["mine"]) for c in cs] == [("piotr@wrenieruchomosci.pl",
+                                                                  "Właściciel zejdzie do 450 tys.", False)]
+    assert client.delete(f"/api/comments/{cid}", headers=kasia).status_code == 404  # nie swój
+    assert client.delete(f"/api/comments/{cid}", headers=piotr).status_code == 200
+
+    favs = client.get("/api/favorites", headers=kasia).json()
+    assert [f["id"] for f in favs] == [o["id"]] and favs[0]["municipality"] == "Syntetyczna Rozwojowa"
+    client.post("/api/favorites/remove", json={"keys": o["listing_keys"]}, headers=kasia)
+    assert client.get("/api/favorites", headers=kasia).json() == []
+    assert len(client.get("/api/favorites", headers=piotr).json()) == 1
+
+
+def test_shared_password_is_one_team_user(client):
+    assert client.get("/api/me").json()["user"] == "zespół"
+    assert client.post("/api/comments", json={"key": "x", "body": "a"}).status_code == 400
+    assert client.post("/api/comments", json={"key": "otodom:1", "body": " "}).status_code == 400
