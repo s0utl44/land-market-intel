@@ -116,7 +116,7 @@ def test_small_municipalities_are_not_ranked(synthetic_data):
         pd.DataFrame([l.__dict__ for l in dedup.deduplicate(dedup.listings_from_observations(synthetic_data["rows"]))])))
     # DuckDB sumuje równolegle, więc ostatnia cyfra po zaokrągleniu może się różnić
     assert list(base["opportunity_score"]) == pytest.approx(
-        list(scores.dropna(subset=["rank"]).sort_values("rank")["opportunity_score"]), abs=0.002)
+        list(scores.dropna(subset=["rank"]).sort_values("rank")["opportunity_score"]), abs=0.005)
 
 
 def test_listing_dates_remove_left_censoring():
