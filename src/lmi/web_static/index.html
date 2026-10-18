@@ -396,7 +396,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
             <th data-k="supply" aria-sort="none"><button type="button">Oferty</button></th>
             <th data-k="ppm2" aria-sort="none" title="Mediana ceny ofertowej za m²"><button type="button">zł/m²</button></th>
             <th data-k="price_trend" aria-sort="none"><button type="button">Trend</button></th>
-            <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu pod zabudowę w ostatnich 12 miesiącach"><button type="button">Akty 12 m.</button></th>
+            <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu w ostatnich 12 miesiącach (pod spodem: ile pod zabudowę i mediana zł/m²)"><button type="button">Akty 12 m.</button></th>
           </tr></thead>
           <tbody id="rank-body"></tbody>
         </table>
@@ -664,7 +664,7 @@ function renderRank(){
       <td>${nf(r.supply)}</td>
       <td>${nf(r.ppm2)}</td>
       <td>${sgn(r.price_trend)}</td>
-      <td title="${r.tx_ppm2!=null?'mediana transakcyjna '+nf(r.tx_ppm2)+' zł/m²':''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
+      <td title="${r.tx_12m!=null?`${nf(r.tx_12m)} transakcji gruntem, w tym ${nf(r.tx_build_12m)} pod zabudowę`+(r.tx_ppm2!=null?` · mediana ${nf(r.tx_ppm2)} zł/m²`+(r.tx_build_12m<5?' (ze wszystkich, za mało pod zabudowę)':' (pod zabudowę)'):''):''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
     (rows.length>rankLimit?'<button class="btn" id="rank-all" type="button">Pokaż wszystkie</button>':'');

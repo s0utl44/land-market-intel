@@ -118,14 +118,17 @@ def ranking():
                avg_absorption_rate AS absorption, price_trend_pct AS price_trend,
                avg_discounted_share AS discounted, median_days_to_disappear AS days,
                latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks,
-               latest_median_listing_age_days AS age, t.tx_12m, t.tx_ppm2
+               latest_median_listing_age_days AS age, t.tx_12m, t.tx_build_12m, t.tx_ppm2
         FROM mart.region_scores
         LEFT JOIN (
-            -- transakcje samym gruntem pod zabudowę z ostatnich 12 miesięcy danych RCN
-            SELECT gmina_teryt, count(*) AS tx_12m,
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) AS tx_ppm2
+            -- transakcje samym gruntem z ostatnich 12 miesięcy danych RCN; mediana z gruntów pod zabudowę,
+            -- a gdy jest ich mniej niż 5 (np. w mieście plan rzadko jest wpisany w akt) — ze wszystkich
+            SELECT gmina_teryt, count(*) AS tx_12m, count(*) FILTER (WHERE buildable) AS tx_build_12m,
+                   CASE WHEN count(*) FILTER (WHERE buildable) >= 5
+                        THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) FILTER (WHERE buildable)
+                        ELSE percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) END AS tx_ppm2
             FROM mart.rcn_land_transactions
-            WHERE buildable AND ppm2 BETWEEN %(lo)s AND %(hi)s
+            WHERE ppm2 BETWEEN %(lo)s AND %(hi)s
               AND doc_date > (SELECT max(doc_date) FROM scrape.rcn_parcels) - 365
             GROUP BY gmina_teryt
         ) t ON t.gmina_teryt = municipality_teryt

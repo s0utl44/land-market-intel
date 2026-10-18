@@ -212,7 +212,8 @@ def test_shared_password_is_one_team_user(client):
 def test_transactions_endpoint_and_ranking(client, pg_conn):
     rows = [("A", "990001_1.1.1", "2025-03-01", 300000, 1000, "budownictwoMieszkanioweJednorodzinne"),
             ("B", "990001_1.1.2", "2025-06-01", 100000, 1000, "terenRolniczy"),
-            ("C", "990001_1.1.3", "2025-07-01", 10, 100000, "terenDrogWewnetrznych")]   # 0,0001 zł/m²: odrzucona
+            ("C", "990001_1.1.3", "2025-07-01", 10, 100000, "terenDrogWewnetrznych"),   # 0,0001 zł/m²: odrzucona
+            ("D", "990001_1.1.4", "2025-08-01", 500000, 0.1, "budownictwoMieszkanioweJednorodzinne")]  # 0,1 ha
     for tx, parcel, d, price, area, mpzp in rows:
         pg_conn.execute("""INSERT INTO scrape.rcn_parcels (tx_id, parcel_id, gmina_teryt, doc_date, tran_type, tran_price,
                            nier_type, share, mpzp, area_m2, land_use) VALUES (%s, %s, '9900011', %s, 'wolnyRynek', %s,
@@ -222,10 +223,12 @@ def test_transactions_endpoint_and_ranking(client, pg_conn):
     rcn.refresh_land(pg_conn)          # strona czyta zmaterializowane transakcje, odświeżane po pobraniu RCN
     d = client.get("/api/municipality/9900011/transactions").json()
     s = d["summary"]
-    assert s["tx_12m"] == 2 and s["tx_build_12m"] == 1 and float(s["ppm2_build_12m"]) == 300.0
-    assert [r["ppm2"] for r in d["recent"]] == [100, 300] and len(d["quarters"]) == 2
+    assert s["tx_12m"] == 3 and s["tx_build_12m"] == 2 and float(s["ppm2_build_12m"]) == 400.0
+    assert [r["ppm2"] for r in d["recent"]] == [500, 100, 300] and len(d["quarters"]) == 3
+    assert float(d["recent"][0]["area"]) == 1000.0          # powierzchnia w hektarach przeliczona na m²
     rank = {r["teryt"]: r for r in client.get("/api/ranking").json()}
-    assert rank["9900011"]["tx_12m"] == 1 and rank["9900022"]["tx_12m"] is None
+    assert rank["9900011"]["tx_12m"] == 3 and rank["9900011"]["tx_build_12m"] == 2
+    assert rank["9900022"]["tx_12m"] is None
 
 
 def test_feedback_flow(client, monkeypatch):

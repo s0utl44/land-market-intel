@@ -44,8 +44,13 @@ SELECT tx_id,
        min(gmina_teryt)                                       AS gmina_teryt,
        min(doc_date)                                          AS doc_date,
        max(tran_price)                                        AS price,
-       sum(area_m2)                                           AS area_m2,
-       round(max(tran_price) / nullif(sum(area_m2), 0), 2)    AS ppm2,
+       -- część starostw (np. Wrocław) wpisuje powierzchnię w hektarach, reszta w m²: cena ponad 20 000 zł
+       -- za "m²" przy dobrej cenie za hektar oznacza hektary
+       sum(area_m2) * CASE WHEN max(tran_price) / nullif(sum(area_m2), 0) > 20000 THEN 10000 ELSE 1 END
+                                                              AS area_m2,
+       round(max(tran_price) / nullif(sum(area_m2) * CASE WHEN max(tran_price) / nullif(sum(area_m2), 0) > 20000
+                                                          THEN 10000 ELSE 1 END, 0), 2)
+                                                              AS ppm2,
        count(*)                                               AS parcels,
        string_agg(DISTINCT mpzp, ';')                         AS mpzp,
        string_agg(DISTINCT land_use, ';')                     AS land_use,
