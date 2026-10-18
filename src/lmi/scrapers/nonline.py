@@ -23,7 +23,7 @@ from .otodom import LayoutChanged, ScrapeStats, classify_land_use
 log = logging.getLogger(__name__)
 
 LIST_URL = "https://{region}.nieruchomosci-online.pl/dzialki,sprzedaz/"
-MAX_PAGES = 400
+MAX_PAGES = 1500  # lista województwa ma ponad 400 stron po 41 ofert; koniec poznajemy po braku nowych ofert
 
 
 def _decimals(v) -> int:
