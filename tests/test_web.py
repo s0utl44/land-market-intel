@@ -325,3 +325,20 @@ def test_changes_snapshot_is_reused(client, pg_conn):
     assert first["daily"] and first["since"] == first["last_day"]
     web.refresh_changes(pg_conn)                          # wywołanie z porannego przebiegu
     assert "marker" not in client.get("/api/changes", params={"days": 7}).json()
+
+
+def test_changes_show_only_complete_days(client, pg_conn, tmp_path):
+    before = client.get("/api/changes", params={"days": 1}).json()
+    # trwa poranny przebieg: jeden portal ma już nowy dzień, pozostałe jeszcze nie
+    f = tmp_path / "o.csv"
+    f.write_text("source_listing_id,observed_at,municipality_teryt,municipality_name,area_m2,price_pln\n"
+                 "901,2026-06-29,9900011,Syntetyczna Rozwojowa,1000,500000\n"
+                 "901,2026-07-06,9900011,Syntetyczna Rozwojowa,1000,500000\n")
+    db.add_source(pg_conn, "otodom", "Otodom")
+    db.approve_source(pg_conn, "otodom", "test", "pytest")
+    db.import_csv(pg_conn, "otodom", f)
+    run_id, _ = db.run_dedup(pg_conn)
+    pg_conn.commit()
+    after = client.get("/api/changes", params={"days": 1}).json()
+    assert after["last_day"] == before["last_day"] == "2026-06-29"          # nie pół dnia
+    assert after["daily"][-1]["active"] >= before["daily"][-1]["active"]   # liczba ofert nie spada w trakcie

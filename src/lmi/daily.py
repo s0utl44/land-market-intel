@@ -85,7 +85,7 @@ def already_done_today(conn, today: date, source: str = "otodom") -> bool:
 
 class _SourceLock:
     """Blokada pliku per źródło: to samo źródło nie biegnie dwa razy naraz
-    (np. długie pierwsze pobieranie i ponowna próba o 14:00). Działa między kontenerami,
+    (np. długie pierwsze pobieranie i ponowna próba o 11:00). Działa między kontenerami,
     bo katalog data/ jest wspólny."""
 
     def __init__(self, out_dir: str | Path, source: str):

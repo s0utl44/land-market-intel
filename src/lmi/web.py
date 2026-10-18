@@ -171,8 +171,15 @@ PERIODS = (1, 7, 30)
 _CHANGES_LOCK = threading.Lock()
 
 
+# Ostatni pełny dzień: taki, w którym pobrały się już wszystkie portale aktywne w ostatnim tygodniu.
+# W trakcie porannego przebiegu (Otodom już jest, reszta jeszcze nie) strona pokazuje wczoraj, a nie pół dnia.
+COMPLETE_DAY = """
+    WITH ends AS (SELECT source_id, max(observed_at) AS e FROM core.listing_observations GROUP BY 1)
+    SELECT min(e) AS d FROM ends WHERE e >= (SELECT max(e) FROM ends) - 7"""
+
+
 def _changes_state(conn) -> str:
-    r = conn.execute("""SELECT (SELECT max(observed_at) FROM core.listing_observations) AS d,
+    r = conn.execute(f"""SELECT ({COMPLETE_DAY}) AS d,
                                (SELECT max(run_id) FROM core.dedup_runs) AS run,
                                (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS rcn""").fetchone()
     return f"{r['d']}|{r['run']}|{r['rcn']}"
@@ -233,7 +240,7 @@ def changes(days: int = Query(7, ge=1, le=31)):
 
 def _changes_all(conn, periods) -> dict:
     empty = {"last_day": None, "daily": [], "weekly": [], "cuts": [], "fresh": [], "gone_fast": [], "gminy": [], "rcn": []}
-    last = conn.execute("SELECT max(observed_at) AS d FROM core.listing_observations").fetchone()["d"]
+    last = conn.execute(COMPLETE_DAY).fetchone()["d"]
     if last is None:
         return {p: dict(empty) for p in periods}
     out = {}
@@ -241,14 +248,20 @@ def _changes_all(conn, periods) -> dict:
         for sql in CHANGES_TEMP:
             conn.execute(sql)
         # liczniki per dzień, jedno przejście
+        # aktywna w dniu D: któreś jej ogłoszenie było widziane przed D i po D (jednodniowa awaria portalu
+        # nie "zdejmuje" jego działek); tylko pełne dni (<= last)
         rows = conn.execute("""
-            SELECT 'active' AS k, d, count(*)::float AS v FROM ch_pday WHERE d > %(last)s::date - 61 GROUP BY d
+            WITH days AS (SELECT DISTINCT observed_at AS d FROM core.listing_observations
+                          WHERE observed_at > %(last)s::date - 61 AND observed_at <= %(last)s)
+            SELECT 'active' AS k, days.d, count(DISTINCT l.property_key)::float AS v
+                FROM days JOIN ch_lst l ON l.fs <= days.d AND l.ls >= days.d GROUP BY days.d
             UNION ALL SELECT 'ppm2', d, percentile_cont(0.5) WITHIN GROUP (ORDER BY price / area)
-                      FROM ch_pday WHERE d > %(last)s::date - 61 AND area > 0 GROUP BY d
-            UNION ALL SELECT 'new', fs, count(*) FROM ch_prop WHERE genuine_new AND fs > %(last)s::date - 61 GROUP BY fs
+                      FROM ch_pday WHERE d > %(last)s::date - 61 AND d <= %(last)s AND area > 0 GROUP BY d
+            UNION ALL SELECT 'new', fs, count(*) FROM ch_prop WHERE genuine_new AND fs > %(last)s::date - 61
+                      AND fs <= %(last)s GROUP BY fs
             UNION ALL SELECT 'gone_after', ls, count(*) FROM ch_prop WHERE gone_known AND ls > %(last)s::date - 62
-                      GROUP BY ls
-            UNION ALL SELECT 'cuts', d, count(*) FROM ch_pday WHERE d > %(last)s::date - 61
+                      AND ls < %(last)s GROUP BY ls
+            UNION ALL SELECT 'cuts', d, count(*) FROM ch_pday WHERE d > %(last)s::date - 61 AND d <= %(last)s
                       AND price < prev_price * 0.995 GROUP BY d""", {"last": last}).fetchall()
         by: dict = {}
         for r in rows:

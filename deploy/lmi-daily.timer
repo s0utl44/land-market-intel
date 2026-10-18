@@ -1,9 +1,9 @@
 [Unit]
-Description=LMI: codziennie o 8:00 czasu polskiego
+Description=LMI: codziennie o 5:00 czasu polskiego (gotowe przed 8:00)
 
 [Timer]
-OnCalendar=*-*-* 08:00:00 Europe/Warsaw
-# jeśli serwer był wyłączony o 8:00, uruchom po starcie
+OnCalendar=*-*-* 05:00:00 Europe/Warsaw
+# jeśli serwer był wyłączony o 5:00, uruchom po starcie
 Persistent=true
 
 [Install]

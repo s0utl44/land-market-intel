@@ -475,7 +475,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 
 <footer>
   <div class="wrap">
-    <span>Dane: ogłoszenia Otodom, Gratka, Nieruchomości-online i Adresowo (codziennie o 8:00), gminy: GUGiK ULDK. Ceny ofertowe, nie transakcyjne. Zniknięcie oferty nie oznacza sprzedaży.</span>
+    <span>Dane: ogłoszenia Otodom, Gratka, Nieruchomości-online i Adresowo (codziennie od 5:00), gminy: GUGiK ULDK. Ceny ofertowe, nie transakcyjne. Zniknięcie oferty nie oznacza sprzedaży.</span>
     <span>Narzędzie wewnętrzne DoneHome</span>
   </div>
 </footer>
@@ -536,7 +536,7 @@ function renderSummary(){
   const w=OV.weeks_of_data||0, early=$('#early');
   if(w===0){
     early.hidden=false;
-    early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Trwa pierwsze pobieranie ofert.</b> Pierwsze pełne pobranie wszystkich działek w dolnośląskim trwa kilka godzin. Ranking i oferty pojawią się tutaj, gdy się zakończy. Potem dane odświeżają się codziennie o 8:00.</div>`;
+    early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Trwa pierwsze pobieranie ofert.</b> Pierwsze pełne pobranie wszystkich działek w dolnośląskim trwa kilka godzin. Ranking i oferty pojawią się tutaj, gdy się zakończy. Potem dane odświeżają się codziennie rano.</div>`;
   }else if(w<4){
     early.hidden=false;
     early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Ranking wstępny: dane z ${w} ${w===1?'tygodnia':'tygodni'}.</b> Liczba ofert i ceny są już wiarygodne. Tempo znikania, trend cen i czas na rynku potrzebują kilku tygodni historii: ranking zacznie mieć sens po ok. 4 tygodniach, a stabilny będzie po 2–3 miesiącach.</div>`;

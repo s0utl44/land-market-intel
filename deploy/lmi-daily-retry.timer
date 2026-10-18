@@ -1,8 +1,8 @@
 [Unit]
-Description=LMI: ponowna próba o 14:00 czasu polskiego (tylko gdy poranna się nie udała)
+Description=LMI: ponowna próba o 11:00 czasu polskiego (tylko gdy poranna się nie udała)
 
 [Timer]
-OnCalendar=*-*-* 14:00:00 Europe/Warsaw
+OnCalendar=*-*-* 11:00:00 Europe/Warsaw
 Persistent=true
 
 [Install]

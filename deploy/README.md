@@ -108,17 +108,20 @@ journalctl -u lmi-daily -f                # podgląd (Ctrl+C nie przerywa pobier
 
 Jeśli przebieg zostanie przerwany, nic nie przepada: pobrane szczegóły są w cache, a następny przebieg zaczyna od brakujących.
 
-## 6. Codziennie o 8:00 (+ ponowna próba o 14:00)
+## 6. Codziennie o 5:00 (+ ponowna próba o 11:00)
 
 ```bash
 systemctl enable --now lmi-daily.timer
-# ponowna próba o 14:00, tylko jeśli poranne pobieranie się nie udało (np. chwilowa blokada 403)
+# ponowna próba o 11:00, tylko jeśli poranne pobieranie się nie udało (np. chwilowa blokada 403)
 cp deploy/lmi-daily-retry.service deploy/lmi-daily-retry.timer /etc/systemd/system/
 systemctl daemon-reload && systemctl enable --now lmi-daily-retry.timer
 systemctl list-timers lmi-daily.timer     # pokazuje następne uruchomienie
 ```
 
-Kolejne przebiegi trwają kilka minut: 58 stron wyników plus szczegóły tylko nowych ofert.
+Przebieg trwa ok. 2–3 godziny (najdłużej lista Nieruchomości-online, 400+ stron), więc start o 5:00 daje
+gotowe dane przed 8:00. Strona pokazuje tylko pełne dni: dopóki przebieg trwa, liczniki i wykresy są z wczoraj.
+Po zmianie godzin w repozytorium skopiuj timery jeszcze raz:
+`cp deploy/lmi-daily*.timer /etc/systemd/system/ && systemctl daemon-reload && systemctl restart lmi-daily.timer lmi-daily-retry.timer`
 
 ## 7. Strona pod domeną (HTTPS + hasło)
 
