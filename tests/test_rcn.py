@@ -39,6 +39,7 @@ def test_parse_and_row():
 def test_helpers():
     assert rcn.gmina_teryt("022308_4.0001.806/3") == "0223084"
     assert rcn.gmina_teryt("bzdura") is None
+    assert rcn.gmina_teryt("026403_9.0011.12/4") == "0264011"      # Wrocław-Krzyki (delegatura) -> gmina Wrocław
     assert rcn.locality("UL:Leśna") is None
     assert list(rcn.months(date(2025, 11, 15), date(2026, 2, 1))) == [
         (date(2025, 11, 15), date(2025, 12, 1)), (date(2025, 12, 1), date(2026, 1, 1)), (date(2026, 1, 1), date(2026, 2, 1))]

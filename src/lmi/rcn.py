@@ -133,9 +133,14 @@ def _day(v: str | None) -> date | None:
 
 
 def gmina_teryt(parcel_id: str) -> str | None:
-    """'022302_2.0012.401/2' -> '0223022' (TERYT gminy z rodzajem, jak w ULDK)."""
+    """'022302_2.0012.401/2' -> '0223022' (TERYT gminy z rodzajem, jak w ULDK).
+
+    Wrocław prowadzi ewidencję w delegaturach (026402_9 Fabryczna … 026406_9 Śródmieście, rodzaj 9;
+    rodzaj 8 to dzielnice): takie działki należą do gminy miejskiej powiatu, '0264011'."""
     head = (parcel_id or "").split(".", 1)[0]
     if len(head) == 8 and head[6] == "_" and head[:6].isdigit() and head[7].isdigit():
+        if head[7] in "89":
+            return head[:4] + "011"
         return head[:6] + head[7]
     return None
 
