@@ -136,11 +136,16 @@ def gmina_teryt(parcel_id: str) -> str | None:
     """'022302_2.0012.401/2' -> '0223022' (TERYT gminy z rodzajem, jak w ULDK).
 
     Wrocław prowadzi ewidencję w delegaturach (026402_9 Fabryczna … 026406_9 Śródmieście, rodzaj 9;
-    rodzaj 8 to dzielnice): takie działki należą do gminy miejskiej powiatu, '0264011'."""
+    rodzaj 8 to dzielnice): takie działki należą do gminy miejskiej powiatu, '0264011'.
+    Gminy miejsko-wiejskie mają jednostki ewidencyjne miasta (_4) i obszaru wiejskiego (_5): obie to gmina _3,
+    np. '022304_5.0007.12' (Kąty Wrocławskie, obszar wiejski) -> '0223043'."""
     head = (parcel_id or "").split(".", 1)[0]
     if len(head) == 8 and head[6] == "_" and head[:6].isdigit() and head[7].isdigit():
         if head[7] in "89":
             return head[:4] + "011"
+        if head[7] in "45":
+            # gmina miejsko-wiejska: ewidencja osobno dla miasta (4) i obszaru wiejskiego (5), gmina to rodzaj 3
+            return head[:6] + "3"
         return head[:6] + head[7]
     return None
 
