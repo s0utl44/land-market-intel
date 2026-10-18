@@ -118,19 +118,22 @@ def ranking():
                avg_absorption_rate AS absorption, price_trend_pct AS price_trend,
                avg_discounted_share AS discounted, median_days_to_disappear AS days,
                latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks,
-               latest_median_listing_age_days AS age, t.tx_12m, t.tx_build_12m, t.tx_ppm2
+               latest_median_listing_age_days AS age, t.tx_12m, t.tx_build_12m, t.tx_ppm2, t.tx_until
         FROM mart.region_scores
         LEFT JOIN (
-            -- transakcje samym gruntem z ostatnich 12 miesięcy danych RCN; mediana z gruntów pod zabudowę,
-            -- a gdy jest ich mniej niż 5 (np. w mieście plan rzadko jest wpisany w akt) — ze wszystkich
-            SELECT gmina_teryt, count(*) AS tx_12m, count(*) FILTER (WHERE buildable) AS tx_build_12m,
+            -- transakcje samym gruntem z 12 miesięcy przed ostatnim aktem w powiecie (starostwa przekazują
+            -- dane do RCN z różnym opóźnieniem); mediana z gruntów pod zabudowę, a gdy jest ich mniej niż 5
+            -- (np. w mieście plan rzadko jest wpisany w akt) — ze wszystkich
+            SELECT t.gmina_teryt, count(*) AS tx_12m, count(*) FILTER (WHERE buildable) AS tx_build_12m,
                    CASE WHEN count(*) FILTER (WHERE buildable) >= 5
                         THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) FILTER (WHERE buildable)
-                        ELSE percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) END AS tx_ppm2
-            FROM mart.rcn_land_transactions
-            WHERE ppm2 BETWEEN %(lo)s AND %(hi)s
-              AND doc_date > (SELECT max(doc_date) FROM scrape.rcn_parcels) - 365
-            GROUP BY gmina_teryt
+                        ELSE percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) END AS tx_ppm2,
+                   max(pl.d) AS tx_until
+            FROM mart.rcn_land_transactions t
+            JOIN (SELECT left(parcel_id, 4) AS pw, max(doc_date) AS d FROM scrape.rcn_parcels GROUP BY 1) pl
+              ON pl.pw = left(t.gmina_teryt, 4)
+            WHERE ppm2 BETWEEN %(lo)s AND %(hi)s AND doc_date > pl.d - 365
+            GROUP BY t.gmina_teryt
         ) t ON t.gmina_teryt = municipality_teryt
         ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""", PPM2_RANGE)
 
@@ -363,7 +366,8 @@ def municipality_transactions(teryt: str, limit: int = Query(50, ge=1, le=500)):
     _check_teryt(teryt)
     p = {"t": teryt, "limit": limit, **PPM2_RANGE}
     summary = _rows("""
-        WITH last AS (SELECT max(doc_date) AS d FROM scrape.rcn_parcels)
+        -- okno 12 miesięcy od ostatniego aktu w powiecie tej gminy (starostwa przekazują dane z różnym opóźnieniem)
+        WITH last AS (SELECT max(doc_date) AS d FROM scrape.rcn_parcels WHERE left(parcel_id, 4) = left(%(t)s, 4))
         SELECT (SELECT d FROM last) AS data_until,
                count(*) FILTER (WHERE doc_date > (SELECT d FROM last) - 365)            AS tx_12m,
                count(*) FILTER (WHERE buildable AND doc_date > (SELECT d FROM last) - 365) AS tx_build_12m,

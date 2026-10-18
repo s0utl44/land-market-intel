@@ -678,7 +678,7 @@ function renderRank(){
       <td>${nf(r.supply)}</td>
       <td>${nf(r.ppm2)}</td>
       <td>${sgn(r.price_trend)}</td>
-      <td title="${r.tx_12m!=null?`${nf(r.tx_12m)} transakcji gruntem, w tym ${nf(r.tx_build_12m)} pod zabudowę`+(r.tx_ppm2!=null?` · mediana ${nf(r.tx_ppm2)} zł/m²`+(r.tx_build_12m<5?' (ze wszystkich, za mało pod zabudowę)':' (pod zabudowę)'):''):''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
+      <td title="${r.tx_12m!=null?`${nf(r.tx_12m)} transakcji gruntem, w tym ${nf(r.tx_build_12m)} pod zabudowę`+(r.tx_ppm2!=null?` · mediana ${nf(r.tx_ppm2)} zł/m²`+(r.tx_build_12m<5?' (ze wszystkich, za mało pod zabudowę)':' (pod zabudowę)'):'')+(r.tx_until?` · 12 mies. do ${dFull(r.tx_until)} (ostatni akt w powiecie)`:''):''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}${r.tx_until&&OV&&OV.last_observed&&(new Date(OV.last_observed)-new Date(r.tx_until))/864e5>120?`<span class="sub2" title="starostwo przekazuje dane do RCN z dużym opóźnieniem">do ${dPL(r.tx_until)}</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
     (rows.length>rankLimit?'<button class="btn" id="rank-all" type="button">Pokaż wszystkie</button>':'');
