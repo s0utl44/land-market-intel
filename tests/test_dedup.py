@@ -175,3 +175,19 @@ def test_diff_runs_explains_split_pairs():
     new = {a.key: "P1", b.key: "P2"}
     d = dedup.diff_runs([a, b], old, new)
     assert list(d) == ["metraż różny"] and d["metraż różny"]["pairs"] == 1
+
+
+def test_identical_copies_on_one_portal_are_merged():
+    # to samo ogłoszenie wystawione 3 razy (554 m², 85 000 zł, bez pinezki)
+    ls = [L("nonline", str(i), area=554, prices=(85_000.0,)) for i in range(3)]
+    assert groups(dedup.deduplicate(ls)) == [["0", "1", "2"]]
+
+
+def test_owner_and_agency_price_on_exact_odd_area():
+    # 842 m²: biuro 99 tys., właściciel 88 tys. — identyczny, nieokrągły metraż i ten sam typ
+    a, b = L("otodom", "1", area=842, prices=(99_000.0,)), L("adresowo", "2", area=842, prices=(88_000.0,))
+    a.land_use = b.land_use = "budowlana"
+    assert groups(dedup.deduplicate([a, b])) == [["1", "2"]]
+    c, d = L("otodom", "3", area=1000, prices=(99_000.0,)), L("adresowo", "4", area=1000, prices=(88_000.0,))
+    c.land_use = d.land_use = "budowlana"
+    assert groups(dedup.deduplicate([c, d])) == [["3"], ["4"]]       # okrągły metraż: za mało pewne

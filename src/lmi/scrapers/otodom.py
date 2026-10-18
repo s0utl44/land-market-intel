@@ -278,6 +278,7 @@ class ScrapeStats:
     interest_failed: int = 0
     interest_due: int = 0          # ofert z minionym terminem pomiaru (przed budżetem)
     features_refetched: int = 0    # stron ofert pobranych ponownie dla parametrów (media, dojazd...)
+    skipped_archived: int = 0      # ogłoszenia archiwalne (strona jest, oferty już nie)
     notes: list[str] = field(default_factory=list)
 
 

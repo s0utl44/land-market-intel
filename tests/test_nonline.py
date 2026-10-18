@@ -123,3 +123,14 @@ def test_scrape_end_to_end():
     web.calls.clear()
     nonline.scrape(web.get, cache, date(2026, 10, 18))
     assert not any(c.endswith(".html") for c in web.calls)  # szczegóły tylko raz
+
+
+def test_archived_offer_is_not_counted():
+    archived = detail_page() + '<div class="banner">Ogłoszenie archiwalne</div>'
+    assert nonline.parse_detail_page(archived)["archived"] is True
+    assert nonline.parse_detail_page(detail_page())["archived"] is False
+    web = Web(pages=[search_page([offer(1), offer(2)], pages=())],
+              details={"2670001": detail_page(), "2670002": archived},
+              communes={"16.826552,51.142864": "0\n026401_1|Wrocław"})
+    rows, stats = nonline.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
+    assert [r["source_listing_id"] for r in rows] == ["2670001"] and stats.skipped_archived == 1

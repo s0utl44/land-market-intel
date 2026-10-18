@@ -316,11 +316,16 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
                 detail["features"] = features.empty()  # nie próbujemy w kółko
             else:
                 detail["features"] = fresh.get("features") or features.empty()
+                if "archived" in fresh:
+                    detail["archived"] = fresh["archived"]
             stats.features_refetched += 1
             cache.put_detail(it.ad_id, it.url, detail)
             if stats.features_refetched % 100 == 0:
                 log.info("%s: uzupełniono parametry %d ofert", label, stats.features_refetched)
 
+        if detail.get("archived"):
+            stats.skipped_archived += 1
+            continue
         price = it.price_pln or detail.get("price_pln")
         if price is None:
             stats.skipped_no_price += 1

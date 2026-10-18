@@ -26,6 +26,9 @@ LIST_URL = "https://{region}.nieruchomosci-online.pl/dzialki,sprzedaz/"
 MAX_PAGES = 1500  # lista województwa ma ponad 400 stron po 41 ofert; koniec poznajemy po braku nowych ofert
 
 
+ARCHIVED = re.compile(r">\s*Ogłoszenie archiwalne\s*<")
+
+
 def _decimals(v) -> int:
     return len(str(v).split(".")[1]) if "." in str(v) else 0
 
@@ -123,6 +126,8 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         "listed_at": posted.isoformat() if posted else None,
         "municipality_hint": ((listing.get("address") or {}).get("addressLocality")),
         "features": _features(listing, html),
+        # zdjęte z portalu, ale strona dalej działa (żółty pasek "Ogłoszenie archiwalne"): nie liczymy jako oferty
+        "archived": bool(ARCHIVED.search(html)),
     }
 
 

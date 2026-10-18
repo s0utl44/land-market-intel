@@ -9,8 +9,9 @@ Reguły (od najmocniejszej):
                    wystawienie), powierzchnia <= price_area_area_tol. Punkty: zgodna powierzchnia 2,
                    nieokrągła powierzchnia (np. 1636 m²) +1, cena <= 0,5% +2 albo <= 3% +1, ten sam typ
                    działki +1; łączymy od PRICE_AREA_MIN_SCORE i tylko jednoznacznie (jeden kandydat
-                   z danego portalu, albo kilku bliźniaczych — to samo ogłoszenie wystawione dwa razy).
-                   Cena różna o > 3% wyklucza; inny typ działki nie (portale różnie go nazywają).
+                   z danego portalu, albo kilka identycznych kopii — to samo ogłoszenie wystawione wielokrotnie).
+                   Cena różna o 3–15% tylko przy identycznym, nieokrągłym metrażu i tym samym typie (właściciel
+                   vs biuro); inny typ działki nie wyklucza (portale różnie go nazywają).
 Dwa ogłoszenia z RÓŻNYMI parcel_id nigdy nie trafiają do jednej nieruchomości (także pośrednio).
 Ogłoszenia z jednego portalu widoczne w tym samym czasie łączymy tylko, gdy są niemal identyczne
 (metraż <= 1%, cena <= 2%) — inaczej to zwykle sąsiednie działki z jednego podziału.
@@ -26,7 +27,7 @@ from datetime import date, timedelta
 from itertools import combinations
 from typing import Iterable
 
-ALGORITHM_VERSION = "dedup-v3"
+ALGORITHM_VERSION = "dedup-v4"
 PRICE_AREA_MIN_SCORE = 4
 
 METHOD_CONFIDENCE = {
@@ -43,7 +44,7 @@ class DedupParams:
     max_distance_m: float = 150.0
     location_area_tol: float = 0.05
     price_area_area_tol: float = 0.005
-    price_area_price_tol: float = 0.03
+    price_area_price_tol: float = 0.15   # powyżej 3% tylko przy identycznym, nieokrągłym metrażu i tym samym typie
     price_area_max_gap_days: int = 14
     price_area_max_distance_m: float = 1000.0
     same_source_area_tol: float = 0.01
@@ -196,11 +197,16 @@ def attribute_score(a: Listing, b: Listing, params: DedupParams) -> int:
     gap = _price_gap(a, b)
     if gap > params.price_area_price_tol:
         return 0
+    nonround = bool(round(a.area_m2) % 100 and round(b.area_m2) % 100)
+    if gap > 0.03 and not (nonround and _rel_diff(a.area_m2, b.area_m2) <= 0.002):
+        # ta sama działka bywa u właściciela taniej niż u biura (np. 842 m²: 88 i 99 tys.), ale taką różnicę
+        # przyjmujemy tylko przy identycznym, nieokrągłym metrażu
+        return 0
     # inny typ działki nie wyklucza: portale różnie nazywają to samo (budowlana / rolno-budowlana / inwestycyjna)
     score = 2
-    if round(a.area_m2) % 100 and round(b.area_m2) % 100:
+    if nonround:
         score += 1                       # nieokrągły metraż rzadko się powtarza przypadkiem
-    score += 2 if gap <= 0.005 else 1
+    score += 2 if gap <= 0.005 else 1 if gap <= 0.03 else 0
     if a.land_use and a.land_use == b.land_use:
         score += 1
     return score
@@ -279,8 +285,8 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
         return _rel_diff(a.area_m2, b.area_m2) <= 0.005 and _price_gap(a, b) <= 0.005
 
     def unambiguous(cands: list[int]) -> bool:
-        # najwyżej dwa identyczne ogłoszenia: przy większej serii (np. osiedle równych działek) nie zgadujemy
-        return len(cands) == 1 or (len(cands) == 2 and twins(*cands))
+        # jeden kandydat albo kilka identycznych kopii (to samo ogłoszenie wystawione wielokrotnie)
+        return len(cands) == 1 or all(twins(x, y) for x, y in combinations(cands, 2))
 
     price_area = {(min(i, j), max(i, j)) for i, per_src in ok.items() for src, cands in per_src.items()
                   if unambiguous(cands) for j in cands
@@ -289,8 +295,7 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
     # bliźniacze ogłoszenia z jednego portalu (podwójne wystawienie) też łączymy
     price_area |= {(min(i, j), max(i, j)) for i, per_src in ok.items()
                    for j in per_src.get(listings[i].source_id, [])
-                   if j != i and len(per_src[listings[i].source_id]) == 1 and twins(i, j)
-                   and ok[j][listings[i].source_id] == [i]}
+                   if j != i and twins(i, j) and unambiguous(per_src[listings[i].source_id])}
     pairs.extend((i, j, "price_area") for i, j in sorted(price_area))
     return pairs
 
