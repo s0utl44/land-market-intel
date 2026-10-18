@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("dedup", help="uruchom deduplikację")
     sub.add_parser("metrics", help="przelicz metryki (mart.*)")
     sub.add_parser("refresh-page", help="przelicz od razu gotowe dane strony (Co się zmieniło, transakcje RCN)")
+    sub.add_parser("dedup-review", help="raport jakości ostatniej deduplikacji z linkami (możliwe duplikaty, błędy)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
     s.add_argument("--new", type=int, help="run_id nowszej (domyślnie ostatnia)")
@@ -141,6 +142,33 @@ def main(argv: list[str] | None = None) -> int:
                 run_id, links = db.run_dedup(conn)
                 print(f"Dedup run {run_id}: {len(links)} ogłoszeń -> "
                       f"{len({l.property_key for l in links})} nieruchomości")
+            elif args.cmd == "dedup-review":
+                from . import dedup
+
+                obs = db.load_observations(conn)
+                listings = dedup.listings_from_observations(obs.astype(object).where(obs.notna(), None).to_dict("records"))
+                run_id = db.latest_dedup_run(conn)
+                links = [dedup.Link(s_, l, p, m, c) for s_, l, p, m, c in conn.execute(
+                    """SELECT source_id, source_listing_id, property_key, match_method, match_confidence
+                       FROM core.listing_property_links WHERE run_id = %s""", (run_id,))]
+                rep = dedup.review(listings, links, examples=8)
+                urls = {f"{s_}:{l}": u for s_, l, u in conn.execute(
+                    """SELECT DISTINCT ON (source_id, source_listing_id) source_id, source_listing_id, url
+                       FROM core.listing_observations ORDER BY source_id, source_listing_id, observed_at DESC""")}
+                print(f"Deduplikacja run {run_id}: {rep['listings']} ogłoszeń -> {rep['properties']} działek, "
+                      f"z kilku ogłoszeń: {rep['multi_listing_properties']}")
+                print(f"{'portal':<22}{'ogłoszeń':>9}{'działek':>9}{'tylko tu':>10}")
+                for src, v in rep["by_source"].items():
+                    print(f"{src:<22}{v['listings']:>9}{v['properties']:>9}{v['only_this_portal']:>10}")
+                for key, title in (("possible_same_source", "Możliwe duplikaty w jednym portalu (nie połączone)"),
+                                   ("possible_cross_source", "Możliwe duplikaty między portalami (nie połączone)")):
+                    print(f"\n{title}: {rep[key]}")
+                    for e in rep[key + "_examples"]:
+                        print(f"  {e['area']:.0f} m², {e['prices'][0]:.0f} / {e['prices'][1]:.0f} zł, "
+                              f"pinezki {e['dist_m'] if e['dist_m'] is not None else '–'} m, typ {e['land_use'][0]}/{e['land_use'][1]}")
+                        print(f"      {urls.get(e['a'], e['a'])}\n      {urls.get(e['b'], e['b'])}")
+                print(f"\nDo sprawdzenia (połączone, a ceny/metraże się różnią): {rep['suspicious']}, "
+                      f"nieprawdopodobne wartości: {rep['outliers']}")
             elif args.cmd == "dedup-diff":
                 from . import dedup
 

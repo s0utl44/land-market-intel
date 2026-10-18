@@ -386,6 +386,23 @@ def review(listings: list[Listing], links: list[Link], params: DedupParams | Non
                 if attribute_score(a, b, params) == PRICE_AREA_MIN_SCORE - 1:
                     near.append({"a": f"{a.source_id}:{a.source_listing_id}", "b": f"{b.source_id}:{b.source_listing_id}",
                                  "area": a.area_m2, "prices": [min(a.prices), min(b.prices)]})
+    # możliwe duplikaty, których reguły nie łączą: ten sam metraż, cena do 15%, widoczne naraz,
+    # pinezki blisko albo brak; osobno z jednego portalu (np. kilka biur) i z różnych
+    possible: dict[str, list] = {"same_source": [], "cross_source": []}
+    for ls in by_muni.values():
+        for pos, a in enumerate(ls):
+            for b in ls[pos + 1:]:
+                if b.area_m2 > a.area_m2 * (1 + params.price_area_area_tol) + 0.01:
+                    break
+                if prop_of[a.key] == prop_of[b.key] or not _overlap(a, b, 14) or _price_gap(a, b) > 0.15:
+                    continue
+                dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else None
+                if dist is not None and dist > 100:
+                    continue
+                possible["same_source" if a.source_id == b.source_id else "cross_source"].append({
+                    "a": f"{a.source_id}:{a.source_listing_id}", "b": f"{b.source_id}:{b.source_listing_id}",
+                    "area": a.area_m2, "prices": [min(a.prices), min(b.prices)],
+                    "dist_m": round(dist) if dist is not None else None, "land_use": [a.land_use, b.land_use]})
     outliers = []
     for l in listings:
         ppm2 = min(l.prices) / l.area_m2
@@ -401,6 +418,13 @@ def review(listings: list[Listing], links: list[Link], params: DedupParams | Non
         "suspicious": len(suspicious), "suspicious_examples": suspicious[:examples],
         "near_miss": len(near), "near_miss_examples": near[:examples],
         "outliers": len(outliers), "outlier_examples": outliers[:examples],
+        "possible_same_source": len(possible["same_source"]), "possible_same_source_examples": possible["same_source"][:examples],
+        "possible_cross_source": len(possible["cross_source"]),
+        "possible_cross_source_examples": possible["cross_source"][:examples],
+        "by_source": {src: {"listings": sum(1 for k in by_key if k[0] == src),
+                            "properties": len({prop_of[k] for k in by_key if k[0] == src}),
+                            "only_this_portal": sum(1 for g in groups_.values() if {l.source_id for l in g} == {src})}
+                      for src in sorted({k[0] for k in by_key})},
     }
 
 
