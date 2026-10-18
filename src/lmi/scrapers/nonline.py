@@ -23,7 +23,7 @@ from .otodom import LayoutChanged, ScrapeStats, classify_land_use
 log = logging.getLogger(__name__)
 
 LIST_URL = "https://{region}.nieruchomosci-online.pl/dzialki,sprzedaz/"
-MAX_PAGES = 1500  # lista województwa ma ponad 400 stron po 41 ofert; koniec poznajemy po braku nowych ofert
+MAX_PAGES = 1500  # zabezpieczenie; lista kończy się, gdy zostają same archiwalne albo brak nowych ofert
 
 
 ARCHIVED = re.compile(r">\s*Ogłoszenie archiwalne\s*<")
@@ -58,16 +58,32 @@ def ad_id(url: str) -> str | None:
 
 
 def parse_search_page(html: str) -> tuple[list[Item], int]:
-    """Zwraca (ogłoszenia, najwyższy numer strony widoczny w stronicowaniu)."""
+    """Zwraca (aktywne ogłoszenia, najwyższy numer strony widoczny w stronicowaniu)."""
+    items, last, _ = parse_search_page_full(html)
+    return items, last
+
+
+def _out_of_stock(o: dict) -> bool:
+    return "outofstock" in str(o.get("availability") or "").lower()
+
+
+def parse_search_page_full(html: str) -> tuple[list[Item], int, list[str]]:
+    """(aktywne ogłoszenia, najwyższy numer strony, numery archiwalnych na stronie).
+
+    Lista regionu pokazuje po aktywnych także ogłoszenia archiwalne (availability: OutOfStock):
+    pomijamy je od razu, bez pobierania strony oferty."""
     page = _of_type(ld_json(html), "CollectionPage")
     if page is None:
         raise LayoutChanged("nieruchomosci-online: brak CollectionPage w JSON-LD")
     offers = (page.get("mainEntity") or {}).get("offers") or []
     agg = offers[0] if isinstance(offers, list) and offers else offers
-    items = []
+    items, archived = [], []
     for o in (agg or {}).get("offers") or []:
         url = o.get("url") or ""
         if not (aid := ad_id(url)):
+            continue
+        if _out_of_stock(o):
+            archived.append(aid)
             continue
         place = o.get("itemOffered") or {}
         items.append(Item(
@@ -75,7 +91,7 @@ def parse_search_page(html: str) -> tuple[list[Item], int]:
             listed_at=None, refreshed_at=None, title=o.get("name"), description=place.get("description"),
         ))
     pages = [int(n) for n in re.findall(r"dzialki,sprzedaz/\?p=(\d+)", html)]
-    return items, max(pages, default=1)
+    return items, max(pages, default=1), archived
 
 
 def _land_use_from_props(listing: dict) -> str | None:
@@ -127,7 +143,9 @@ def parse_detail_page(html: str, title: str | None = None, description: str | No
         "municipality_hint": ((listing.get("address") or {}).get("addressLocality")),
         "features": _features(listing, html),
         # zdjęte z portalu, ale strona dalej działa (żółty pasek "Ogłoszenie archiwalne"): nie liczymy jako oferty
-        "archived": bool(ARCHIVED.search(html)),
+        "archived": bool(ARCHIVED.search(html)) or any(
+            isinstance(o, dict) and _out_of_stock(o)
+            for o in (listing.get("offers") if isinstance(listing.get("offers"), list) else [listing.get("offers") or {}])),
     }
 
 
@@ -163,15 +181,19 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
                 raise
             log.warning("nieruchomosci-online: strona %d niedostępna, kończę listę", page)
             break
-        items, last_seen = parse_search_page(html)
+        items, last_seen, archived = parse_search_page_full(html)
         # stronicowanie pokazuje tylko kilka sąsiednich numerów: granica przesuwa się w trakcie
         total_pages = max(total_pages, last_seen)
         stats.pages += 1
         stats.items_seen += len(items)
+        stats.skipped_archived += len(archived)
+        stats.archived_ids.extend(archived)
+        if archived and not items:
+            break  # po aktywnych lista pokazuje już tylko archiwum: koniec ofert do sprzedaży
         if stats.pages % 20 == 0:
             log.info("nieruchomosci-online: lista, strona %d, ogłoszeń do tej pory %d", stats.pages, len(ads) + len(items))
         new = [it for it in items if it.ad_id not in ads]
-        if not new:
+        if not new and not archived:
             break  # pusta strona albo powtórka poprzedniej: koniec listy
         for it in new:
             ads[it.ad_id] = it
@@ -181,6 +203,25 @@ def scrape(get, cache, observed_at: date, region_slug: str = "dolnoslaskie", ter
     rows = build_rows(ads.values(), get, cache, observed_at, teryt_prefix, max_details, geo_get, stats,
                       parse_detail_page, "nieruchomosci-online", features_budget=features_budget)
     return rows, stats
+
+
+def archived_ids(get, region_slug: str = "dolnoslaskie", max_pages: int = MAX_PAGES) -> tuple[list[str], int]:
+    """Przechodzi całą listę regionu (także część z samym archiwum) i zbiera numery ogłoszeń archiwalnych.
+    Jednorazowo, do wyłączenia archiwalnych pobranych wcześniej. Zwraca (numery, liczba stron)."""
+    out, page = [], 1
+    while page <= max_pages:
+        try:
+            html = get(search_url(region_slug, page))
+        except FetchError:
+            break
+        items, _, archived = parse_search_page_full(html)
+        if not items and not archived:
+            break
+        out.extend(archived)
+        if page % 50 == 0:
+            log.info("nieruchomosci-online: archiwum, strona %d, archiwalnych do tej pory %d", page, len(out))
+        page += 1
+    return out, page - 1
 
 
 def check(region_slug: str = "dolnoslaskie", details: int = 3) -> int:

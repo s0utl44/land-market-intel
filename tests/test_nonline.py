@@ -134,3 +134,24 @@ def test_archived_offer_is_not_counted():
               communes={"16.826552,51.142864": "0\n026401_1|Wrocław"})
     rows, stats = nonline.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
     assert [r["source_listing_id"] for r in rows] == ["2670001"] and stats.skipped_archived == 1
+
+
+def test_archived_offers_are_skipped_on_list_and_end_listing():
+    archived = [dict(offer(i), availability="https://schema.org/OutOfStock") for i in (5, 6)]
+    items, _, arch = nonline.parse_search_page_full(search_page([offer(1), archived[0]]))
+    assert [i.ad_id for i in items] == ["2670001"] and arch == ["2670005"]
+    web = Web(pages=[search_page([offer(1), archived[0]], pages=(2, 3)), search_page(archived, pages=(1, 3)),
+                     search_page([offer(3)], pages=(2,))],
+              details={"2670001": detail_page()}, communes={"16.826552,51.142864": "0\n026401_1|Wrocław"})
+    rows, stats = nonline.scrape(web.get, otodom.MemoryCache(), date(2026, 10, 17))
+    assert stats.pages == 2 and stats.skipped_archived == 3       # strona z samym archiwum kończy listę
+    assert sorted(set(stats.archived_ids)) == ["2670005", "2670006"]
+    assert [r["source_listing_id"] for r in rows] == ["2670001"]
+
+
+def test_archived_ids_walks_whole_list():
+    archived = [dict(offer(i), availability="https://schema.org/OutOfStock") for i in (5, 6)]
+    web = Web(pages=[search_page([offer(1)], pages=(2,)), search_page(archived, pages=(3,)),
+                     search_page([], pages=())], details={}, communes={})
+    ids, pages = nonline.archived_ids(web.get)
+    assert sorted(ids) == ["2670005", "2670006"] and pages == 2

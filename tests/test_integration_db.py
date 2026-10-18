@@ -268,3 +268,18 @@ def test_unapproved_default_source_is_skipped(pg_conn, tmp_path, monkeypatch):
     assert run_daily(pg_conn, tmp_path, client=_FakeClient(make_web())) == 0
     # wywołany wprost nadal zgłasza brak zatwierdzenia
     assert run_daily(pg_conn, tmp_path, sources=("nieruchomosci-online",), client=_FakeClient(make_web())) == 2
+
+
+@pytest.mark.integration
+def test_excluded_listings_are_left_out_of_dedup(pg_conn, synthetic_data):
+    from lmi import db as _db
+
+    for src in ("portal_a",):
+        _db.add_source(pg_conn, src, src)
+        _db.approve_source(pg_conn, src, "test", "pytest")
+        _db.import_csv(pg_conn, src, synthetic_data["paths"][src])
+    before = {l.source_listing_id for l in _db.run_dedup(pg_conn)[1]}
+    victim = sorted(before)[0]
+    assert _db.exclude_listings(pg_conn, "portal_a", [victim, victim], "archiwalne") == 1
+    after = {l.source_listing_id for l in _db.run_dedup(pg_conn)[1]}
+    assert victim not in after and len(after) == len(before) - 1

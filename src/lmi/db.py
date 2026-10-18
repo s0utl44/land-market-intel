@@ -142,7 +142,10 @@ OBS_COLUMNS = ("source_id", "source_listing_id", "observed_at", "municipality_te
 
 
 def load_observations(conn) -> pd.DataFrame:
-    cur = conn.execute(f"SELECT {', '.join(OBS_COLUMNS)} FROM core.listing_observations")
+    # bez ogłoszeń wyłączonych z analizy (archiwalne itp.): nie trafiają do deduplikacji ani metryk
+    cur = conn.execute(f"""SELECT {', '.join('o.' + c for c in OBS_COLUMNS)} FROM core.listing_observations o
+                           WHERE NOT EXISTS (SELECT 1 FROM scrape.excluded_listings x
+                                             WHERE x.source_id = o.source_id AND x.source_listing_id = o.source_listing_id)""")
     df = pd.DataFrame(cur.fetchall(), columns=list(OBS_COLUMNS))
     for col in ("lat", "lon", "area_m2", "price_pln"):
         df[col] = pd.to_numeric(df[col])
@@ -213,3 +216,16 @@ def run_metrics(conn, run_id: int | None = None) -> tuple[pd.DataFrame, pd.DataF
                 rows(scores),
             )
     return weekly, scores
+
+
+def exclude_listings(conn, source_id: str, listing_ids, reason: str) -> int:
+    """Wyłącza ogłoszenia z analizy (np. archiwalne). Zwraca liczbę nowo wyłączonych."""
+    ids = sorted(set(listing_ids))
+    if not ids:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany("""INSERT INTO scrape.excluded_listings (source_id, source_listing_id, reason)
+                           VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""", [(source_id, i, reason) for i in ids])
+        n = cur.rowcount
+    conn.commit()
+    return n

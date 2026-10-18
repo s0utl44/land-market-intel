@@ -325,6 +325,7 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
 
         if detail.get("archived"):
             stats.skipped_archived += 1
+            stats.archived_ids.append(it.ad_id)
             continue
         price = it.price_pln or detail.get("price_pln")
         if price is None:

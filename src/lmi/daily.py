@@ -48,7 +48,8 @@ def _log_run(conn, source, started, status, rows=None, stats=None, message=None)
     conn.execute(
         """INSERT INTO scrape.runs (source_id, started_at, status, rows_written, stats, message)
            VALUES (%s, %s, %s, %s, %s, %s)""",
-        (source, started, status, rows, json.dumps(asdict(stats)) if stats else None, message),
+        (source, started, status, rows,
+         json.dumps({k: v for k, v in asdict(stats).items() if k != "archived_ids"}) if stats else None, message),
     )
     conn.commit()
 
@@ -247,6 +248,9 @@ def _run_source(conn, source, out_dir, max_details, region_slug, teryt_prefix, c
         print(f"{name}: ZMIANA STRUKTURY STRONY: {exc}. Parser wymaga poprawki.")
         return 4, False
 
+    if stats.archived_ids:
+        n = db.exclude_listings(conn, source, stats.archived_ids, "archiwalne")
+        print(f"{name}: ogłoszeń archiwalnych {len(set(stats.archived_ids))} (nowo wyłączonych z analizy: {n})")
     print(f"{name}: {stats.pages} stron, {stats.unique_ads} ogłoszeń, {stats.rows} wierszy "
           f"(nowe szczegóły {stats.details_fetched}, odłożone {stats.details_deferred}, "
           f"bez ceny {stats.skipped_no_price}, bez lokalizacji {stats.skipped_no_location}, "

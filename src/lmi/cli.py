@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("dedup", help="uruchom deduplikację")
     sub.add_parser("metrics", help="przelicz metryki (mart.*)")
     sub.add_parser("refresh-page", help="przelicz od razu gotowe dane strony (Co się zmieniło, transakcje RCN)")
+    sub.add_parser("nonline-archived", help="jednorazowo: wyłącz z analizy archiwalne ogłoszenia Nieruchomości-online")
     sub.add_parser("dedup-review", help="raport jakości ostatniej deduplikacji z linkami (możliwe duplikaty, błędy)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
@@ -142,6 +143,20 @@ def main(argv: list[str] | None = None) -> int:
                 run_id, links = db.run_dedup(conn)
                 print(f"Dedup run {run_id}: {len(links)} ogłoszeń -> "
                       f"{len({l.property_key for l in links})} nieruchomości")
+            elif args.cmd == "nonline-archived":
+                from . import jobs, web
+                from .scrapers import nonline
+                from .scrapers.http import PoliteClient
+
+                with jobs.tracked(conn, "nonline-archived", "lista archiwalnych ogłoszeń") as job:
+                    ids, pages = nonline.archived_ids(PoliteClient().get)
+                    n = db.exclude_listings(conn, "nieruchomosci-online", ids, "archiwalne")
+                    run_id, links = db.run_dedup(conn)
+                    db.run_metrics(conn, run_id)
+                    web.refresh_changes(conn)
+                    job.finish("ok", f"{pages} stron, archiwalnych {len(set(ids))}, nowo wyłączonych {n}")
+                print(f"Nieruchomości-online: {pages} stron listy, archiwalnych {len(set(ids))}, nowo wyłączonych {n}. "
+                      f"Deduplikacja: {len(links)} ogłoszeń -> {len({l.property_key for l in links})} działek.")
             elif args.cmd == "dedup-review":
                 from . import dedup
 
