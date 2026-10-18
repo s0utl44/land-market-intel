@@ -238,6 +238,10 @@ dialog#fb-dialog{border:1px solid var(--line-2);border-radius:12px;background:va
 dialog#fb-dialog::backdrop{background:rgb(15 20 27 / .55)}
 #fb-form{display:flex;flex-direction:column;gap:12px}
 #fb-form label{display:flex;flex-direction:column;gap:4px}
+.fb-problem{border:1px solid var(--line-2);border-radius:8px;padding:8px 12px;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.fb-problem legend{padding:0 4px}
+.fb-problem label{flex-direction:row!important;align-items:center;gap:6px!important;font-size:.88rem;cursor:pointer}
+@media (max-width:560px){.fb-problem{grid-template-columns:1fr}}
 #fb-form textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:8px 10px;font:inherit;font-size:.92rem;resize:vertical}
 .fb-hint,.fb-ctx{margin:0;color:var(--muted);font-size:.84rem}
 .fb-actions{display:flex;justify-content:flex-end;gap:8px}
@@ -465,7 +469,15 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
     <h2 id="fb-title">Zgłoś uwagę</h2>
     <p class="fb-hint">Opisz, co jest nie tak albo co poprawić. Zaznaczone obszary dołączymy do zgłoszenia.</p>
     <div><span class="label">Zaznaczone obszary</span><ul class="fb-areas" id="fb-areas"></ul></div>
-    <label><span class="label">Rodzaj</span>
+    <fieldset class="fb-problem" id="fb-problem" hidden><legend class="label">Co jest nie tak z tą ofertą?</legend>
+      <label><input type="radio" name="fb-pr" value="nieaktualna / archiwalna"> nieaktualna lub archiwalna</label>
+      <label><input type="radio" name="fb-pr" value="duplikat innej oferty (niepołączony)"> duplikat innej oferty</label>
+      <label><input type="radio" name="fb-pr" value="błędnie połączona z inną działką"> błędnie połączona z inną działką</label>
+      <label><input type="radio" name="fb-pr" value="zła gmina lub lokalizacja"> zła gmina lub lokalizacja</label>
+      <label><input type="radio" name="fb-pr" value="zły typ, metraż albo cena"> zły typ, metraż albo cena</label>
+      <label><input type="radio" name="fb-pr" value="inne" checked> inne</label>
+    </fieldset>
+    <label id="fb-kind-wrap"><span class="label">Rodzaj</span>
       <select id="fb-kind"><option>błąd</option><option>poprawka danych</option><option>pomysł</option></select></label>
     <label><span class="label">Opis</span>
       <textarea id="fb-body" required minlength="3" maxlength="4000" rows="6" placeholder="Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”"></textarea></label>
@@ -804,7 +816,7 @@ const who=e=>esc(String(e||'').split('@')[0]);  // login albo część e-maila p
 function teamCell(r){
   const users=r.fav_users||[], others=users.filter(u=>u!==ME.user);
   const names=users.map(who).join(', ');
-  return `<button type="button" class="star${r.fav?' on':''}" data-act="fav" aria-pressed="${!!r.fav}" title="${r.fav?'Usuń z moich ulubionych':'Dodaj do moich ulubionych'}${names?' · oznaczyli: '+names:''}">${r.fav?'★':'☆'}</button>${others.length?`<span class="cnt" title="Oznaczyli też: ${others.map(who).join(', ')}">+${others.length}</span>`:''}<button type="button" class="cmb${r.comments?' has':''}" data-act="cm" aria-expanded="false" title="Komentarze zespołu">${ICON_CM}${r.comments?r.comments:''}</button>`}
+  return `<button type="button" class="star${r.fav?' on':''}" data-act="fav" aria-pressed="${!!r.fav}" title="${r.fav?'Usuń z moich ulubionych':'Dodaj do moich ulubionych'}${names?' · oznaczyli: '+names:''}">${r.fav?'★':'☆'}</button>${others.length?`<span class="cnt" title="Oznaczyli też: ${others.map(who).join(', ')}">+${others.length}</span>`:''}<button type="button" class="cmb${r.comments?' has':''}" data-act="cm" aria-expanded="false" title="Komentarze zespołu">${ICON_CM}${r.comments?r.comments:''}</button><button type="button" class="cmb flag" data-act="flag" title="Zgłoś problem z tą ofertą (nieaktualna, duplikat, zła gmina…)">⚑</button>`}
 const PNAME={dimensions:'wymiary',location:'położenie',building_types:'zabudowa',plot_type:'rodzaj',terrain_type:'teren'};
 function featLine(f){
   if(!f)return '';
@@ -888,7 +900,7 @@ async function toggleComments(tr,btn){
 function teamClicks(tbody){
   tbody.addEventListener('click',ev=>{
     const b=ev.target.closest('button[data-act]'); if(!b)return;
-    const tr=b.closest('tr'); b.dataset.act==='fav'?toggleFav(tr):toggleComments(tr,b)});
+    const tr=b.closest('tr'); b.dataset.act==='fav'?toggleFav(tr):b.dataset.act==='flag'?reportOffer(tr):toggleComments(tr,b)});
 }
 async function loadFavs(){
   const body=$('#favs-body');
@@ -975,9 +987,22 @@ function renderAreas(){
 }
 $('#fb-areas').addEventListener('click',ev=>{const i=ev.target.dataset&&ev.target.dataset.rm; if(i==null)return;
   PICK[+i].el.classList.remove('pick-sel'); PICK.splice(+i,1); renderAreas();});
+let REPORT=null;   // zgłoszenie konkretnej oferty (przycisk ⚑ w wierszu)
+function reportOffer(tr){
+  const r=ROWS[tr.dataset.id]; if(!r)return;
+  if(picking)pickStop(false);
+  PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[{el:tr,text:describe(tr)}]; tr.classList.add('pick-sel');
+  REPORT=r; $('#fb-kind').value='poprawka danych';
+  openFbDialog();
+}
 function openFbDialog(){
   pickStop(true); renderAreas(); const c=fbContext(); $('#fb-msg').textContent=''; $('#fb-send').disabled=false;
-  $('#fb-ctx').textContent=`Dołączymy też: ${c.widok}${c.gmina?' · '+c.gmina:''}.`;
+  $('#fb-ctx').textContent=`Dołączymy też: ${c.widok}${c.gmina?' · '+c.gmina:''}${REPORT?' · linki do wszystkich ogłoszeń tej działki':''}.`;
+  $('#fb-problem').hidden=!REPORT; $('#fb-kind-wrap').hidden=!!REPORT; $('#fb-back').hidden=!!REPORT;
+  $('#fb-title').textContent=REPORT?'Zgłoś problem z ofertą':'Zgłoś uwagę';
+  $('#fb-body').required=!REPORT;
+  $('.fb-hint').textContent=REPORT?'Wybierz, co jest nie tak. Opis jest opcjonalny, np. z którą ofertą to duplikat albo jaka powinna być gmina.':'Opisz, co jest nie tak albo co poprawić. Zaznaczone obszary dołączymy do zgłoszenia.';
+  $('#fb-body').placeholder=REPORT?'Opcjonalnie: szczegóły, np. link do oferty, z którą to duplikat':'Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”';
   $('#fb-dialog').showModal(); $('#fb-body').focus();
 }
 $('#fb-btn').addEventListener('click',ev=>{ev.stopPropagation(); if(picking){pickStop(false);return} PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[]; pickStart()});
@@ -985,13 +1010,17 @@ $('#pick-cancel').addEventListener('click',()=>pickStop(false));
 $('#pick-skip').addEventListener('click',()=>{PICK.forEach(p=>p.el.classList.remove('pick-sel'));PICK=[];openFbDialog()});
 $('#pick-next').addEventListener('click',openFbDialog);
 $('#fb-back').addEventListener('click',()=>{$('#fb-dialog').close();pickStart();PICK.forEach(p=>p.el.classList.add('pick-sel'))});
-$('#fb-dialog').addEventListener('close',()=>{if(!picking){PICK.forEach(p=>p.el.classList.remove('pick-sel'))}});
+$('#fb-dialog').addEventListener('close',()=>{if(!picking){PICK.forEach(p=>p.el.classList.remove('pick-sel'))}REPORT=null});
 $('#fb-cancel').addEventListener('click',()=>{$('#fb-dialog').close();PICK=[]});
 $('#fb-form').addEventListener('submit',async ev=>{
-  ev.preventDefault(); const body=$('#fb-body').value.trim(); if(body.length<3)return;
+  ev.preventDefault();
+  const problem=REPORT?(document.querySelector('input[name="fb-pr"]:checked')||{}).value:null;
+  let body=$('#fb-body').value.trim(); if(REPORT&&body.length<3)body=`Oferta: ${problem}`; if(body.length<3)return;
   $('#fb-send').disabled=true; $('#fb-msg').textContent='Wysyłanie…';
   try{
-    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | ')}});
+    const extra=REPORT?{problem,dzialka:REPORT.id,ogloszenia:(REPORT.offers||[{url:REPORT.url}]).map(o=>o.url).filter(Boolean).join(' | '),
+      gmina:REPORT.municipality||fbContext().gmina,teryt:REPORT.teryt||fbContext().teryt}:{};
+    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | '),...extra}});
     $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value=''; PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[];
     setTimeout(()=>$('#fb-dialog').close(),1400); if(ME.is_admin&&!$('#fbl').hidden)loadFbl();
   }catch(e){$('#fb-msg').textContent='Nie udało się wysłać. Spróbuj ponownie.';$('#fb-send').disabled=false}
@@ -1001,7 +1030,7 @@ async function loadFbl(){
   let rows; try{rows=await api('/api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
   $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
   list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
-    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div><p>${esc(r.body)}</p>${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
+    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div>${r.context&&r.context.problem?`<div><span class="pill warn">${esc(r.context.problem)}</span></div>`:''}<p>${esc(r.body)}</p>${r.context&&r.context.ogloszenia?`<div class="meta">${r.context.ogloszenia.split(' | ').map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,'').slice(0,60))}</a>`).join(' · ')}</div>`:''}${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
     <div><button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
 }
 $('#fbl-list').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-fb]');if(!b)return;

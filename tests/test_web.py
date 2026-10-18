@@ -364,3 +364,13 @@ def test_offer_links_freshest_listing_and_lowest_price(client, pg_conn, tmp_path
     assert o["url"] == "https://gratka.example/1" and o["source"] == "gratka"   # podbita najpóźniej
     assert float(o["price"]) == 88000 and len(o["offers"]) == 2
     assert {x["source"] for x in o["offers"]} == {"otodom", "gratka"}
+
+
+def test_offer_report_keeps_problem_and_links(client, monkeypatch):
+    monkeypatch.setenv("LMI_ADMINS", "x")
+    r = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: nieaktualna / archiwalna",
+                                             "context": {"problem": "nieaktualna / archiwalna", "dzialka": "P-abc",
+                                                         "ogloszenia": "https://a.example/1 | https://b.example/2"}})
+    assert r.status_code == 200
+    txt = client.get("/api/feedback/export", headers={"X-Auth-Request-User": "x"}).text
+    assert "Problem z ofertą: nieaktualna / archiwalna" in txt and "ogłoszenie: https://b.example/2" in txt

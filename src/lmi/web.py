@@ -746,8 +746,9 @@ def feedback_add(request: Request, kind: str = Body(...), body: str = Body(...),
     if not 3 <= len(body) <= 4000:
         raise HTTPException(400, "opis: od 3 do 4000 znaków")
     # kontekst tylko z dozwolonych, krótkich pól (bez dowolnych danych z przeglądarki)
-    ctx = {k: str(v)[:1500 if k == "obszary" else 300] for k, v in (context or {}).items()
-           if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta", "obszary")
+    ctx = {k: str(v)[:1500 if k in ("obszary", "ogloszenia") else 300] for k, v in (context or {}).items()
+           if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta", "obszary",
+                    "problem", "dzialka", "ogloszenia")
            and v not in (None, "")}
     import json as _json
     with _conn() as conn:
@@ -770,11 +771,17 @@ def feedback_text(rows: list[dict]) -> str:
     for r in rows:
         c = dict(r["context"] or {})
         areas = c.pop("obszary", None)
+        links = c.pop("ogloszenia", None)
+        problem = c.pop("problem", None)
         c.pop("przegladarka", None)
         ctx = ", ".join(f"{k}: {v}" for k, v in c.items())
         when = r["created_at"].strftime("%Y-%m-%d %H:%M") if hasattr(r["created_at"], "strftime") else r["created_at"]
         out.append(f"#{r['id']} [{r['kind']}] {when} · {r['author']}" + (f" · {r['status']}" if r["status"] != "nowe" else ""))
+        if problem:
+            out.append(f"Problem z ofertą: {problem}")
         out.append(r["body"])
+        if links:
+            out.extend(f"  ogłoszenie: {u.strip()}" for u in links.split(" | "))
         if areas:
             out.extend(f"  - {a.strip()}" for a in areas.split(" | "))
         if ctx:
