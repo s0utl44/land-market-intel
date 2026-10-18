@@ -345,3 +345,22 @@ def test_changes_show_only_complete_days(client, pg_conn, tmp_path):
     after = client.get("/api/changes", params={"days": 1}).json()
     assert after["last_day"] == before["last_day"] == "2026-06-29"          # nie pół dnia
     assert after["daily"][-1]["active"] >= before["daily"][-1]["active"]   # liczba ofert nie spada w trakcie
+
+
+def test_offer_links_freshest_listing_and_lowest_price(client, pg_conn, tmp_path):
+    for src, price, pushed in (("otodom", 99000, ""), ("gratka", 88000, "2026-06-28")):
+        f = tmp_path / f"{src}.csv"
+        f.write_text("source_listing_id,observed_at,municipality_teryt,municipality_name,area_m2,price_pln,parcel_id,"
+                     "url,pushed_up_at\n"
+                     f"{src}1,2026-06-29,9900011,Syntetyczna Rozwojowa,842,{price},990001_1.0001.842,"
+                     f"https://{src}.example/1,{pushed}\n")
+        db.add_source(pg_conn, src, src)
+        db.approve_source(pg_conn, src, "test", "pytest")
+        db.import_csv(pg_conn, src, f)
+    db.run_dedup(pg_conn)
+    pg_conn.commit()
+    rows = client.get("/api/municipality/9900011/offers", params={"min_area": 842, "max_area": 842}).json()
+    o = next(r for r in rows if r["portals"] == 2)
+    assert o["url"] == "https://gratka.example/1" and o["source"] == "gratka"   # podbita najpóźniej
+    assert float(o["price"]) == 88000 and len(o["offers"]) == 2
+    assert {x["source"] for x in o["offers"]} == {"otodom", "gratka"}

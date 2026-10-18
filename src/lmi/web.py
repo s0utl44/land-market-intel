@@ -494,10 +494,10 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
                    min(observed_at) AS first_seen, max(observed_at) AS last_seen,
                    count(DISTINCT source_id) AS portals,
                    (array_agg(price_pln ORDER BY observed_at))[1]       AS first_price,
-                   (array_agg(price_pln ORDER BY observed_at DESC))[1]  AS price,
+                   (array_agg(price_pln ORDER BY observed_at DESC))[1]  AS price_obs,
                    (array_agg(area_m2 ORDER BY observed_at DESC))[1]    AS area,
                    (array_agg(land_use ORDER BY observed_at DESC))[1]   AS land_use,
-                   (array_agg(url ORDER BY observed_at DESC))[1]        AS url,
+                   (array_agg(url ORDER BY observed_at DESC))[1]        AS url_obs,
                    bool_or(lat IS NOT NULL)                             AS precise,
                    bool_or(in_latest)                                   AS active,
                    min(listed_at)                                       AS listed_at,
@@ -506,13 +506,45 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
                         FILTER (WHERE source_id = 'otodom'))[1]          AS otodom_id,
                    (array_agg(source_listing_id ORDER BY observed_at DESC)
                         FILTER (WHERE source_id = 'gratka'))[1]          AS gratka_id,
-                   (array_agg(source_id ORDER BY observed_at DESC, source_id))[1]          AS source,
-                   (array_agg(source_listing_id ORDER BY observed_at DESC, source_id))[1]  AS source_listing_id,
+                   (array_agg(source_id ORDER BY observed_at DESC, source_id))[1]          AS source_obs,
+                   (array_agg(source_listing_id ORDER BY observed_at DESC, source_id))[1]  AS source_listing_id_obs,
                    array_agg(DISTINCT source_id)                         AS sources,
                    array_agg(DISTINCT source_id || ':' || source_listing_id) AS listing_keys,
                    (array_agg(municipality_name ORDER BY observed_at DESC))[1] AS municipality,
                    (array_agg(municipality_teryt ORDER BY observed_at DESC))[1] AS teryt
             FROM o GROUP BY property_key
+        ),
+        -- poszczególne ogłoszenia działki: aktywne? ostatnia cena, link, data ostatniej aktualizacji w portalu
+        lst AS (
+            SELECT o.source_id, o.source_listing_id, o.property_key, bool_or(o.in_latest) AS active,
+                   (array_agg(o.price_pln ORDER BY o.observed_at DESC))[1] AS last_price,
+                   (array_agg(o.url ORDER BY o.observed_at DESC))[1] AS url,
+                   max(o.observed_at) AS last_seen,
+                   greatest(max(o.pushed_up_at), min(o.listed_at),
+                            max((coalesce(od.detail, pd.detail)->'features'->>'updated_at')::date)) AS refreshed
+            FROM o
+            LEFT JOIN scrape.otodom_details od ON o.source_id = 'otodom' AND od.ad_id = o.source_listing_id
+            LEFT JOIN scrape.portal_details pd ON pd.source_id = o.source_id AND pd.ad_id = o.source_listing_id
+            GROUP BY 1, 2, 3
+        ),
+        -- link do ogłoszenia najświeższego (aktywne, ostatnio aktualizowane/podbite/wystawione); cena: najniższa aktywna
+        rep AS (
+            SELECT DISTINCT ON (property_key) property_key, source_id AS rep_source, source_listing_id AS rep_id,
+                   url AS rep_url
+            FROM lst ORDER BY property_key, active DESC, refreshed DESC NULLS LAST, last_seen DESC, source_id
+        ),
+        offs AS (
+            SELECT property_key, min(last_price) FILTER (WHERE active) AS min_active_price,
+                   json_agg(json_build_object('source', source_id, 'url', url, 'price', last_price, 'active', active,
+                                              'refreshed', refreshed)
+                            ORDER BY active DESC, refreshed DESC NULLS LAST, last_price) AS offers
+            FROM lst GROUP BY 1
+        ),
+        p2 AS (
+            SELECT p.*, coalesce(offs.min_active_price, p.price_obs) AS price, offs.offers,
+                   coalesce(rep.rep_url, p.url_obs) AS url, coalesce(rep.rep_source, p.source_obs) AS source,
+                   coalesce(rep.rep_id, p.source_listing_id_obs) AS source_listing_id
+            FROM p LEFT JOIN rep USING (property_key) LEFT JOIN offs USING (property_key)
         ),
         -- historia ceny: dni, w których cena (najniższa z portali) się zmieniła
         daily AS (
@@ -557,7 +589,7 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
                    round((price / coalesce(oh.hist_first_price, first_price) - 1) * 100, 1) AS price_change,
                    least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS start_date,
                    last_seen - least(first_seen, coalesce(listed_at, oh.hist_published, first_seen)) AS age_days
-            FROM p LEFT JOIN changes c USING (property_key) LEFT JOIN oh USING (property_key)
+            FROM p2 p LEFT JOIN changes c USING (property_key) LEFT JOIN oh USING (property_key)
                    LEFT JOIN gv USING (property_key)
                    LEFT JOIN scrape.portal_details pd
                           ON pd.source_id = p.source AND pd.ad_id = p.source_listing_id
@@ -565,7 +597,7 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
         SELECT property_key AS id, price, area, ppm2, land_use, url, portals, precise, source, sources,
                first_seen, listed_at, pushed_up_at, start_date, age_days, price_change, history,
                otodom_history, views, views_source, views_per_day, saved, relists, land_use_source,
-               active, municipality, teryt, listing_keys, features_raw,
+               active, municipality, teryt, listing_keys, features_raw, offers,
                -- zespół: ulubione (moje / ile osób, kto) i liczba komentarzy do tej działki
                EXISTS (SELECT 1 FROM app.favorites fv WHERE fv.user_email = %(me)s
                          AND fv.source_id || ':' || fv.source_listing_id = ANY(listing_keys)) AS fav,

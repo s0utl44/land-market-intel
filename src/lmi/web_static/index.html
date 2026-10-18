@@ -177,6 +177,8 @@ th.l,td.l{text-align:left}
 .sub2.feat{max-width:260px;white-space:normal}
 td.two-line{white-space:normal;min-width:110px}
 td.wide{min-width:200px}
+.others a{color:var(--muted);text-decoration:none;white-space:nowrap} .others a:hover{color:var(--gold-ink)}
+.others a.inactive{text-decoration:line-through}
 .layout th,.layout td{padding:8px 7px}
 .layout .score{grid-template-columns:auto}
 .layout .sbar{display:none}
@@ -447,7 +449,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       </div>
       <div class="more" id="offers-more"></div>
     </div>
-    <p class="ar" style="margin:8px 0 0">Ta sama działka z kilku portali liczy się raz. „Na rynku” liczymy od wystawienia w portalu; „≥” to oferta sprzed zbierania tej daty. Najedź na cenę, żeby zobaczyć historię.</p>
+    <p class="ar" style="margin:8px 0 0">Ta sama działka z kilku portali liczy się raz: link prowadzi do najświeższego ogłoszenia, cena to najniższa aktualna, a pod linkiem są pozostałe portale z cenami. „Na rynku” liczymy od wystawienia w portalu; „≥” to oferta sprzed zbierania tej daty. Najedź na cenę, żeby zobaczyć historię.</p>
     </div>
   </section>
   </div>
@@ -831,14 +833,16 @@ function offerRow(r,opts={}){
       :(ownHist.length>1?'Zmiany widziane przez Radar:\n'+ownHist.map(h=>`${dFull(h.date)}: ${nf(h.price)} zł`).join('\n'):'');
     ROWS[r.id]=r;
     const cut=r.price_change<=-1?` · <b class="down" style="color:var(--bad)">▼ ${nf(-r.price_change,1)}%</b>`:r.price_change>=1?` · ▲ ${nf(r.price_change,1)}%`:'';
-    const more=(r.portals||0)>1?` <span class="ar" title="${esc((r.sources||[]).map(x=>SRC[x]||x).join(', '))}">+${r.portals-1}</span>`:'';
+    // pozostałe ogłoszenia tej działki (inne portale / kopie): portal i cena, najświeższe pierwsze
+    const others=(r.offers||[]).filter(x=>x.url!==r.url);
+    const more=others.length?`<span class="sub2 others">${others.slice(0,3).map(x=>`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${x.active?'aktywne':'nieaktywne'}${x.refreshed?', aktualizacja '+dFull(x.refreshed):''}"${x.active?'':' class="inactive"'}>${esc(SRC[x.source]||x.source)} ${nf(x.price)}</a>`).join(' · ')}${others.length>3?` · +${others.length-3}`:''}</span>`:'';
     return `<tr data-id="${esc(r.id)}">
     <td class="l team">${teamCell(r)}</td>
     <td class="l two-line wide"><b>${esc(r.land_use||'działka')}</b>${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Portal nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''} · <span title="${nf(r.area/100,1)} ar">${nf(r.area)} m²</span>${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}${opts.gmina?`<span class="sub2">${esc(r.municipality||'–')}</span>`:''}${featLine(r.features)}</td>
     <td class="two-line" title="${esc(histTxt)}">${nf(r.price)} zł<span class="sub2"><b>${nf(r.ppm2)}</b> zł/m²${cut}</span></td>
     <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
     <td class="two-line" title="${r.views!=null?`Licznik z portalu ${SRC[r.views_source]||r.views_source}`+(r.views_per_day!=null?'; tempo: przyrost między pomiarami albo średnia od wystawienia':''):''}">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${r.views_per_day!=null?nf(r.views_per_day,r.views_per_day<10?1:0)+'/dzień':''}${r.saved!=null?(r.views_per_day!=null?' · ':'')+nf(r.saved)+' '+(r.saved===1?'zapis':'zapisów'):''}</span>`:'<span class="na">–</span>'}</td>
-    <td class="l">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}${more}</td></tr>`}
+    <td class="l two-line">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" title="najświeższe ogłoszenie tej działki">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}${more}</td></tr>`}
 async function send(u,body,method='POST'){
   const r=await fetch(u,{method,headers:{'Content-Type':'application/json',Accept:'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined});
   if(r.status===401||r.status===403){location.reload();throw new Error('sesja wygasła')}
