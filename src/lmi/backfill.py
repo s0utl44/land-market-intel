@@ -20,7 +20,7 @@ PARSERS = {"gratka": gratka.parse_detail_page, "nieruchomosci-online": nonline.p
 FEATURES_V = 2   # wersja odczytu parametrów; oferty z niższą wersją pobieramy ponownie
 
 
-def pending(conn, source: str) -> list[tuple[str, str]]:
+def pending(conn, source: str, redo: bool = False) -> list[tuple[str, str]]:
     """Aktywne oferty portalu (widziane w jego ostatnim pobraniu) bez aktualnych parametrów: [(ad_id, url)]."""
     return conn.execute(
         """SELECT o.source_listing_id, o.url
@@ -28,17 +28,18 @@ def pending(conn, source: str) -> list[tuple[str, str]]:
            JOIN scrape.portal_details d ON d.source_id = o.source_id AND d.ad_id = o.source_listing_id
            WHERE o.source_id = %(s)s AND o.url IS NOT NULL
              AND o.observed_at = (SELECT max(observed_at) FROM core.listing_observations WHERE source_id = %(s)s)
-             AND coalesce((d.detail->'features'->>'v')::int, 0) < %(v)s
+             AND (%(redo)s OR coalesce((d.detail->'features'->>'v')::int, 0) < %(v)s)
              AND NOT EXISTS (SELECT 1 FROM scrape.excluded_listings x
                              WHERE x.source_id = o.source_id AND x.source_listing_id = o.source_listing_id)
-           ORDER BY o.source_listing_id""", {"s": source, "v": FEATURES_V}).fetchall()
+           ORDER BY o.source_listing_id""", {"s": source, "v": FEATURES_V, "redo": redo}).fetchall()
 
 
-def run(conn, source: str, get, limit: int | None = None) -> dict:
+def run(conn, source: str, get, limit: int | None = None, redo: bool = False) -> dict:
     """Pobiera ponownie strony ofert z `pending` i zapisuje nowe parametry. Zwraca liczniki."""
     parse = PARSERS[source]
     cache = PgCache(conn, source)
-    todo = pending(conn, source)[:limit] if limit else pending(conn, source)
+    todo = pending(conn, source, redo)
+    todo = todo[:limit] if limit else todo
     stats = {"pending": len(todo), "done": 0, "failed": 0, "archived": 0, "private": 0, "agency": 0}
     archived_ids = []
     for ad_id, url in todo:

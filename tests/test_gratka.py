@@ -146,3 +146,8 @@ def test_owner_type_sets_seller():
     assert f["seller"] == "prywatny" and f["params"]["ownerType"] == "user"
     assert gratka.parse_features({"offer": {"ownerType": "FIRM"}}, {}, "")["seller"] == "biuro"
     assert gratka.parse_features({"offer": {"ownerType": "xyz1"}}, {}, "")["seller"] is None   # nowy kod: surowy w params
+
+
+def test_owner_type_from_flat_nuxt_data():
+    html = '<script id="__NUXT_DATA__" type="application/json">[{"a": 1}, {"ownerType": 2}, "user"]</script>'
+    assert gratka.parse_features({}, {}, html)["seller"] == "prywatny"

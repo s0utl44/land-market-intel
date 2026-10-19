@@ -73,3 +73,26 @@ def find_first(obj, predicate, depth=0):
             if r is not None:
                 return r
     return None
+
+
+def raw_fields(html: str, key: str) -> list:
+    """Wartości pola `key` prosto z płaskiej tablicy (bez rozpakowywania całości): przydatne, gdy pole leży
+    głębiej, niż sięga `unflatten`. Zwraca tylko wartości proste (napisy, liczby, tak/nie)."""
+    m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    if not m:
+        return []
+    try:
+        raw = json.loads(m.group(1))
+    except ValueError:
+        return []
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw:
+        if isinstance(item, dict) and key in item:
+            v = item[key]
+            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < len(raw):
+                v = raw[v]
+            if isinstance(v, (str, int, float, bool)):
+                out.append(v)
+    return out

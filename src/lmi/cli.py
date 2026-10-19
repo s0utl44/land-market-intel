@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("backfill-features", help="jednorazowo: uzupełnij typ sprzedającego i parametry aktywnych ofert")
     s.add_argument("--source", required=True, choices=["gratka", "nieruchomosci-online", "adresowo"])
     s.add_argument("--limit", type=int, help="najwyżej tyle ofert (np. na próbę)")
+    s.add_argument("--redo", action="store_true", help="także oferty już uzupełnione (po poprawce odczytu)")
     sub.add_parser("dedup-review", help="raport jakości ostatniej deduplikacji z linkami (możliwe duplikaty, błędy)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
@@ -165,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
                 from .scrapers.http import PoliteClient
 
                 with jobs.tracked(conn, f"backfill-{args.source}", "uzupełnianie typu sprzedającego") as job:
-                    st = backfill.run(conn, args.source, PoliteClient().get, args.limit)
+                    st = backfill.run(conn, args.source, PoliteClient().get, args.limit, args.redo)
                     job.finish("ok", f"uzupełniono {st['done']} z {st['pending']}: prywatne {st['private']}, "
                                      f"biura {st['agency']}, archiwalne {st['archived']}, błędy {st['failed']}")
                 print(f"{args.source}: uzupełniono {st['done']} z {st['pending']} (prywatne {st['private']}, "

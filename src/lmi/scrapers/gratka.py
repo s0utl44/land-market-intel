@@ -17,7 +17,7 @@ from datetime import date, datetime
 
 from . import features, interest, uldk
 from .http import FetchError
-from .nuxt import find_first, nuxt_data
+from .nuxt import find_first, nuxt_data, raw_fields
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
 
 log = logging.getLogger(__name__)
@@ -201,7 +201,7 @@ OWNER_TYPES = {"user": "prywatny", "private": "prywatny", "priv": "prywatny", "o
                "developer": "deweloper", "dev": "deweloper"}
 
 
-def parse_features(nd, pd: dict, html: str) -> dict:  # noqa: ARG001 - html na przyszłe pola
+def parse_features(nd, pd: dict, html: str) -> dict:
     pairs = {k: v for k, v in _label_pairs(nd).items()
              if not re.search(r"numer ogłoszenia|liczba odsłon|^cena", k, re.I)}
     f = features.from_params(pairs)
@@ -210,8 +210,9 @@ def parse_features(nd, pd: dict, html: str) -> dict:  # noqa: ARG001 - html na p
     # typ ogłoszeniodawcy tylko z danych oferty: w menu strony są słowa "biuro", "deweloper" dla wszystkich ofert
     # Gratka: pole ownerType w danych oferty (krótki kod); surowy kod zapisujemy, żeby było widać nowe wartości
     owner = find_first(nd, lambda d: isinstance(d.get("ownerType"), str))
-    if owner is not None:
-        code = owner["ownerType"].strip()
+    codes = [owner["ownerType"]] if owner is not None else [v for v in raw_fields(html, "ownerType") if isinstance(v, str)]
+    if codes:
+        code = codes[0].strip()
         f["params"]["ownerType"] = code[:20]
         f["seller"] = OWNER_TYPES.get(code.lower(), f["seller"])
     if f["seller"] is None:
