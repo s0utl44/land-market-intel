@@ -141,20 +141,11 @@ def test_old_details_get_features_within_budget():
     assert sum("features" in cache.get_detail(i) for i in ("1", "2")) == 1
 
 
-def test_owner_type_sets_seller():
-    f = gratka.parse_features({"offer": {"ownerType": "user"}}, {}, "")
-    assert f["seller"] == "prywatny" and f["params"]["ownerType"] == "user"
-    assert gratka.parse_features({"offer": {"ownerType": "FIRM"}}, {}, "")["seller"] == "biuro"
-    assert gratka.parse_features({"offer": {"ownerType": "xyz1"}}, {}, "")["seller"] is None   # nowy kod: surowy w params
-
-
-def test_owner_type_from_flat_nuxt_data():
-    html = '<script id="__NUXT_DATA__" type="application/json">[{"a": 1}, {"ownerType": 2}, "user"]</script>'
-    assert gratka.parse_features({}, {}, html)["seller"] == "prywatny"
-
-
-def test_owner_type_behind_index_list():
-    # ownerType -> [3] -> 3 -> "agency" (wskaźnik w liście, jak na stronach Gratki)
+def test_seller_type_from_json_ld():
+    ld = lambda t: f'<script type="application/ld+json">{{"@type": "Product", "offers": {{"@type": "Offer", "price": 1, "seller": {{"@type": "{t}", "name": "X Sp. z o.o."}}}}}}</script>'
+    f = gratka.parse_features({}, {}, ld("Person"))
+    assert f["seller"] == "prywatny" and f["params"]["ogłoszeniodawca"] == "Person" and "Sp. z o.o." not in str(f)
+    assert gratka.parse_features({}, {}, ld("Organization"))["seller"] == "biuro"
+    # "ownerType" w danych Nuxt to filtr wyszukiwarki: nie wpływa na typ
     html = '<script id="__NUXT_DATA__" type="application/json">[{"a": 1}, {"ownerType": 2}, [3], "agency"]</script>'
-    f = gratka.parse_features({}, {}, html)
-    assert f["seller"] == "biuro" and f["params"]["ownerType"] == "agency"
+    assert gratka.parse_features({}, {}, html)["seller"] is None

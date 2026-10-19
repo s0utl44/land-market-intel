@@ -17,7 +17,7 @@ from datetime import date, datetime
 
 from . import features, interest, uldk
 from .http import FetchError
-from .nuxt import find_first, nuxt_data, raw_fields
+from .nuxt import find_first, nuxt_data
 from .otodom import LayoutChanged, ScrapeStats, classify_land_use
 
 log = logging.getLogger(__name__)
@@ -196,9 +196,27 @@ def _label_pairs(nd) -> dict:
     return out
 
 
-OWNER_TYPES = {"user": "prywatny", "private": "prywatny", "priv": "prywatny", "osoba": "prywatny", "person": "prywatny",
-               "firm": "biuro", "company": "biuro", "agency": "biuro", "agent": "biuro", "biuro": "biuro",
-               "developer": "deweloper", "dev": "deweloper"}
+SELLER_TYPES = {"Person": "prywatny", "Organization": "biuro", "RealEstateAgent": "biuro", "Corporation": "biuro",
+                "LocalBusiness": "biuro"}
+
+
+def _ld_seller_type(html: str) -> str | None:
+    for m in re.finditer(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.S):
+        try:
+            data = json.loads(m.group(1), strict=False)
+        except ValueError:
+            continue
+        for d in data if isinstance(data, list) else [data]:
+            if not isinstance(d, dict):
+                continue
+            for node in [d, d.get("offers")] + list(d.get("@graph") or []):
+                if isinstance(node, dict):
+                    seller = node.get("seller")
+                    if not isinstance(seller, dict) and isinstance(node.get("offers"), dict):
+                        seller = node["offers"].get("seller")
+                    if isinstance(seller, dict) and seller.get("@type"):
+                        return str(seller["@type"])
+    return None
 
 
 def parse_features(nd, pd: dict, html: str) -> dict:
@@ -209,14 +227,12 @@ def parse_features(nd, pd: dict, html: str) -> dict:
         f["updated_at"] = d.isoformat()
     # typ ogłoszeniodawcy tylko z danych oferty: w menu strony są słowa "biuro", "deweloper" dla wszystkich ofert
     # Gratka: pole ownerType w danych oferty (krótki kod); surowy kod zapisujemy, żeby było widać nowe wartości
-    owner = find_first(nd, lambda d: isinstance(d.get("ownerType"), str))
-    codes = [owner["ownerType"]] if owner is not None else [str(v) for v in raw_fields(html, "ownerType")]
-    if codes:
-        f["params"]["ownerType"] = ",".join(c.strip()[:20] for c in codes[:3])
-        for code in codes:
-            if (seller := OWNER_TYPES.get(code.strip().lower())):
-                f["seller"] = seller
-                break
+    # typ ogłoszeniodawcy z JSON-LD oferty: seller.@type = Organization (biuro/firma) albo Person (osoba
+    # prywatna). Uwaga: "ownerType" w danych Nuxt to pole filtra wyszukiwarki, a nie typ tej oferty.
+    kind = _ld_seller_type(html)
+    if kind:
+        f["params"]["ogłoszeniodawca"] = kind[:30]
+        f["seller"] = SELLER_TYPES.get(kind, f["seller"])
     if f["seller"] is None:
         seller = find_first(nd, lambda d: isinstance(d.get("isPrivate"), bool) or isinstance(d.get("isAgency"), bool))
         if seller is not None:
