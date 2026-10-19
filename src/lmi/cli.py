@@ -242,11 +242,16 @@ def main(argv: list[str] | None = None) -> int:
 
                 rcn.refresh_land(conn)
                 web.refresh_changes(conn)
-                print("Dane strony przeliczone (transakcje RCN i Co się zmieniło dla 1 / 7 / 30 dni).")
+                print("Dane strony przeliczone (transakcje RCN i Co się zmieniło dla 1 / 7 / 30 dni, każdy typ działek).")
             elif args.cmd == "metrics":
-                weekly, scores = db.run_metrics(conn)
-                print(f"Zapisano {len(weekly)} wierszy tygodniowych.\n")
-                print(scores.to_string(index=False))
+                db.run_metrics(conn)
+                print("Typ działek         gminy  wiersze tyg.  aktywne oferty (ost. tydzień)")
+                for r in conn.execute("""
+                        SELECT segment, count(DISTINCT municipality_teryt), count(*),
+                               coalesce(sum(active_supply) FILTER (WHERE week_start = (
+                                   SELECT max(week_start) FROM mart.weekly_region_metrics)), 0)
+                        FROM mart.weekly_region_metrics GROUP BY 1 ORDER BY 4 DESC"""):
+                    print(f"{r[0]:<18} {r[1]:>6} {r[2]:>13} {r[3]:>15}")
             elif args.cmd == "daily":
                 from .daily import run_daily
 
