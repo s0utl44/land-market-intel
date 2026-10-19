@@ -129,6 +129,12 @@ def test_offers_use_otodom_account_history(client, pg_conn, tmp_path):
     assert priv[0]["features"]["params"] == {"otodom": {"dimensions": "20x50"}}
     assert client.get("/api/municipality/9900011/offers", params={"media": "gaz"}).json() == []
     assert client.get("/api/municipality/9900011/offers", params={"seller": "x"}).status_code == 422
+    # ta sama działka pokazana gdzieś jako biuro: już nie "od właściciela"
+    pg_conn.execute("""UPDATE scrape.otodom_details SET detail = detail || '{"list_seller": "biuro"}' WHERE ad_id = '777'""")
+    pg_conn.commit()
+    assert client.get("/api/municipality/9900011/offers", params={"seller": "prywatny"}).json() == []
+    agency = client.get("/api/municipality/9900011/offers", params={"seller": "biuro"}).json()
+    assert [r["id"] for r in agency] == [o["id"]] and agency[0]["features"]["seller"] == "biuro"
 
 
 def test_overview_reports_failed_attempt(client, pg_conn):
@@ -301,7 +307,8 @@ def test_merge_features_across_portals():
         {"src": "gratka", "seller": "prywatny", "media": ["woda", "prąd"], "negotiable": True,
          "updated_at": "2026-10-05", "params": {"Media": "prąd, woda"}},
     ])
-    assert f["seller"] == "prywatny" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True   # któreś od właściciela
+    assert f["seller"] == "biuro" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True   # biuro wygrywa
+    assert merge_features([{"seller": "prywatny"}, {"seller": None}])["seller"] == "prywatny"
     assert f["updated_at"] == "2026-10-05" and set(f["params"]) == {"otodom", "gratka"}
 
 

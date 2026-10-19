@@ -542,8 +542,14 @@ def municipality_offers(
         where.append("age_days >= %(min_age)s")
         params["min_age"] = min_age_days
     if seller:
-        where.append("(features_raw @> jsonb_build_array(jsonb_build_object('seller', %(seller)s::text)) "
-                     "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', %(seller)s::text)))")
+        # jak merge_features: "od właściciela" tylko gdy żaden portal nie pokazuje przy działce biura ani dewelopera
+        has = ("(features_raw @> jsonb_build_array(jsonb_build_object('seller', {v}::text)) "
+               "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', {v}::text)))")
+        if seller == "prywatny":
+            where.append(f"{has.format(v='%(seller)s')} AND NOT {has.format(v=chr(39) + 'biuro' + chr(39))} "
+                         f"AND NOT {has.format(v=chr(39) + 'deweloper' + chr(39))}")
+        else:
+            where.append(has.format(v="%(seller)s"))
         params["seller"] = seller
     for i, m in enumerate((media or "").split("+") if media else []):
         where.append(f"features_raw @> jsonb_build_array(jsonb_build_object('media', jsonb_build_array(%(m{i})s::text)))")
@@ -709,17 +715,19 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
 
 
 def merge_features(parts: list[dict]) -> dict:
-    """Jedna działka, kilka portali: suma mediów i dróg, sprzedający z pierwszego portalu, który go podaje."""
+    """Jedna działka, kilka portali: suma mediów i dróg; sprzedający: biuro/deweloper, jeśli którykolwiek portal
+    tak go pokazuje, inaczej "prywatny", jeśli któryś tak podaje."""
     out = {"seller": None, "negotiable": None, "media": [], "access": [], "fence": None, "vicinity": [],
            "updated_at": None, "params": {}}
     for f in parts:
         if not isinstance(f, dict):
             continue
-        # jeśli którekolwiek ogłoszenie działki jest od właściciela, działka jest "prywatna" (do właściciela da się
-        # dotrzeć bezpośrednio, nawet gdy na innym portalu sprzedaje ją biuro)
-        seller = f.get("seller") or f.get("list_seller")
-        if seller == "prywatny" or out["seller"] is None:
-            out["seller"] = seller or out["seller"]
+        # biura i deweloperzy często wystawiają na Otodomie z konta prywatnego, a na innych portalach jako biuro
+        # (sprawdzone ręcznie): oznaczenie biura/dewelopera wygrywa z "prywatny"
+        rank = {None: 0, "prywatny": 1, "biuro": 2, "deweloper": 3}
+        for seller in (f.get("seller"), f.get("list_seller")):
+            if rank.get(seller, 0) > rank.get(out["seller"], 0):
+                out["seller"] = seller
         for k in ("media", "access", "vicinity"):
             out[k] = sorted(set(out[k]) | set(f.get(k) or []))
         for k in ("negotiable", "fence"):
