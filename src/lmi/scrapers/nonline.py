@@ -156,10 +156,14 @@ def _features(listing: dict, html: str) -> dict:
     modified = _date(listing.get("dateModified"))
     if modified:
         f["updated_at"] = modified.isoformat()
-    if f["seller"] is None:
-        # oznaczenie przy ogłoszeniu, nie w menu strony
-        m = re.search(r"(oferta prywatna|bezpośrednio od właściciela|oferta biura|biuro nieruchomości)\s*<", html, re.I)
-        f["seller"] = features.seller_from_text(m.group(1)) if m else None
+    # typ ogłoszeniodawcy z JSON-LD: agent.@type = RealEstateAgent (biuro) albo Person (osoba prywatna);
+    # sama kategoria, bez danych agenta. Napisy "biuro nieruchomości" są w menu każdej strony, więc nie z tekstu.
+    agent = listing.get("agent") or listing.get("offeredBy") or listing.get("seller")
+    kind = str((agent or {}).get("@type") or "") if isinstance(agent, dict) else ""
+    if kind:
+        f["params"]["ogłoszeniodawca"] = kind[:30]
+        f["seller"] = ("biuro" if kind in ("RealEstateAgent", "Organization", "LocalBusiness")
+                       else "prywatny" if kind == "Person" else f["seller"])
     if f["negotiable"] is None and re.search(r">\s*Cena do negocjacji\s*<", html):
         f["negotiable"] = True
     return f

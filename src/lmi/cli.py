@@ -37,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("metrics", help="przelicz metryki (mart.*)")
     sub.add_parser("refresh-page", help="przelicz od razu gotowe dane strony (Co się zmieniło, transakcje RCN)")
     sub.add_parser("nonline-archived", help="jednorazowo: wyłącz z analizy archiwalne ogłoszenia Nieruchomości-online")
+    s = sub.add_parser("backfill-features", help="jednorazowo: uzupełnij typ sprzedającego i parametry aktywnych ofert")
+    s.add_argument("--source", required=True, choices=["gratka", "nieruchomosci-online", "adresowo"])
+    s.add_argument("--limit", type=int, help="najwyżej tyle ofert (np. na próbę)")
     sub.add_parser("dedup-review", help="raport jakości ostatniej deduplikacji z linkami (możliwe duplikaty, błędy)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
@@ -157,6 +160,16 @@ def main(argv: list[str] | None = None) -> int:
                     job.finish("ok", f"{pages} stron, archiwalnych {len(set(ids))}, nowo wyłączonych {n}")
                 print(f"Nieruchomości-online: {pages} stron listy, archiwalnych {len(set(ids))}, nowo wyłączonych {n}. "
                       f"Deduplikacja: {len(links)} ogłoszeń -> {len({l.property_key for l in links})} działek.")
+            elif args.cmd == "backfill-features":
+                from . import backfill, jobs
+                from .scrapers.http import PoliteClient
+
+                with jobs.tracked(conn, f"backfill-{args.source}", "uzupełnianie typu sprzedającego") as job:
+                    st = backfill.run(conn, args.source, PoliteClient().get, args.limit)
+                    job.finish("ok", f"uzupełniono {st['done']} z {st['pending']}: prywatne {st['private']}, "
+                                     f"biura {st['agency']}, archiwalne {st['archived']}, błędy {st['failed']}")
+                print(f"{args.source}: uzupełniono {st['done']} z {st['pending']} (prywatne {st['private']}, "
+                      f"biura {st['agency']}, archiwalne {st['archived']}, błędy {st['failed']})")
             elif args.cmd == "dedup-review":
                 from . import dedup
 

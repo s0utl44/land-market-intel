@@ -146,9 +146,12 @@ def _features(page_html: str, description: str, today: date | None = None) -> di
     today = today or date.today()
     f = features.empty()
     marks = " ".join(_text(m) for m in re.findall(r'<div class="min-w-0">(.*?)<span', page_html, re.S))
-    if re.search(r"bezpośrednio od właściciela", marks, re.I):
+    text = _text(re.sub(r"<script.*?</script>", " ", page_html, flags=re.S))
+    # Adresowo przy ofercie właściciela pisze "Ogłoszenie właściciela - bez pośredników" / "Oferta bezpośrednio
+    # od właściciela"; przy ofercie biura "Oferta biura nieruchomości" / "Ogłoszenie pośrednika"
+    if re.search(r"bezpośrednio od właściciela|ogłoszenie właściciela", marks + " " + text, re.I):
         f["seller"] = "prywatny"
-    elif re.search(r"biur|pośredni|agencj", marks, re.I):
+    elif re.search(r"oferta biura|ogłoszenie (?:biura|pośrednika|agencji)|oferta (?:pośrednika|agencji)", marks + " " + text, re.I):
         f["seller"] = "biuro"
     if re.search(r"Cena do negocjacji", marks):
         f["negotiable"] = True

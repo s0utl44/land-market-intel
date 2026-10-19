@@ -283,3 +283,28 @@ def test_excluded_listings_are_left_out_of_dedup(pg_conn, synthetic_data):
     assert _db.exclude_listings(pg_conn, "portal_a", [victim, victim], "archiwalne") == 1
     after = {l.source_listing_id for l in _db.run_dedup(pg_conn)[1]}
     assert victim not in after and len(after) == len(before) - 1
+
+
+@pytest.mark.integration
+def test_backfill_features_updates_active_offers(pg_conn, tmp_path):
+    import json
+
+    from lmi import backfill, db as _db
+
+    _db.add_source(pg_conn, "adresowo", "Adresowo")
+    _db.approve_source(pg_conn, "adresowo", "test", "pytest")
+    f = tmp_path / "a.csv"
+    f.write_text("source_listing_id,observed_at,municipality_teryt,municipality_name,area_m2,price_pln,url\n"
+                 "1,2026-10-18,0223043,Kąty,1000,200000,https://adresowo.example/o/1\n")
+    _db.import_csv(pg_conn, "adresowo", f)
+    pg_conn.execute("INSERT INTO scrape.portal_details (source_id, ad_id, url, detail) VALUES ('adresowo', '1', 'u', %s)",
+                    (json.dumps({"lat": 51.0, "lon": 17.0, "features": {"seller": None, "v": 1}}),))
+    pg_conn.commit()
+    page = ('<script type="application/ld+json">{"@graph": [{"@type": "Offer", "price": "200000"},'
+            '{"@type": "Place", "geo": {"latitude": "51.0", "longitude": "17.0"}}]}</script>'
+            '<div class="min-w-0"> Oferta bezpośrednio od właściciela <span>x</span></div>')
+    st = backfill.run(pg_conn, "adresowo", lambda url: page)
+    assert st["done"] == 1 and st["private"] == 1
+    d = pg_conn.execute("SELECT detail FROM scrape.portal_details WHERE ad_id = '1'").fetchone()[0]
+    assert d["features"]["seller"] == "prywatny" and d["features"]["v"] == backfill.FEATURES_V
+    assert backfill.pending(pg_conn, "adresowo") == []

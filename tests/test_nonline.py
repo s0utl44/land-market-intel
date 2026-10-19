@@ -155,3 +155,11 @@ def test_archived_ids_walks_whole_list():
                      search_page([], pages=())], details={}, communes={})
     ids, pages = nonline.archived_ids(web.get)
     assert sorted(ids) == ["2670005", "2670006"] and pages == 2
+
+
+def test_seller_from_agent_type_only():
+    page = detail_page()                                   # agent: RealEstateAgent
+    assert nonline.parse_detail_page(page)["features"]["seller"] == "biuro"
+    private = page.replace('"@type": "RealEstateAgent"', '"@type": "Person"')
+    f = nonline.parse_detail_page(private)["features"]
+    assert f["seller"] == "prywatny" and "Kowalski" not in str(f) and "600100200" not in str(f)

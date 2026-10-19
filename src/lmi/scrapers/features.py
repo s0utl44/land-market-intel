@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from datetime import date, timedelta
 
-VERSION = 1
+VERSION = 2
 
 MEDIA = {"electricity": "prąd", "water": "woda", "gas": "gaz", "sewage": "kanalizacja", "phone": "telefon",
          "cesspool": "szambo", "internet": "internet", "septic": "szambo"}

@@ -438,6 +438,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
         <label><span class="label">Maks. zł/m²</span><input type="number" id="f-ppm2" min="0" step="10" inputmode="numeric"></label>
         <label><span class="label">Na rynku dłużej niż</span>
           <select id="f-age"><option value="">dowolnie</option><option value="90">3 miesiące</option><option value="180">6 miesięcy</option><option value="365">rok</option><option value="730">2 lata</option></select></label>
+        <label class="check" style="flex-direction:row;align-self:center"><input type="checkbox" id="f-private"> tylko od właścicieli</label>
         <label><span class="label">Sprzedający</span>
           <select id="f-seller"><option value="">dowolny</option><option value="prywatny">prywatnie</option><option value="biuro">biuro</option><option value="deweloper">deweloper</option></select></label>
         <label><span class="label">Media</span>
@@ -807,6 +808,9 @@ function drawCharts(data){
 /* ---------- oferty ---------- */
 let offersTimer=null, offersReq=0; const OFFERS_PAGE=50; let offersLimit=OFFERS_PAGE;
 const reloadOffers=()=>{offersLimit=OFFERS_PAGE;loadOffers()};
+// skrót "tylko od właścicieli" = filtr Sprzedający: prywatnie
+$('#f-private').onchange=e=>{$('#f-seller').value=e.target.checked?'prywatny':'';reloadOffers()};
+$('#f-seller').addEventListener('change',()=>{$('#f-private').checked=$('#f-seller').value==='prywatny'});
 ['#f-use','#f-sort','#f-age','#f-seller','#f-media'].forEach(s=>$(s).onchange=reloadOffers);
 ['#f-min','#f-max','#f-ppm2'].forEach(s=>$(s).oninput=()=>{clearTimeout(offersTimer);offersTimer=setTimeout(reloadOffers,350)});
 // --- wiersz oferty (tabela gminy i "Moje ulubione") ---------------------------------------------

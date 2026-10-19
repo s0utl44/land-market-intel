@@ -139,3 +139,10 @@ def test_old_details_get_features_within_budget():
     gratka.build_rows(gratka.parse_search_page(web.pages[0])[0], web.get, cache, date(2026, 10, 17), "02", None,
                       web.get, otodom.ScrapeStats(), gratka.parse_detail_page, "gratka", features_budget=1)
     assert sum("features" in cache.get_detail(i) for i in ("1", "2")) == 1
+
+
+def test_owner_type_sets_seller():
+    f = gratka.parse_features({"offer": {"ownerType": "user"}}, {}, "")
+    assert f["seller"] == "prywatny" and f["params"]["ownerType"] == "user"
+    assert gratka.parse_features({"offer": {"ownerType": "FIRM"}}, {}, "")["seller"] == "biuro"
+    assert gratka.parse_features({"offer": {"ownerType": "xyz1"}}, {}, "")["seller"] is None   # nowy kod: surowy w params

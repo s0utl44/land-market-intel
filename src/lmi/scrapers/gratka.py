@@ -196,6 +196,11 @@ def _label_pairs(nd) -> dict:
     return out
 
 
+OWNER_TYPES = {"user": "prywatny", "private": "prywatny", "priv": "prywatny", "osoba": "prywatny", "person": "prywatny",
+               "firm": "biuro", "company": "biuro", "agency": "biuro", "agent": "biuro", "biuro": "biuro",
+               "developer": "deweloper", "dev": "deweloper"}
+
+
 def parse_features(nd, pd: dict, html: str) -> dict:  # noqa: ARG001 - html na przyszłe pola
     pairs = {k: v for k, v in _label_pairs(nd).items()
              if not re.search(r"numer ogłoszenia|liczba odsłon|^cena", k, re.I)}
@@ -203,9 +208,16 @@ def parse_features(nd, pd: dict, html: str) -> dict:  # noqa: ARG001 - html na p
     if (d := features.pl_date(str(pairs.get("Aktualizacja") or ""))):
         f["updated_at"] = d.isoformat()
     # typ ogłoszeniodawcy tylko z danych oferty: w menu strony są słowa "biuro", "deweloper" dla wszystkich ofert
-    seller = find_first(nd, lambda d: isinstance(d.get("isPrivate"), bool) or isinstance(d.get("isAgency"), bool))
-    if f["seller"] is None and seller is not None:
-        f["seller"] = "prywatny" if seller.get("isPrivate") is True or seller.get("isAgency") is False else "biuro"
+    # Gratka: pole ownerType w danych oferty (krótki kod); surowy kod zapisujemy, żeby było widać nowe wartości
+    owner = find_first(nd, lambda d: isinstance(d.get("ownerType"), str))
+    if owner is not None:
+        code = owner["ownerType"].strip()
+        f["params"]["ownerType"] = code[:20]
+        f["seller"] = OWNER_TYPES.get(code.lower(), f["seller"])
+    if f["seller"] is None:
+        seller = find_first(nd, lambda d: isinstance(d.get("isPrivate"), bool) or isinstance(d.get("isAgency"), bool))
+        if seller is not None:
+            f["seller"] = "prywatny" if seller.get("isPrivate") is True or seller.get("isAgency") is False else "biuro"
     if not f["media"]:
         media = pd.get("media") or pd.get("utilities")
         if media:
@@ -307,7 +319,7 @@ def build_rows(items, get, cache, observed_at: date, teryt_prefix: str, max_deta
             cache.put_detail(it.ad_id, it.url, detail)
             if stats.details_fetched % 100 == 0:
                 log.info("%s: pobrano szczegóły %d nowych ofert", label, stats.details_fetched)
-        elif ("features" not in detail and not detail.get("unparsable")
+        elif ((detail.get("features") or {}).get("v", 0) < features.VERSION and not detail.get("unparsable")
               and stats.features_refetched < features_budget):
             try:
                 fresh = parse_detail(get(it.url), it.title, it.description)
