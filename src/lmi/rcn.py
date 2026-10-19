@@ -389,6 +389,7 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
 def refresh_land(conn) -> None:
     """Odczytuje udziały nowych rekordów i przelicza zmaterializowane transakcje gruntowe (czyta je strona)."""
     fill_share_fractions(conn)
+    conn.execute("SELECT scrape.fix_gmina_codes()")   # stare kody gmin -> aktualne (db/init/020)
     conn.execute("REFRESH MATERIALIZED VIEW mart.rcn_land_transactions")
     conn.commit()
 

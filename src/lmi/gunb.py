@@ -102,6 +102,7 @@ def load(conn, zip_bytes: bytes, teryt_prefix: str = "02") -> int:
                 n += len(batch)
         conn.execute("""INSERT INTO scrape.gunb_fetch_log (rows, permits)
                         SELECT %s, count(DISTINCT numer_gunb) FROM scrape.gunb_permits""", (n,))
+        conn.execute("SELECT scrape.fix_gmina_codes()")   # stare kody gmin -> aktualne (db/init/020)
         conn.execute("REFRESH MATERIALIZED VIEW mart.gunb_permits")
     conn.commit()
     return n

@@ -43,3 +43,16 @@ def test_load_and_view(pg_conn):
     assert rows == [("A", "0223043", 2, True), ("B", "0223043", 1, False)]
     assert gunb.load(pg_conn, buf.getvalue()) == 3                    # ponowne wczytanie zastępuje, nie dubluje
     assert pg_conn.execute("SELECT count(*) FROM scrape.gunb_permits").fetchone()[0] == 3
+
+
+def test_old_gmina_code_goes_to_current_gmina(pg_conn):
+    # Miękinia: dziś gmina miejsko-wiejska 0218033, w rejestrze jednostka ze starym kodem 021803_2
+    pg_conn.execute("INSERT INTO scrape.uldk_communes (coord_key, teryt, name) VALUES ('a', '0218033', 'Miękinia'),"
+                    " ('b', '0218012', 'Kostomłoty')")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("w.csv", "\n".join([HEAD, line("A", unit="021803_2", terc="0218032"),
+                                       line("B", unit="026491_1", terc="0264911")]))
+    gunb.load(pg_conn, buf.getvalue())
+    rows = dict(pg_conn.execute("SELECT numer_gunb, gmina_teryt FROM mart.gunb_permits").fetchall())
+    assert rows == {"A": "0218033", "B": "0264911"}      # nieznany numer gminy zostaje bez zmian
