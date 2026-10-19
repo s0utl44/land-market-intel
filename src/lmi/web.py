@@ -542,14 +542,16 @@ def municipality_offers(
         where.append("age_days >= %(min_age)s")
         params["min_age"] = min_age_days
     if seller:
-        # jak merge_features: "od właściciela" tylko gdy żaden portal nie pokazuje przy działce biura ani dewelopera
+        # jak merge_features: właściciel potwierdzony przez Adresowo/Gratkę albo "prywatny" bez biura na innym portalu
         has = ("(features_raw @> jsonb_build_array(jsonb_build_object('seller', {v}::text)) "
                "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', {v}::text)))")
+        agency = f"({has.format(v=chr(39) + 'biuro' + chr(39))} OR {has.format(v=chr(39) + 'deweloper' + chr(39))})"
+        owner = " OR ".join(f"features_raw @> jsonb_build_array(jsonb_build_object('src', '{src}', 'seller', 'prywatny'))"
+                            for src in OWNER_CONFIRMED)
         if seller == "prywatny":
-            where.append(f"{has.format(v='%(seller)s')} AND NOT {has.format(v=chr(39) + 'biuro' + chr(39))} "
-                         f"AND NOT {has.format(v=chr(39) + 'deweloper' + chr(39))}")
+            where.append(f"(({owner}) OR ({has.format(v='%(seller)s')} AND NOT {agency}))")
         else:
-            where.append(has.format(v="%(seller)s"))
+            where.append(f"({has.format(v='%(seller)s')} AND NOT ({owner}))")
         params["seller"] = seller
     for i, m in enumerate((media or "").split("+") if media else []):
         where.append(f"features_raw @> jsonb_build_array(jsonb_build_object('media', jsonb_build_array(%(m{i})s::text)))")
@@ -696,7 +698,7 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
         FROM (SELECT *, scrape.views_per_day(views_log, start_date) AS views_per_day,
                      -- parametry ze wszystkich portali, na których jest ta działka (media, dojazd, sprzedający...)
                      (SELECT coalesce(jsonb_agg(x.f || jsonb_build_object('src', x.src)), '[]'::jsonb) FROM (
-                         SELECT 'otodom' AS src, d.detail->'features' || jsonb_strip_nulls(jsonb_build_object(
+                         SELECT 'otodom' AS src, coalesce(d.detail->'features', '{{}}') || jsonb_strip_nulls(jsonb_build_object(
                                     'list_seller', d.detail->'list_seller')) AS f
                          FROM unnest(listing_keys) k JOIN scrape.otodom_details d
                            ON split_part(k, ':', 1) = 'otodom' AND d.ad_id = substr(k, 8)
@@ -714,18 +716,24 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
     return rows
 
 
+# portale, na których "prywatny" to jawne oznaczenie właściciela (Adresowo: "Oferta bezpośrednio od właściciela",
+# Gratka: osoba prywatna). Na Otodomie z kont prywatnych wystawiają też biura i deweloperzy.
+OWNER_CONFIRMED = ("adresowo", "gratka")
+
+
 def merge_features(parts: list[dict]) -> dict:
-    """Jedna działka, kilka portali: suma mediów i dróg; sprzedający: biuro/deweloper, jeśli którykolwiek portal
-    tak go pokazuje, inaczej "prywatny", jeśli któryś tak podaje."""
+    """Jedna działka, kilka portali: suma mediów i dróg. Sprzedający: "prywatny", gdy właściciela potwierdza
+    Adresowo/Gratka (często ta sama działka jest też u biura: do właściciela da się dotrzeć bezpośrednio);
+    inaczej biuro/deweloper, jeśli którykolwiek portal tak pokazuje; inaczej "prywatny" z Otodomu."""
     out = {"seller": None, "negotiable": None, "media": [], "access": [], "fence": None, "vicinity": [],
            "updated_at": None, "params": {}}
     for f in parts:
         if not isinstance(f, dict):
             continue
-        # biura i deweloperzy często wystawiają na Otodomie z konta prywatnego, a na innych portalach jako biuro
-        # (sprawdzone ręcznie): oznaczenie biura/dewelopera wygrywa z "prywatny"
-        rank = {None: 0, "prywatny": 1, "biuro": 2, "deweloper": 3}
+        rank = {None: 0, "prywatny": 1, "biuro": 2, "deweloper": 3, "właściciel": 4}
         for seller in (f.get("seller"), f.get("list_seller")):
+            if seller == "prywatny" and f.get("src") in OWNER_CONFIRMED:
+                seller = "właściciel"
             if rank.get(seller, 0) > rank.get(out["seller"], 0):
                 out["seller"] = seller
         for k in ("media", "access", "vicinity"):
@@ -737,6 +745,8 @@ def merge_features(parts: list[dict]) -> dict:
             out["updated_at"] = f["updated_at"]
         if f.get("params"):
             out["params"][f.get("src") or "portal"] = f["params"]
+    if out["seller"] == "właściciel":
+        out["seller"] = "prywatny"
     return out
 
 
