@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS scrape.rcn_fetch_log (
 -- luki: rekordy, które usługa liczy, ale nie oddaje nawet przy zapytaniu o jeden dzień i powiat
 ALTER TABLE scrape.rcn_fetch_log ADD COLUMN IF NOT EXISTS gaps text;
 
+-- Udział odczytany z opisowego pola NIER_UDZIAL (lmi.rcn.share_fraction): starostwa piszą '1/1', '1/1;',
+-- 'udz. 1/1 w dz.', '1/1 w dz.43/18; 1/10 w dz.43/16' (działka + udział w drodze). NULL = nieczytelny zapis.
+ALTER TABLE scrape.rcn_parcels ADD COLUMN IF NOT EXISTS share_frac numeric;
+ALTER TABLE scrape.rcn_parcels ADD COLUMN IF NOT EXISTS share_frac_checked boolean;
+
 -- Transakcje samym gruntem: każda działka niezabudowana, w całości, wolny rynek albo przetarg,
 -- jedna gmina. Mieszane (dom + działka, lokal z udziałem w gruncie, bonifikaty) pomijamy.
 -- Definicja "na żywo"; strona czyta jej zmaterializowaną kopię mart.rcn_land_transactions (013).
@@ -46,10 +51,13 @@ SELECT tx_id,
        max(tran_price)                                        AS price,
        -- część starostw (np. Wrocław) wpisuje powierzchnię w hektarach, reszta w m²: cena ponad 20 000 zł
        -- za "m²" przy dobrej cenie za hektar oznacza hektary
-       sum(area_m2) * CASE WHEN max(tran_price) / nullif(sum(area_m2), 0) > 20000 THEN 10000 ELSE 1 END
+       -- powierzchnia kupiona: działki w całości + udziały (np. 1/10 drogi dojazdowej)
+       sum(area_m2 * share_frac) * CASE WHEN max(tran_price) / nullif(sum(area_m2 * share_frac), 0) > 20000
+                                        THEN 10000 ELSE 1 END
                                                               AS area_m2,
-       round(max(tran_price) / nullif(sum(area_m2) * CASE WHEN max(tran_price) / nullif(sum(area_m2), 0) > 20000
-                                                          THEN 10000 ELSE 1 END, 0), 2)
+       round(max(tran_price) / nullif(sum(area_m2 * share_frac)
+                                      * CASE WHEN max(tran_price) / nullif(sum(area_m2 * share_frac), 0) > 20000
+                                             THEN 10000 ELSE 1 END, 0), 2)
                                                               AS ppm2,
        count(*)                                               AS parcels,
        string_agg(DISTINCT mpzp, ';')                         AS mpzp,
@@ -66,8 +74,9 @@ SELECT tx_id,
 FROM scrape.rcn_parcels
 GROUP BY tx_id
 HAVING bool_and(nier_type = 'nieruchomoscGruntowaNiezabudowana')
-   AND bool_and(share IN ('1/1', ''))
+   -- co najmniej jedna działka kupiona w całości, pozostałe z czytelnym udziałem (np. droga dojazdowa)
+   AND bool_and(share_frac IS NOT NULL) AND bool_or(share_frac = 1)
    AND bool_and(tran_type IN ('wolnyRynek', 'sprzedazPrzetargowa'))
    AND count(DISTINCT gmina_teryt) = 1
    AND max(tran_price) >= 1000
-   AND sum(area_m2) > 0;
+   AND sum(area_m2 * share_frac) > 0;

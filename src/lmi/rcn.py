@@ -150,6 +150,68 @@ def gmina_teryt(parcel_id: str) -> str | None:
     return None
 
 
+_FRAC = r"(\d+)\s*/\s*(\d+)"
+_PARCEL_LIST = re.compile(r"dz(?:iałk\w*|\.)?\s*(?:nr\.?\s*)?((?:\d+(?:/\d+)?(?:\s*(?:,|\bi\b|\boraz\b)\s*(?:nr\.?\s*)?)?)+)")
+
+
+def share_fraction(text: str | None, parcel_id: str | None) -> float | None:
+    """Udział w tej działce z pola NIER_UDZIAL, które starostwa wypełniają po swojemu.
+
+    '1/1', '1/1;', 'udz. 1/1 w dz.' -> 1.0 (cała działka); '1/1 w dz.43/18; 1/10 w dz.43/16' -> 1.0 dla 43/18
+    i 0.1 dla 43/16 (działka z udziałem w drodze). None = nie da się odczytać (transakcję pomijamy), np. opis
+    z bonifikatą, użytkowanie wieczyste albo nietypowy zapis."""
+    t = " ".join((text or "").lower().split())
+    if not t:
+        return 1.0
+    if re.search(r"użytk|bonifik|wiecz", t):
+        return None
+    number = (parcel_id or "").rsplit(".", 1)[-1].strip().lower()
+    t = re.sub(r"\budz(?:iał|\.)?\s*", " ", t)
+    segments = [x.strip(" ,.") for x in re.split(r";|\boraz\b|,\s*(?=" + _FRAC + r"\s*(?:cz\.?|części)?\s*w\b)", t)
+                if x and x.strip(" ,.")]
+    mapping = []
+    for seg in segments:
+        m = re.match(_FRAC + r"\s*(?:cz\.?|części)?\s*(.*)$", seg)
+        if not m:
+            if re.search(_FRAC, seg):
+                return None          # ułamek w środku zdania (inny szyk): nie zgadujemy
+            continue                 # dopisek bez liczb, np. "cena z VAT"
+        a, b, rest = int(m.group(1)), int(m.group(2)), m.group(3)
+        if b == 0 or a > b:
+            return None
+        lists = _PARCEL_LIST.findall(rest)
+        parcels = re.findall(r"\d+(?:/\d+)?", " ".join(lists)) if lists else []
+        mapping.append((a / b, parcels))
+    if not mapping:
+        return None
+    if len(mapping) == 1 and not mapping[0][1]:
+        return mapping[0][0]         # jeden udział bez listy działek: dotyczy całej transakcji
+    for frac, parcels in mapping:
+        if number in parcels:
+            return frac
+    return None
+
+
+SHARE_BATCH = 5000
+
+
+def fill_share_fractions(conn) -> int:
+    """Uzupełnia scrape.rcn_parcels.share_frac (odczytany udział) dla rekordów, które go jeszcze nie mają."""
+    n = 0
+    while True:
+        rows = conn.execute("""SELECT tx_id, parcel_id, nier_type, share FROM scrape.rcn_parcels
+                               WHERE share_frac_checked IS NOT TRUE LIMIT %s""", (SHARE_BATCH,)).fetchall()
+        if not rows:
+            break
+        with conn.cursor() as cur:
+            cur.executemany("""UPDATE scrape.rcn_parcels SET share_frac = %s, share_frac_checked = true
+                               WHERE tx_id = %s AND parcel_id = %s AND nier_type = %s AND share = %s""",
+                            [(share_fraction(sh, pid), tx, pid, nt, sh) for tx, pid, nt, sh in rows])
+        conn.commit()
+        n += len(rows)
+    return n
+
+
 def locality(address: str | None) -> str | None:
     """'MSC:Domaszczyn;UL:Leśna;NR_PORZ:2D' -> 'Domaszczyn' (bez ulicy i numeru)."""
     for part in (address or "").split(";"):
@@ -325,7 +387,8 @@ def refresh(conn, get=None, teryt_prefix: str = "02", today: date | None = None,
 
 
 def refresh_land(conn) -> None:
-    """Przelicza zmaterializowane transakcje gruntowe (czyta je strona)."""
+    """Odczytuje udziały nowych rekordów i przelicza zmaterializowane transakcje gruntowe (czyta je strona)."""
+    fill_share_fractions(conn)
     conn.execute("REFRESH MATERIALIZED VIEW mart.rcn_land_transactions")
     conn.commit()
 

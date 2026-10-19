@@ -167,6 +167,9 @@ def test_refresh_and_land_view(pg_conn):
             feature("MIX", "022302_2.0001.5", nier="nieruchomoscGruntowaZabudowana", gid=5),     # dom + grunt
             feature("SHARE", "022302_2.0001.6", share="1/2", gid=6),                             # udział
             feature("BONUS", "022302_2.0001.7", tran="sprzedazZBonifikata", gid=7),              # bonifikata
+            # działka w całości + 1/10 drogi dojazdowej (zapis jak w starostwie bolesławieckim)
+            feature("ROAD", "022302_2.0001.8", share="1/1 w dz.8;\n1/10 w dz.9;", area="1000", gid=8),
+            feature("ROAD", "022302_2.0001.9", share="1/1 w dz.8;\n1/10 w dz.9;", area="500", gid=9),
         ),
     }
     calls = []
@@ -187,15 +190,15 @@ def test_refresh_and_land_view(pg_conn):
 
     n = rcn.refresh(pg_conn, get, today=date(2025, 6, 10), since=date(2025, 5, 1))
     assert rcn.repair(pg_conn, get) == (0, 0)
-    assert n == 7 and all("GEOMETRIA" not in c for c in calls)
+    assert n == 9 and all("GEOMETRIA" not in c for c in calls)
     assert any("PropertyIsNull" in c for c in calls)                       # osobno akty bez daty
     log = pg_conn.execute("SELECT sum(matched), sum(saved) FROM scrape.rcn_fetch_log").fetchone()
-    assert log == (7, 7)
-    rows = pg_conn.execute("SELECT tx_id, ppm2, parcels, buildable FROM mart.rcn_land_transactions ORDER BY tx_id").fetchall()
-    assert rows == [("LAND", 300, 1, True), ("LAND2", 250, 2, True)]
+    assert log == (9, 9)
+    rows = pg_conn.execute("SELECT tx_id, ppm2::float, parcels, buildable FROM mart.rcn_land_transactions ORDER BY tx_id").fetchall()
+    assert rows == [("LAND", 300, 1, True), ("LAND2", 250, 2, True), ("ROAD", pytest.approx(285.71, abs=0.01), 2, True)]
     # ponowne pobranie tych samych aktów niczego nie dubluje
     rcn.refresh(pg_conn, get, today=date(2025, 6, 10), since=date(2025, 5, 1))
-    assert pg_conn.execute("SELECT count(*) FROM scrape.rcn_parcels").fetchone()[0] == 7
+    assert pg_conn.execute("SELECT count(*) FROM scrape.rcn_parcels").fetchone()[0] == 9
 
 
 @pytest.mark.integration
@@ -246,3 +249,28 @@ def test_undated_query_rejected_by_service_is_noted_not_fatal(pg_conn):
     noted = pg_conn.execute("SELECT gaps FROM scrape.rcn_fetch_log WHERE period_start IS NULL").fetchone()[0]
     assert noted.startswith("akty bez daty")
     assert rcn.repair(pg_conn, get) == (0, 1)        # takiej uwagi naprawa nie ponawia w kółko
+
+
+@pytest.mark.parametrize("text, parcel, expected", [
+    ("1/1", "020102_2.0001.5", 1.0),
+    ("1/1;", "020102_2.0001.5", 1.0),
+    ("", "020102_2.0001.5", 1.0),
+    ("udz. 1/1 w dz.", "020802_1.0001.5", 1.0),
+    ("udz.1/1 w dz.", "020802_1.0001.5", 1.0),
+    ("udz. 1/1w dz.", "020802_1.0001.5", 1.0),
+    ("udz. 1/1 w dz., cena z VAT", "020802_1.0001.5", 1.0),
+    ("udz. 1/1 w dz. (II przetarg)", "020802_1.0001.5", 1.0),
+    ("1/1 w dz.43/18;\n1/10 w dz.43/16;", "020102_2.0003.43/18", 1.0),
+    ("1/1 w dz.43/18;\n1/10 w dz.43/16;", "020102_2.0003.43/16", 0.1),
+    ("1/1 w dz.507/8;\n1/7 w dz.49/7, 49/9, 507/1 i 507/2;", "020102_2.0003.507/1", 1 / 7),
+    ("udz. 1/1 w dz. nr 55/16 oraz udz. 3/9 cz. w dz. nr 55/17, nr 55/10 i nr 55/24", "020802_1.0001.55/10", 3 / 9),
+    ("udz. 1/1 w dz. nr 55/16 oraz udz. 3/9 cz. w dz. nr 55/17, nr 55/10 i nr 55/24", "020802_1.0001.55/16", 1.0),
+    ("udz. 1/11 cz. w dz. nr 12/9, udz. 1/22 cz. w dz. nr 12/7", "020802_1.0001.12/7", 1 / 22),
+    ("1/2;", "020102_2.0001.5", 0.5),
+    ("udz. 2/21 w użytk.wiecz.dz.", "020802_1.0001.5", None),
+    ("udz. 1/1 w dz. Od ww. ceny udzielono 99% bonifikaty.", "020802_1.0001.5", None),
+    ("w działce 17/8 sprzedaż 6/10 części oraz w działce 17/5 6/80 części", "020802_1.0001.17/8", None),
+])
+def test_share_fraction(text, parcel, expected):
+    got = rcn.share_fraction(text, parcel)
+    assert got == pytest.approx(expected) if expected is not None else got is None
