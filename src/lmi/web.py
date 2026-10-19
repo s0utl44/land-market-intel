@@ -118,7 +118,8 @@ def ranking():
                avg_absorption_rate AS absorption, price_trend_pct AS price_trend,
                avg_discounted_share AS discounted, median_days_to_disappear AS days,
                latest_active_supply AS supply, latest_median_price_per_m2 AS ppm2, weeks_observed AS weeks,
-               latest_median_listing_age_days AS age, t.tx_12m, t.tx_build_12m, t.tx_ppm2, t.tx_until
+               latest_median_listing_age_days AS age, t.tx_12m, t.tx_build_12m, t.tx_ppm2, t.tx_until,
+               g.permits_12m, g.permits_prev_12m
         FROM mart.region_scores
         LEFT JOIN (
             -- transakcje samym gruntem z 12 miesięcy przed ostatnim aktem w powiecie (starostwa przekazują
@@ -135,6 +136,15 @@ def ranking():
             WHERE ppm2 BETWEEN %(lo)s AND %(hi)s AND doc_date > pl.d - 365
             GROUP BY t.gmina_teryt
         ) t ON t.gmina_teryt = municipality_teryt
+        LEFT JOIN (
+            -- pozwolenia na budowę domów jednorodzinnych (GUNB): ostatnie 12 miesięcy i poprzednie 12
+            SELECT gmina_teryt,
+                   count(*) FILTER (WHERE decided_on > x.m - 365) AS permits_12m,
+                   count(*) FILTER (WHERE decided_on > x.m - 730 AND decided_on <= x.m - 365) AS permits_prev_12m
+            FROM mart.gunb_permits, (SELECT max(decided_on) AS m FROM mart.gunb_permits) x
+            WHERE single_family
+            GROUP BY gmina_teryt
+        ) g ON g.gmina_teryt = municipality_teryt
         ORDER BY rank NULLS LAST, latest_active_supply DESC NULLS LAST, municipality_name""", PPM2_RANGE)
 
 
@@ -187,8 +197,9 @@ COMPLETE_DAY = """
 def _changes_state(conn) -> str:
     r = conn.execute(f"""SELECT ({COMPLETE_DAY}) AS d,
                                (SELECT max(run_id) FROM core.dedup_runs) AS run,
-                               (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS rcn""").fetchone()
-    return f"{r['d']}|{r['run']}|{r['rcn']}"
+                               (SELECT max(fetched_at) FROM scrape.rcn_fetch_log) AS rcn,
+                               (SELECT max(fetched_at) FROM scrape.gunb_fetch_log) AS gunb""").fetchone()
+    return f"{r['d']}|{r['run']}|{r['rcn']}|{r['gunb']}"
 
 
 def _jsonable(v):
@@ -245,7 +256,7 @@ def changes(days: int = Query(7, ge=1, le=31)):
 
 
 def _changes_all(conn, periods) -> dict:
-    empty = {"last_day": None, "daily": [], "weekly": [], "cuts": [], "fresh": [], "gone_fast": [], "gminy": [], "rcn": []}
+    empty = {"last_day": None, "daily": [], "weekly": [], "cuts": [], "fresh": [], "gone_fast": [], "gminy": [], "rcn": [], "permits": []}
     last = conn.execute(COMPLETE_DAY).fetchone()["d"]
     if last is None:
         return {p: dict(empty) for p in periods}
@@ -288,6 +299,10 @@ def _changes_all(conn, periods) -> dict:
             w["gone"] += r["gone"]
             w["cuts"] += r["cuts"]
             w["active"], w["ppm2"] = r["active"], r["ppm2"]   # stan na ostatni dzień tygodnia
+        permits = conn.execute("""
+            SELECT date_trunc('month', decided_on)::date AS month, count(*) FILTER (WHERE single_family) AS houses
+            FROM mart.gunb_permits WHERE decided_on >= DATE '2023-01-01'
+            GROUP BY 1 ORDER BY 1""").fetchall()
         rcn = conn.execute("""
             SELECT date_trunc('month', doc_date)::date AS month, count(*) AS tx,
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY ppm2) AS ppm2
@@ -333,7 +348,8 @@ def _changes_all(conn, periods) -> dict:
                                                               AND pd.price < pd.prev_price * 0.995) > 0
                 ORDER BY 3 + 4 + 5 DESC LIMIT 10""", params).fetchall()
             out[days] = {"last_day": last, "since": params["since"], "daily": daily, "weekly": list(weekly.values()),
-                         "cuts": cuts, "fresh": fresh, "gone_fast": gone_fast, "gminy": gminy, "rcn": rcn}
+                         "cuts": cuts, "fresh": fresh, "gone_fast": gone_fast, "gminy": gminy, "rcn": rcn,
+                         "permits": permits}
     return out
 
 
@@ -808,6 +824,26 @@ def feedback_list(request: Request, status: str = "nowe"):
 def feedback_export(request: Request, status: str = "nowe"):
     _require_admin(request)
     return feedback_text(feedback_rows(None if status == "wszystkie" else status))
+
+
+@app.get("/api/municipality/{teryt}/permits")
+def municipality_permits(teryt: str):
+    """Pozwolenia na budowę (GUNB) w gminie: kwartały (domy jednorodzinne i wszystkie) i podsumowanie 12 miesięcy."""
+    _check_teryt(teryt)
+    quarters = _rows("""
+        SELECT date_trunc('quarter', decided_on)::date AS quarter, count(*) FILTER (WHERE single_family) AS houses,
+               count(*) AS total
+        FROM mart.gunb_permits WHERE gmina_teryt = %(t)s AND decided_on >= DATE '2019-01-01'
+        GROUP BY 1 ORDER BY 1""", {"t": teryt})
+    summary = _rows("""
+        WITH x AS (SELECT max(decided_on) AS m FROM mart.gunb_permits)
+        SELECT (SELECT m FROM x) AS data_until,
+               count(*) FILTER (WHERE single_family AND decided_on > (SELECT m FROM x) - 365) AS houses_12m,
+               count(*) FILTER (WHERE single_family AND decided_on > (SELECT m FROM x) - 730
+                                AND decided_on <= (SELECT m FROM x) - 365) AS houses_prev_12m,
+               count(*) FILTER (WHERE decided_on > (SELECT m FROM x) - 365) AS total_12m
+        FROM mart.gunb_permits WHERE gmina_teryt = %(t)s""", {"t": teryt})[0]
+    return {"summary": summary, "quarters": quarters}
 
 
 # --- nowości dla zespołu ------------------------------------------------------------------------------

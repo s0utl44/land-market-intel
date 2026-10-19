@@ -129,6 +129,22 @@ def _refresh_rcn(conn, today: date, teryt_prefix: str) -> None:
         print(f"RCN: odświeżenie nie powiodło się ({type(exc).__name__}: {exc}); spróbujemy za tydzień.")
 
 
+def _refresh_gunb(conn, today: date) -> None:
+    """Pozwolenia na budowę GUNB raz w tygodniu (poniedziałek), razem z RCN. Błąd nie psuje przebiegu."""
+    if os.environ.get("LMI_GUNB", "1") == "0" or today.weekday() != 0:
+        return
+    from . import gunb
+
+    try:
+        with jobs.tracked(conn, "gunb", "cotygodniowe odświeżenie rejestru pozwoleń") as job:
+            n = gunb.refresh(conn)
+            job.finish("ok", f"wczytano {n} wierszy")
+        print(f"GUNB: wczytano {n} wierszy pozwoleń na budowę.")
+    except Exception as exc:  # noqa: BLE001 - plik GUNB bywa chwilowo niedostępny
+        conn.rollback()
+        print(f"GUNB: odświeżenie nie powiodło się ({type(exc).__name__}: {exc}); spróbujemy za tydzień.")
+
+
 def _approved(conn, source: str) -> bool:
     row = conn.execute("SELECT approved FROM core.sources WHERE source_id = %s", (source,)).fetchone()
     return bool(row and row[0])
@@ -196,6 +212,7 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
         imported = imported or did_import
 
     _refresh_rcn(conn, observed_at, teryt_prefix)
+    _refresh_gunb(conn, observed_at)
     if imported:
         run_id, links = db.run_dedup(conn)
         _, scores = db.run_metrics(conn, run_id)

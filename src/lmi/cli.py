@@ -45,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("title")
     s.add_argument("body", nargs="?", default="")
     s.add_argument("--days", type=int, default=4, help="ile dni roboczych ma wisieć")
+    sub.add_parser("gunb", help="pozwolenia na budowę z rejestru GUNB (plik województwa, wczytanie od nowa)")
     sub.add_parser("dedup-review", help="raport jakości ostatniej deduplikacji z linkami (możliwe duplikaty, błędy)")
     s = sub.add_parser("dedup-diff", help="co rozdzieliła nowa deduplikacja względem poprzedniej (z powodami)")
     s.add_argument("--old", type=int, help="run_id starszej deduplikacji (domyślnie przedostatnia)")
@@ -181,6 +182,16 @@ def main(argv: list[str] | None = None) -> int:
                 r = web.add_announcement(conn, args.title, args.body, "konsola", args.days)
                 conn.commit()
                 print(f"Nowość #{r[0]} na stronie do {r[1]} włącznie.")
+            elif args.cmd == "gunb":
+                from . import gunb, jobs, web
+
+                with jobs.tracked(conn, "gunb", "pobieranie rejestru pozwoleń GUNB") as job:
+                    n = gunb.refresh(conn)
+                    permits, sf = conn.execute("SELECT count(*), count(*) FILTER (WHERE single_family) "
+                                               "FROM mart.gunb_permits").fetchone()
+                    web.refresh_changes(conn)
+                    job.finish("ok", f"{permits} pozwoleń ({sf} na domy jednorodzinne), {n} wierszy działek")
+                print(f"GUNB: {permits} pozwoleń w województwie, w tym na domy jednorodzinne {sf} ({n} wierszy działek).")
             elif args.cmd == "dedup-review":
                 from . import dedup
 

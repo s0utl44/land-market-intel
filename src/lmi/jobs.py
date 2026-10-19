@@ -61,7 +61,7 @@ class Job:
 class JobLogHandler(logging.Handler):
     """Ostatnia linia INFO z modułów pobierania trafia jako postęp zadania."""
 
-    def __init__(self, job: Job, prefixes=("lmi.scrapers", "lmi.rcn", "lmi.backfill")):
+    def __init__(self, job: Job, prefixes=("lmi.scrapers", "lmi.rcn", "lmi.backfill", "lmi.gunb")):
         super().__init__(level=logging.INFO)
         self.job, self.prefixes = job, prefixes
 

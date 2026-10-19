@@ -393,3 +393,24 @@ def test_announcements_visible_for_four_business_days(client, pg_conn, monkeypat
     pg_conn.execute("UPDATE app.announcements SET visible_until = current_date - 1")
     pg_conn.commit()
     assert client.get("/api/announcements").json() == []                         # po terminie znika sama
+
+
+def test_permits_in_ranking_and_card(client, pg_conn):
+    import io
+    import zipfile
+
+    from lmi import gunb
+    from test_gunb import HEAD, line
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("w.csv", "\n".join([HEAD,
+                                       line("A", unit="990001_1", terc="9900011", decided="2026-05-04 00:00:00"),
+                                       line("B", unit="990001_1", terc="9900011", decided="2025-03-01 00:00:00"),
+                                       line("C", unit="990001_1", terc="9900011", kind="Inny", cat="XVII")]))
+    gunb.load(pg_conn, buf.getvalue(), teryt_prefix="99")
+    rank = {r["teryt"]: r for r in client.get("/api/ranking").json()}
+    assert rank["9900011"]["permits_12m"] == 1 and rank["9900011"]["permits_prev_12m"] == 1
+    d = client.get("/api/municipality/9900011/permits").json()
+    assert d["summary"]["houses_12m"] == 1 and d["summary"]["total_12m"] == 2 and len(d["quarters"]) == 2
+    assert client.get("/api/changes", params={"days": 7}).json()["permits"]

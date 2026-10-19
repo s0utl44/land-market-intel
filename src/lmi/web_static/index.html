@@ -92,7 +92,7 @@ button,input,select{font:inherit}
 .news-form{display:grid;gap:8px;margin-top:6px}
 .news-form input,.news-form textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
 /* co się zmieniło */
-.ch-charts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ch-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .ch-lists{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .mini{padding:12px 14px 4px;position:relative;min-width:0}
 .mini h3{font-size:.9rem;font-weight:700}
@@ -416,6 +416,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
             <th data-k="ppm2" aria-sort="none" title="Mediana ceny ofertowej za m²"><button type="button">zł/m²</button></th>
             <th data-k="price_trend" aria-sort="none"><button type="button">Trend</button></th>
             <th data-k="tx_12m" aria-sort="none" title="Akty notarialne z RCN: sprzedaże samego gruntu w ostatnich 12 miesiącach (pod spodem: ile pod zabudowę i mediana zł/m²)"><button type="button">Akty 12 m.</button></th>
+            <th data-k="permits_12m" aria-sort="none" title="Pozwolenia na budowę domów jednorodzinnych (GUNB) w ostatnich 12 miesiącach; pod spodem zmiana do poprzednich 12"><button type="button">Domy 12 m.</button></th>
           </tr></thead>
           <tbody id="rank-body"></tbody>
         </table>
@@ -436,7 +437,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       <button type="button" role="tab" id="t-of" aria-controls="p-of" aria-selected="false">Oferty<span class="n" id="t-of-n"></span></button>
       <button type="button" role="tab" id="t-tx" aria-controls="p-tx" aria-selected="false">Transakcje<span class="n" id="t-tx-n"></span></button>
     </div>
-    <div id="p-ov" role="tabpanel" aria-labelledby="t-ov"><div class="charts" id="charts"></div></div>
+    <div id="p-ov" role="tabpanel" aria-labelledby="t-ov"><div id="permits"></div><div class="charts" id="charts"></div></div>
     <div id="p-tx" role="tabpanel" aria-labelledby="t-tx" hidden>
       <p class="ar" style="margin:0 0 10px">Akty notarialne z Rejestru Cen Nieruchomości (geoportal GUGiK): sprzedaże samego gruntu niezabudowanego w całości, na wolnym rynku lub w przetargu. Starostwa dopisują akty z opóźnieniem kilku tygodni.</p>
       <div id="tx"></div>
@@ -536,7 +537,7 @@ async function load(){
     [OV,RANK]=await Promise.all([api('/api/overview'),api('/api/ranking')]);
   }catch(e){
     $('#status').innerHTML='<span><i class="dot bad"></i>Nie udało się pobrać danych. Odśwież stronę za chwilę.</span>';
-    $('#rank-body').innerHTML='<tr><td class="l" colspan="7"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
+    $('#rank-body').innerHTML='<tr><td class="l" colspan="8"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges(); loadNews();
@@ -625,6 +626,10 @@ async function loadChanges(){
   }else{
     miniChart(box,{title:'Mediana ceny ofert',sub:'zł/m²',labels:lab,line:{name:'zł/m²',vals:series.map(x=>x.ppm2)},fmt:v=>nf(v)+' zł',nozero:true});
   }
+  const pm=(d.permits||[]).slice(-24);
+  if(pm.length>1)miniChart(box,{title:'Pozwolenia na domy (GUNB)',sub:'miesięcznie, województwo',
+    labels:pm.map(x=>new Date(x.month+'T00:00:00').toLocaleDateString('pl-PL',{month:'short',year:'2-digit'})),
+    bars:[{name:'pozwolenia',cls:'o',color:'var(--good)',vals:pm.map(x=>x.houses)}],fmt:v=>nf(v)});
   const offerLi=(o,right,sub)=>`<li><span class="g" data-t="${esc(o.teryt)}" title="Pokaż gminę ${esc(o.gmina)}">${esc(o.gmina)}</span>${o.url?`<a class="ext" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${right} ↗</a>`:`<span>${right}</span>`}<small>${sub}</small></li>`;
   const list=(title,rows,fn,empty)=>`<div class="panel lst"><h3>${title}</h3>${rows.length?`<ol>${rows.map(fn).join('')}</ol>`:`<div class="na" style="font-size:.84rem">${empty}</div>`}</div>`;
   $('#ch-lists').innerHTML=
@@ -694,7 +699,7 @@ function marketPill(r){
 function renderRank(){
   const rows=rankRows(), max=Math.max(0.01,...RANK.map(r=>Math.abs(r.score||0)));
   const body=$('#rank-body');
-  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="7"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
+  if(!rows.length){body.innerHTML=`<tr><td class="l" colspan="8"><div class="empty">${RANK.length?'Żadna gmina nie pasuje do wyszukiwania.':'Brak danych. Ranking pojawi się po pierwszym pobraniu ofert.'}</div></td></tr>`;$('#rank-more').innerHTML='';return}
   body.innerHTML=rows.slice(0,rankLimit).map(r=>{
     const sc=r.score, w=sc==null?0:Math.abs(sc)/max*50;
     const more=`znika ${pct(r.absorption)} tygodniowo · z obniżką ${pct(r.discounted,0)} · do zniknięcia ${nf(r.days)} dni · oferty wiszą ${age(r.age==null?null:Math.round(r.age))}`;
@@ -705,7 +710,8 @@ function renderRank(){
       <td>${nf(r.supply)}</td>
       <td>${nf(r.ppm2)}</td>
       <td>${sgn(r.price_trend)}</td>
-      <td title="${r.tx_12m!=null?`${nf(r.tx_12m)} transakcji gruntem, w tym ${nf(r.tx_build_12m)} pod zabudowę`+(r.tx_ppm2!=null?` · mediana ${nf(r.tx_ppm2)} zł/m²`+(r.tx_build_12m<5?' (ze wszystkich, za mało pod zabudowę)':' (pod zabudowę)'):'')+(r.tx_until?` · 12 mies. do ${dFull(r.tx_until)} (ostatni akt w powiecie)`:''):''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}${r.tx_until&&OV&&OV.last_observed&&(new Date(OV.last_observed)-new Date(r.tx_until))/864e5>120?`<span class="sub2" title="starostwo przekazuje dane do RCN z dużym opóźnieniem">do ${dPL(r.tx_until)}</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
+      <td title="${r.tx_12m!=null?`${nf(r.tx_12m)} transakcji gruntem, w tym ${nf(r.tx_build_12m)} pod zabudowę`+(r.tx_ppm2!=null?` · mediana ${nf(r.tx_ppm2)} zł/m²`+(r.tx_build_12m<5?' (ze wszystkich, za mało pod zabudowę)':' (pod zabudowę)'):'')+(r.tx_until?` · 12 mies. do ${dFull(r.tx_until)} (ostatni akt w powiecie)`:''):''}">${r.tx_12m!=null?`${nf(r.tx_12m)}${r.tx_ppm2!=null?`<span class="sub2">${nf(r.tx_ppm2)} zł/m²</span>`:''}${r.tx_until&&OV&&OV.last_observed&&(new Date(OV.last_observed)-new Date(r.tx_until))/864e5>120?`<span class="sub2" title="starostwo przekazuje dane do RCN z dużym opóźnieniem">do ${dPL(r.tx_until)}</span>`:''}`:'<span class="na">–</span>'}</td>
+      <td title="pozwolenia na domy jednorodzinne (GUNB): ostatnie 12 mies. ${r.permits_12m??0}, poprzednie ${r.permits_prev_12m??0}">${r.permits_12m!=null?`${nf(r.permits_12m)}${r.permits_prev_12m?`<span class="sub2">${sgn(r.permits_12m/r.permits_prev_12m-1)}</span>`:''}`:'<span class="na">–</span>'}</td></tr>`}).join('');
   const hidden=RANK.length-RANK.filter(r=>r.rank!=null).length;
   $('#rank-more').innerHTML=`<span>Pokazano ${Math.min(rankLimit,rows.length)} z ${rows.length}${!showAll&&hidden&&RANK.some(x=>x.rank!=null)?` · ukryto ${hidden} gmin z małą liczbą ofert`:''}</span>`+
     (rows.length>rankLimit?'<button class="btn" id="rank-all" type="button">Pokaż wszystkie</button>':'');
@@ -738,7 +744,7 @@ async function select(teryt,scroll){
   $('#charts').innerHTML='<div class="panel empty">Ładowanie wykresów…</div>';
   try{ drawCharts(await api(`/api/municipality/${teryt}/weekly`)); }
   catch(e){ $('#charts').innerHTML='<div class="panel empty">Nie udało się pobrać wykresów dla tej gminy.</div>'; }
-  loadTx(teryt);
+  loadTx(teryt); loadPermits(teryt);
   offersLimit=OFFERS_PAGE; loadOffers();
 }
 // zakładki karty gminy
@@ -748,6 +754,20 @@ Object.keys(TABS).forEach(t=>$('#'+t).onclick=()=>tab(t));
 $('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const ks=Object.keys(TABS),i=ks.indexOf(document.activeElement.id);if(i<0)return;
   const n=ks[(i+(e.key==='ArrowRight'?1:ks.length-1))%ks.length];tab(n);$('#'+n).focus()});
 
+async function loadPermits(teryt){
+  const box=$('#permits'); box.innerHTML='';
+  let d; try{d=await api(`/api/municipality/${teryt}/permits`)}catch(e){return}
+  if(teryt!==selected||!d.summary.data_until)return;
+  const s=d.summary, q=d.quarters.slice(-16), qmax=Math.max(1,...q.map(x=>x.houses));
+  const ch=s.houses_prev_12m?(s.houses_12m/s.houses_prev_12m-1)*100:null;
+  box.innerHTML=`<div class="tx-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="panel"><span class="label">Pozwolenia na domy (12 mies.)</span><b>${nf(s.houses_12m)}</b><small>wszystkich pozwoleń: ${nf(s.total_12m)} · GUNB do ${dFull(s.data_until)}</small></div>
+    <div class="panel gap ${ch==null?'':ch>=0?'good':'warn'}"><span class="label">Zmiana r/r</span><b>${ch==null?'–':(ch>0?'+':'')+nf(ch,0)+'%'}</b><small>poprzednie 12 mies.: ${nf(s.houses_prev_12m)}</small></div>
+    <div class="panel"><span class="label">Domy jednorodzinne na kwartał</span>
+      <div class="qbars">${q.map(x=>`<span style="height:${Math.round(x.houses/qmax*100)}%" title="${x.quarter.slice(0,4)} Q${Math.floor(+x.quarter.slice(5,7)/3)+1}: ${x.houses} pozwoleń na domy (wszystkich ${x.total})"></span>`).join('')}</div>
+      <div class="qlab"><span>${q.length?q[0].quarter.slice(0,4):''}</span><span>${q.length?q[q.length-1].quarter.slice(0,4):''}</span></div></div>
+  </div>`;
+}
 const MPZP={budownictwoMieszkanioweJednorodzinne:'MN jednorodzinna',budownictwoMieszkanioweWielorodzinne:'MW wielorodzinna',terenRolniczy:'rolny',terenDrogWewnetrznych:'droga wewn.',terenDrogPublicznych:'droga publ.',terenZieleniUrzadzonej:'zieleń',brakMPZPLubWZ:'brak planu/WZ',terenUslug:'usługi',terenLasu:'las'};
 const mpzpTxt=v=>(v||'').split(';').filter(Boolean).map(x=>MPZP[x]||x.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase()).join(', ')||'–';
 async function loadTx(teryt,limit=10){
@@ -969,7 +989,7 @@ function fbContext(){
           adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
 }
 // tryb zaznaczania: najpierw obszary strony, potem opis
-const PICKABLE='.news-item, #ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
+const PICKABLE='#permits .panel, .news-item, #ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
 let PICK=[], picking=false, hoverEl=null;
 const clean=t=>(t||'').replace(/\s+/g,' ').trim();
 function describe(el){

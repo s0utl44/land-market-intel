@@ -7,6 +7,7 @@ from lmi import csv_import, synthetic
 
 os.environ.setdefault("LMI_RCN", "0")  # testy nie odpytują geoportalu (RCN odświeża się w poniedziałki)
 os.environ.setdefault("LMI_WARM_UP", "0")  # bez przeliczania w tle przy starcie strony
+os.environ.setdefault("LMI_GUNB", "0")  # testy nie pobierają rejestru GUNB
 
 
 @pytest.fixture(scope="session")
