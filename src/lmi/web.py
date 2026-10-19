@@ -637,7 +637,11 @@ def merge_features(parts: list[dict]) -> dict:
     for f in parts:
         if not isinstance(f, dict):
             continue
-        out["seller"] = out["seller"] or f.get("seller") or f.get("list_seller")
+        # jeśli którekolwiek ogłoszenie działki jest od właściciela, działka jest "prywatna" (do właściciela da się
+        # dotrzeć bezpośrednio, nawet gdy na innym portalu sprzedaje ją biuro)
+        seller = f.get("seller") or f.get("list_seller")
+        if seller == "prywatny" or out["seller"] is None:
+            out["seller"] = seller or out["seller"]
         for k in ("media", "access", "vicinity"):
             out[k] = sorted(set(out[k]) | set(f.get(k) or []))
         for k in ("negotiable", "fence"):

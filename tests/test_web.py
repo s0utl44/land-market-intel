@@ -301,7 +301,7 @@ def test_merge_features_across_portals():
         {"src": "gratka", "seller": "prywatny", "media": ["woda", "prąd"], "negotiable": True,
          "updated_at": "2026-10-05", "params": {"Media": "prąd, woda"}},
     ])
-    assert f["seller"] == "biuro" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True
+    assert f["seller"] == "prywatny" and f["media"] == ["prąd", "woda"] and f["negotiable"] is True   # któreś od właściciela
     assert f["updated_at"] == "2026-10-05" and set(f["params"]) == {"otodom", "gratka"}
 
 
