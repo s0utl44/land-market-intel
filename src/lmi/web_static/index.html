@@ -79,6 +79,18 @@ button,input,select{font:inherit}
 .summary small{color:var(--muted);font-size:.78rem}
 .delta{font-size:.8rem;font-weight:700}
 .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--muted)}
+/* nowości dla zespołu */
+.news{display:flex;flex-direction:column;gap:8px}
+.news-item{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:10px 14px}
+.news-item .tag{flex:none;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-soft);border-radius:999px;padding:2px 8px;margin-top:2px}
+.news-item div{flex:1;min-width:0}
+.news-item b{display:block}
+.news-item p{margin:2px 0 0;color:var(--ink-2);font-size:.9rem;white-space:pre-wrap}
+.news-item small{color:var(--muted);font-size:.76rem}
+.news-item button{all:unset;cursor:pointer;color:var(--muted);font-weight:700;padding:0 4px;font-size:1.1rem;line-height:1}
+.news-item button:hover{color:var(--ink)}
+.news-form{display:grid;gap:8px;margin-top:6px}
+.news-form input,.news-form textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
 /* co się zmieniło */
 .ch-charts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .ch-lists{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
@@ -334,6 +346,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
 
 <main class="wrap">
   <div class="notice" id="early" hidden></div>
+  <section class="news" id="news" aria-label="Nowości" hidden></section>
 
   <section id="changes" aria-labelledby="h-ch">
     <div class="head">
@@ -526,7 +539,7 @@ async function load(){
     $('#rank-body').innerHTML='<tr><td class="l" colspan="7"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
-  renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges();
+  renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges(); loadNews();
   api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
@@ -557,6 +570,19 @@ function renderSummary(){
     early.innerHTML=`<span aria-hidden="true">⏳</span><div><b>Ranking wstępny: dane z ${w} ${w===1?'tygodnia':'tygodni'}.</b> Liczba ofert i ceny są już wiarygodne. Tempo znikania, trend cen i czas na rynku potrzebują kilku tygodni historii: ranking zacznie mieć sens po ok. 4 tygodniach, a stabilny będzie po 2–3 miesiącach.</div>`;
   }
 }
+
+/* ---------- nowości dla zespołu (wiszą 4 dni robocze; "×" ukrywa u siebie) ---------- */
+let NEWS=[];
+const newsHidden=()=>{try{return JSON.parse(localStorage.getItem('news-hidden')||'[]')}catch(e){return []}};
+async function loadNews(){
+  try{NEWS=await api('/api/announcements')}catch(e){NEWS=[]}
+  const hidden=newsHidden(), items=NEWS.filter(n=>!hidden.includes(n.id)), box=$('#news');
+  box.hidden=!items.length;
+  box.innerHTML=items.map(n=>`<div class="news-item"><span class="tag">Nowość</span><div><b>${esc(n.title)}</b>${n.body?`<p>${esc(n.body)}</p>`:''}<small>${new Date(n.created_at).toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</small></div><button type="button" data-hide="${n.id}" aria-label="Ukryj tę nowość" title="Ukryj u mnie">×</button></div>`).join('');
+}
+$('#news').addEventListener('click',e=>{const id=e.target.dataset&&e.target.dataset.hide; if(!id)return;
+  try{localStorage.setItem('news-hidden',JSON.stringify([...newsHidden(),+id].slice(-50)))}catch(err){}
+  loadNews()});
 
 /* ---------- co się zmieniło ---------- */
 let PERIOD=7, CH=null, chReq=0;
@@ -943,7 +969,7 @@ function fbContext(){
           adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
 }
 // tryb zaznaczania: najpierw obszary strony, potem opis
-const PICKABLE='#ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
+const PICKABLE='.news-item, #ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
 let PICK=[], picking=false, hoverEl=null;
 const clean=t=>(t||'').replace(/\s+/g,' ').trim();
 function describe(el){
@@ -1058,6 +1084,8 @@ async function loadSys(badgeOnly){
   let d; try{d=await api('/api/admin/status')}catch(e){if(!badgeOnly)$('#sys-body').innerHTML='<div class="panel empty">Nie udało się pobrać statusu.</div>';return}
   const b=$('#sys-badge'); b.hidden=!d.problems; b.textContent=d.problems;
   if(badgeOnly)return;
+  // nie przerysowujemy panelu w trakcie pisania nowości (odświeżanie co minutę skasowałoby tekst)
+  const nf_=$('#news-form'); if(nf_&&(nf_.contains(document.activeElement)||$('#news-title').value||$('#news-body').value))return;
   $('#sys-time').textContent='stan z '+new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'});
   const issues=d.issues.length?d.issues.map(i=>`<div class="issue ${i.level}"><i></i><div><b>${esc(i.title)}</b><span>${esc(i.detail||'')}</span>${i.when?`<br><small>${ago(i.when)}</small>`:''}</div></div>`).join('')
     :'<div class="sys-ok">Wszystko w porządku: ostatnie pobierania przeszły.</div>';
@@ -1076,7 +1104,21 @@ async function loadSys(badgeOnly){
     <div class="panel" style="grid-column:1/-1"><h3>Portale</h3><div class="scroll">${srcs}</div></div>
     <div class="panel"><h3>Ceny transakcyjne (RCN)</h3>${rcn}</div>
     <div class="panel"><h3>Ostatnie przebiegi</h3><div class="scroll">${runs}</div></div>
-    ${qualityPanel(d.quality)}</div>`;
+    ${qualityPanel(d.quality)}
+    <div class="panel" style="grid-column:1/-1"><h3>Nowości dla zespołu</h3>
+      <div class="msg">Wiszą na górze strony przez 4 dni robocze (albo tyle, ile ustawisz). Każdy może je ukryć u siebie.</div>
+      <div id="news-admin">${NEWS.length?NEWS.map(n=>`<div class="job"><b>${esc(n.title)}</b> <small class="ar">do ${dFull(n.visible_until)}</small> <button type="button" class="btn" data-news-del="${n.id}">Usuń</button></div>`).join(''):'<div class="na">Brak aktywnych nowości.</div>'}</div>
+      <form class="news-form" id="news-form">
+        <input id="news-title" maxlength="140" required placeholder="Tytuł, np. „Działa filtr: tylko od właścicieli”">
+        <textarea id="news-body" maxlength="1500" rows="2" placeholder="Opcjonalnie: krótko, co to daje i gdzie to znaleźć"></textarea>
+        <div class="tools"><label class="check">dni robocze <input type="number" id="news-days" min="1" max="30" value="4"></label><button class="btn primary" type="submit">Opublikuj</button></div>
+      </form></div></div>`;
+  $('#news-form').addEventListener('submit',async ev=>{ev.preventDefault();
+    try{await send('/api/announcements',{title:$('#news-title').value,body:$('#news-body').value,days:+$('#news-days').value||4})}catch(e){alert('Nie udało się opublikować: '+e.message);return}
+    await loadNews(); loadSys()});
+  $('#news-admin').addEventListener('click',async ev=>{const id=ev.target.dataset&&ev.target.dataset.newsDel; if(!id||!confirm('Usunąć tę nowość ze strony?'))return;
+    try{await send('/api/announcements/'+id,null,'DELETE')}catch(e){alert('Nie udało się usunąć.');return}
+    await loadNews(); loadSys()});
 }
 function qualityPanel(q){
   const r=q&&q.report; if(!r)return '<div class="panel" style="grid-column:1/-1"><h3>Jakość danych</h3><div class="na">Raport pojawi się po najbliższej deduplikacji.</div></div>';

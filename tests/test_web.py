@@ -374,3 +374,22 @@ def test_offer_report_keeps_problem_and_links(client, monkeypatch):
     assert r.status_code == 200
     txt = client.get("/api/feedback/export", headers={"X-Auth-Request-User": "x"}).text
     assert "Problem z ofertą: nieaktualna / archiwalna" in txt and "ogłoszenie: https://b.example/2" in txt
+
+
+def test_announcements_visible_for_four_business_days(client, pg_conn, monkeypatch):
+    from datetime import date
+
+    from lmi import web
+
+    assert web.business_days_after(date(2026, 10, 16), 4) == date(2026, 10, 21)   # pt -> śr (bez weekendu)
+    assert web.business_days_after(date(2026, 10, 19), 4) == date(2026, 10, 22)   # pn -> czw
+    monkeypatch.setenv("LMI_ADMINS", "x")
+    assert client.post("/api/announcements", json={"title": "Test"}).status_code == 403
+    r = client.post("/api/announcements", headers={"X-Auth-Request-User": "x"},
+                    json={"title": "Działa filtr: tylko od właścicieli", "body": "W ofertach gminy."})
+    assert r.status_code == 200
+    items = client.get("/api/announcements").json()
+    assert [i["title"] for i in items] == ["Działa filtr: tylko od właścicieli"]
+    pg_conn.execute("UPDATE app.announcements SET visible_until = current_date - 1")
+    pg_conn.commit()
+    assert client.get("/api/announcements").json() == []                         # po terminie znika sama

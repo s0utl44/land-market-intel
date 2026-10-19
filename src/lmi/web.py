@@ -810,6 +810,57 @@ def feedback_export(request: Request, status: str = "nowe"):
     return feedback_text(feedback_rows(None if status == "wszystkie" else status))
 
 
+# --- nowości dla zespołu ------------------------------------------------------------------------------
+
+def business_days_after(start: date, days: int = 4) -> date:
+    """Ostatni dzień widoczności: `days` dni roboczych (pn–pt) licząc dzień publikacji, jeśli roboczy."""
+    d, left = start, days
+    while True:
+        if d.weekday() < 5:
+            left -= 1
+            if left == 0:
+                return d
+        d += timedelta(days=1)
+
+
+def add_announcement(conn, title: str, body: str, author: str, days: int = 4, today: date | None = None) -> dict:
+    title, body = title.strip(), (body or "").strip()
+    if not 3 <= len(title) <= 140 or len(body) > 1500:
+        raise ValueError("tytuł 3–140 znaków, treść do 1500")
+    until = business_days_after(today or date.today(), max(1, min(days, 30)))
+    return conn.execute("""INSERT INTO app.announcements (title, body, created_by, visible_until)
+                           VALUES (%s, %s, %s, %s) RETURNING announcement_id AS id, visible_until""",
+                        (title, body, author, until)).fetchone()
+
+
+@app.get("/api/announcements")
+def announcements():
+    return _rows("""SELECT announcement_id AS id, title, body, created_at, visible_until
+                    FROM app.announcements WHERE removed_at IS NULL AND visible_until >= current_date
+                    ORDER BY created_at DESC LIMIT 10""")
+
+
+@app.post("/api/announcements")
+def announcement_add(request: Request, title: str = Body(...), body: str = Body(""), days: int = Body(4)):
+    _require_admin(request)
+    with _conn() as conn:
+        try:
+            return add_announcement(conn, title, body, _user(request), days)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/announcements/{announcement_id}")
+def announcement_remove(request: Request, announcement_id: int):
+    _require_admin(request)
+    with _conn() as conn:
+        cur = conn.execute("UPDATE app.announcements SET removed_at = now() WHERE announcement_id = %s AND removed_at IS NULL",
+                           (announcement_id,))
+    if cur.rowcount == 0:
+        raise HTTPException(404, "nie ma takiej nowości")
+    return {"ok": True}
+
+
 @app.post("/api/feedback/{feedback_id}/status")
 def feedback_status(request: Request, feedback_id: int, status: str = Body(..., embed=True)):
     _require_admin(request)
