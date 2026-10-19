@@ -180,6 +180,11 @@ ORDER BY rank NULLS LAST, latest_active_supply DESC
 """
 
 
+# typy działek, dla których liczymy osobne metryki (plus "wszystkie"); strona domyślnie: budowlane
+SEGMENTS = ("wszystkie", "budowlana", "rolno-budowlana", "rolna", "rekreacyjna", "siedliskowa", "inwestycyjna",
+            "leśna")
+
+
 def weekly_region_metrics(observations: pd.DataFrame, links: pd.DataFrame) -> pd.DataFrame:
     con = duckdb.connect()
     obs = observations.copy()

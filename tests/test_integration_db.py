@@ -111,8 +111,11 @@ def test_full_pipeline_writes_marts(approved, synthetic_data):
     assert run2 == run_id + 1  # kolejne uruchomienia nie nadpisują poprzednich
     weekly, scores = db.run_metrics(approved)
     n_weekly = approved.execute("SELECT count(*) FROM mart.weekly_region_metrics").fetchone()[0]
-    assert n_weekly == len(weekly) == 3 * 26
-    top = approved.execute("SELECT municipality_name, dedup_run_id FROM mart.region_scores WHERE rank = 1").fetchone()
+    n_all = approved.execute("SELECT count(*) FROM mart.weekly_region_metrics WHERE segment = 'wszystkie'").fetchone()[0]
+    assert n_all == len(weekly) == 3 * 26 and n_weekly > n_all          # plus osobno typy działek
+    assert approved.execute("SELECT count(DISTINCT segment) FROM mart.region_scores").fetchone()[0] > 1
+    top = approved.execute("SELECT municipality_name, dedup_run_id FROM mart.region_scores "
+                           "WHERE rank = 1 AND segment = 'wszystkie'").fetchone()
     assert top == ("Syntetyczna Rozwojowa", run2)
     db.run_metrics(approved)  # przeliczenie jest idempotentne
     assert approved.execute("SELECT count(*) FROM mart.weekly_region_metrics").fetchone()[0] == n_weekly

@@ -320,14 +320,36 @@ def test_changes_snapshot_is_reused(client, pg_conn):
     from lmi import web
 
     first = client.get("/api/changes", params={"days": 1}).json()
-    n = pg_conn.execute("SELECT count(*), count(DISTINCT state) FROM mart.changes_snapshot").fetchone()
-    assert n == (3, 1)                                   # jedno przeliczenie dało wszystkie trzy okresy
-    pg_conn.execute("UPDATE mart.changes_snapshot SET data = data || '{\"marker\": 1}'")
+    n = pg_conn.execute("SELECT count(*), count(DISTINCT state) FROM mart.changes_cache").fetchone()
+    assert n == (3 * len(web.SEGMENTS), 1)               # jedno przeliczenie: wszystkie okresy i typy działek
+    pg_conn.execute("UPDATE mart.changes_cache SET data = data || '{\"marker\": 1}'")
     pg_conn.commit()
     assert client.get("/api/changes", params={"days": 30}).json()["marker"] == 1   # z zapisanych, bez liczenia
     assert first["daily"] and first["since"] == first["last_day"]
     web.refresh_changes(pg_conn)                          # wywołanie z porannego przebiegu
     assert "marker" not in client.get("/api/changes", params={"days": 7}).json()
+
+
+def test_changes_per_land_use(client):
+    build = client.get("/api/changes", params={"days": 7}).json()           # domyślnie budowlane
+    every = client.get("/api/changes", params={"days": 7, "use": "wszystkie"}).json()
+    farm = client.get("/api/changes", params={"days": 7, "use": "rolna"}).json()
+    assert build["segment"] == "budowlana" and every["segment"] == "wszystkie"
+    a, b, c = (x["daily"][-1]["active"] for x in (every, build, farm))
+    assert 0 < c < b < a and b + c <= a
+    assert sum(w["new"] for w in build["weekly"]) <= sum(w["new"] for w in every["weekly"])
+    assert client.get("/api/changes", params={"days": 7, "use": "zamek"}).status_code == 400
+
+
+def test_stats_per_land_use(client):
+    build = client.get("/api/overview").json()
+    every = client.get("/api/overview", params={"use": "wszystkie"}).json()
+    assert build["segment"] == "budowlana" and 0 < build["active_offers"] < every["active_offers"]
+    rows = client.get("/api/ranking", params={"use": "rolna"}).json()
+    assert len({r["teryt"] for r in rows}) == len(rows)                       # jedna gmina raz
+    w = client.get("/api/municipality/9900011/weekly", params={"use": "wszystkie"}).json()
+    assert w
+    assert client.get("/api/ranking", params={"use": "zamek"}).status_code == 400
 
 
 def test_changes_show_only_complete_days(client, pg_conn, tmp_path):

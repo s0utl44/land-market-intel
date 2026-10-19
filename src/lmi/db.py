@@ -190,32 +190,39 @@ def run_metrics(conn, run_id: int | None = None) -> tuple[pd.DataFrame, pd.DataF
         (run_id,),
     )
     links = pd.DataFrame(cur.fetchall(), columns=["source_id", "source_listing_id", "property_key"])
-    weekly = metrics.weekly_region_metrics(obs, links)
-    scores = metrics.region_scores(weekly)
 
-    def rows(df: pd.DataFrame) -> list[tuple]:
+    def rows(df: pd.DataFrame, segment: str) -> list[tuple]:
         def py(v):
             if pd.isna(v):
                 return None
             return v.item() if hasattr(v, "item") else v  # numpy -> typ Pythona
 
-        return [tuple(py(v) for v in r) + (run_id,) for r in df.itertuples(index=False)]
+        return [tuple(py(v) for v in r) + (run_id, segment) for r in df.itertuples(index=False)]
+
+    results = {}
+    for segment in metrics.SEGMENTS:
+        part = obs if segment == "wszystkie" else obs[obs["land_use"] == segment]
+        if part.empty:
+            continue
+        weekly = metrics.weekly_region_metrics(part, links)
+        results[segment] = (weekly, metrics.region_scores(weekly))
 
     with _committed(conn):
         conn.execute("DELETE FROM mart.weekly_region_metrics")
         conn.execute("DELETE FROM mart.region_scores")
         with conn.cursor() as c:
-            c.executemany(
-                f"""INSERT INTO mart.weekly_region_metrics ({', '.join(weekly.columns)}, dedup_run_id)
-                    VALUES ({', '.join(['%s'] * (len(weekly.columns) + 1))})""",
-                rows(weekly),
-            )
-            c.executemany(
-                f"""INSERT INTO mart.region_scores ({', '.join(scores.columns)}, dedup_run_id)
-                    VALUES ({', '.join(['%s'] * (len(scores.columns) + 1))})""",
-                rows(scores),
-            )
-    return weekly, scores
+            for segment, (weekly, scores) in results.items():
+                c.executemany(
+                    f"""INSERT INTO mart.weekly_region_metrics ({', '.join(weekly.columns)}, dedup_run_id, segment)
+                        VALUES ({', '.join(['%s'] * (len(weekly.columns) + 2))})""",
+                    rows(weekly, segment),
+                )
+                c.executemany(
+                    f"""INSERT INTO mart.region_scores ({', '.join(scores.columns)}, dedup_run_id, segment)
+                        VALUES ({', '.join(['%s'] * (len(scores.columns) + 2))})""",
+                    rows(scores, segment),
+                )
+    return results.get("wszystkie", (pd.DataFrame(), pd.DataFrame()))
 
 
 def exclude_listings(conn, source_id: str, listing_ids, reason: str) -> int:
