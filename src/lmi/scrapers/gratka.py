@@ -210,11 +210,13 @@ def parse_features(nd, pd: dict, html: str) -> dict:
     # typ ogłoszeniodawcy tylko z danych oferty: w menu strony są słowa "biuro", "deweloper" dla wszystkich ofert
     # Gratka: pole ownerType w danych oferty (krótki kod); surowy kod zapisujemy, żeby było widać nowe wartości
     owner = find_first(nd, lambda d: isinstance(d.get("ownerType"), str))
-    codes = [owner["ownerType"]] if owner is not None else [v for v in raw_fields(html, "ownerType") if isinstance(v, str)]
+    codes = [owner["ownerType"]] if owner is not None else [str(v) for v in raw_fields(html, "ownerType")]
     if codes:
-        code = codes[0].strip()
-        f["params"]["ownerType"] = code[:20]
-        f["seller"] = OWNER_TYPES.get(code.lower(), f["seller"])
+        f["params"]["ownerType"] = ",".join(c.strip()[:20] for c in codes[:3])
+        for code in codes:
+            if (seller := OWNER_TYPES.get(code.strip().lower())):
+                f["seller"] = seller
+                break
     if f["seller"] is None:
         seller = find_first(nd, lambda d: isinstance(d.get("isPrivate"), bool) or isinstance(d.get("isAgency"), bool))
         if seller is not None:

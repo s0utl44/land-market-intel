@@ -77,7 +77,8 @@ def find_first(obj, predicate, depth=0):
 
 def raw_fields(html: str, key: str) -> list:
     """Wartości pola `key` prosto z płaskiej tablicy (bez rozpakowywania całości): przydatne, gdy pole leży
-    głębiej, niż sięga `unflatten`. Zwraca tylko wartości proste (napisy, liczby, tak/nie)."""
+    głębiej, niż sięga `unflatten`. Wskaźniki (indeksy, listy indeksów, opakowania Reactive/Ref) rozwiązuje
+    do kilku poziomów i zwraca wartości proste (napisy, liczby, tak/nie), spłaszczone."""
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
     if not m:
         return []
@@ -87,12 +88,31 @@ def raw_fields(html: str, key: str) -> list:
         return []
     if not isinstance(raw, list):
         return []
+
+    def resolve(v, depth=0):
+        if depth > 6:
+            return []
+        if isinstance(v, bool) or isinstance(v, (str, float)):
+            return [v]
+        if isinstance(v, int):
+            if 0 <= v < len(raw) and depth < 6:
+                target = raw[v]
+                if isinstance(target, (str, bool, float)) or target is None:
+                    return [] if target is None else [target]
+                if isinstance(target, int):
+                    return [target]
+                return resolve(target, depth + 1)
+            return [v]
+        if isinstance(v, list):
+            items = v[1:] if v and isinstance(v[0], str) and v[0] in _WRAPPERS | {"Set"} else v
+            return [x for i in items for x in resolve(i, depth + 1)]
+        if isinstance(v, dict):
+            # obiekt typu {"value": ..., "label": ...}: bierzemy wszystkie proste pola
+            return [x for i in v.values() for x in resolve(i, depth + 1)]
+        return []
+
     out = []
     for item in raw:
         if isinstance(item, dict) and key in item:
-            v = item[key]
-            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < len(raw):
-                v = raw[v]
-            if isinstance(v, (str, int, float, bool)):
-                out.append(v)
+            out.extend(resolve(item[key]))
     return out

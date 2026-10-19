@@ -151,3 +151,10 @@ def test_owner_type_sets_seller():
 def test_owner_type_from_flat_nuxt_data():
     html = '<script id="__NUXT_DATA__" type="application/json">[{"a": 1}, {"ownerType": 2}, "user"]</script>'
     assert gratka.parse_features({}, {}, html)["seller"] == "prywatny"
+
+
+def test_owner_type_behind_index_list():
+    # ownerType -> [3] -> 3 -> "agency" (wskaźnik w liście, jak na stronach Gratki)
+    html = '<script id="__NUXT_DATA__" type="application/json">[{"a": 1}, {"ownerType": 2}, [3], "agency"]</script>'
+    f = gratka.parse_features({}, {}, html)
+    assert f["seller"] == "biuro" and f["params"]["ownerType"] == "agency"
