@@ -752,6 +752,7 @@ def merge_features(parts: list[dict]) -> dict:
 
 # --- status systemu (administrator) --------------------------------------------------------------
 
+QUALITY_JUMP = 1.25     # wzrost liczby podejrzanych grup / błędnych ogłoszeń, od którego jest powiadomienie
 STALE_MINUTES = 30      # zadanie "running" bez znaku życia dłużej = pewnie przerwane
 STATUS_TEXT = {"ok": "OK", "warning": "z ostrzeżeniem", "error": "błąd", "blocked": "blokada portalu (403)",
                "layout_changed": "portal zmienił wygląd strony", "running": "trwa"}
@@ -815,21 +816,29 @@ def admin_status(request: Request):
         elif j["state"] == "error" and j["job"] == "rcn":
             issues.append({"level": "bad", "title": f"{label}: zadanie przerwane błędem",
                            "detail": j["message"] or "", "when": j["finished_at"] or j["updated_at"]})
-    if rcn["gaps"]:
-        issues.append({"level": "info", "title": f"RCN: luki w usłudze geoportalu ({len(rcn['gaps'])})",
-                       "detail": "; ".join(rcn["gaps"][:5]), "when": rcn["last_fetch"]})
+    # zapytanie o akty bez daty geoportal odrzuca zawsze (403 po jego stronie): to nie luka w danych
+    gaps = [g for g in rcn["gaps"] if not g.startswith("akty bez daty")]
+    if gaps:
+        issues.append({"level": "info", "title": f"RCN: luki w usłudze geoportalu ({len(gaps)})",
+                       "detail": "; ".join(gaps[:5]), "when": rcn["last_fetch"]})
     if feedback_open:
         issues.append({"level": "info", "title": f"Nowe zgłoszenia od zespołu: {feedback_open}",
                        "detail": "przycisk „Zgłoszenia”", "when": None})
-    quality = _rows("""SELECT run_id, created_at AS run_at, algorithm_version, report FROM core.dedup_runs
-                       ORDER BY run_id DESC LIMIT 1""")
-    quality = quality[0] if quality else None
+    last2 = _rows("""SELECT run_id, created_at AS run_at, algorithm_version, report FROM core.dedup_runs
+                     ORDER BY run_id DESC LIMIT 2""")
+    quality = last2[0] if last2 else None
     rep = (quality or {}).get("report") or {}
-    if rep.get("suspicious"):
+    prev = (last2[1].get("report") or {}) if len(last2) > 1 else {}
+
+    def jumped(k):
+        # stały poziom widać w "Jakość danych"; powiadomienie tylko przy wyraźnym skoku względem poprzedniego przebiegu
+        return bool(rep.get(k)) and prev.get(k) is not None and rep[k] > prev[k] * QUALITY_JUMP + 10
+
+    if jumped("suspicious"):
         issues.append({"level": "info", "title": f"Deduplikacja: {rep['suspicious']} grup do sprawdzenia",
                        "detail": "połączone ogłoszenia z dużą różnicą ceny lub metrażu (sekcja Jakość danych)",
                        "when": quality["run_at"]})
-    if rep.get("outliers"):
+    if jumped("outliers"):
         issues.append({"level": "info", "title": f"Nieprawdopodobne ceny/metraże: {rep['outliers']} ogłoszeń",
                        "detail": "np. cena za m² poniżej 2 zł albo metraż poniżej 100 m² (sekcja Jakość danych)",
                        "when": quality["run_at"]})

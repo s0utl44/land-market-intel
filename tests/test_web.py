@@ -278,6 +278,20 @@ def test_admin_status(client, pg_conn, monkeypatch):
     assert d["problems"] >= 2 and d["jobs"][0]["stale"] is True
 
 
+def test_admin_status_quiet_about_known_noise(client, pg_conn, monkeypatch):
+    monkeypatch.setenv("LMI_ADMINS", "x")
+    admin = {"X-Auth-Request-User": "x"}
+    pg_conn.execute("""INSERT INTO scrape.rcn_fetch_log (teryt_prefix, matched, saved, gaps)
+                       VALUES ('02', 0, 0, 'akty bez daty: usługa odrzuca zapytanie (403)')""")
+    for rep in ('{"suspicious": 79, "outliers": 59}', '{"suspicious": 80, "outliers": 200}'):
+        pg_conn.execute("INSERT INTO core.dedup_runs (algorithm_version, params, report) VALUES ('t', '{}', %s)", (rep,))
+    pg_conn.commit()
+    titles = [i["title"] for i in client.get("/api/admin/status", headers=admin).json()["issues"]]
+    assert not any(t.startswith("RCN: luki") for t in titles)              # stały 403 geoportalu: bez powiadomienia
+    assert not any(t.startswith("Deduplikacja") for t in titles)           # 79 -> 80: stały poziom
+    assert "Nieprawdopodobne ceny/metraże: 200 ogłoszeń" in titles          # 59 -> 200: skok
+
+
 def test_job_tracking_writes_progress(pg_conn):
     import logging
 
