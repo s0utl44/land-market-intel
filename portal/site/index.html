@@ -157,7 +157,7 @@ let saved = 'auto'; try { saved = localStorage.getItem('theme') || 'auto'; } cat
 setTheme(saved); btns.forEach(b => b.onclick = () => setTheme(b.dataset.t));
 // podstrona jeszcze nie wdrożona (404): kafelek "wkrótce" zamiast linku donikąd
 document.querySelectorAll('[data-app]').forEach(a => {
-  fetch(a.dataset.app, {method: 'HEAD', credentials: 'same-origin'}).then(r => { if (r.status === 404 || r.status >= 502){
+  fetch(a.dataset.app, {credentials: 'same-origin', cache: 'no-store'})   // GET: nie każda podstrona obsługuje HEAD.then(r => { if (r.status === 404 || r.status >= 502){
     a.setAttribute('aria-disabled', 'true'); a.removeAttribute('href');
     a.querySelector('b').insertAdjacentHTML('beforeend', '<span class="soon">wkrótce</span>'); }}).catch(() => {});
 });
