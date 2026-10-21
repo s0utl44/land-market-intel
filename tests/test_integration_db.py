@@ -184,14 +184,12 @@ def test_daily_alerts_on_sudden_drop(pg_conn, tmp_path):
 
 
 def test_daily_if_needed_skips_after_success_and_errors_are_logged(pg_conn, tmp_path):
-    from datetime import date
-
-    from lmi.daily import run_daily
+    from lmi.daily import run_daily, today_pl
     from test_otodom import make_web
 
     db.add_source(pg_conn, "otodom", "Otodom")
     db.approve_source(pg_conn, "otodom", "test", "pytest")
-    day = date.today()
+    day = today_pl()   # jak w przebiegu: dzień po polsku (w CI maszyna ma UTC, między 22 a 24 UTC to inna data)
     # ponowna próba po nieudanym ranku: ma się wykonać
     class Broken:
         requests_made = 0

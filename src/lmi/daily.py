@@ -17,6 +17,7 @@ import os
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from . import db, jobs
 from .scrapers import adresowo, gratka, nonline, otodom
@@ -73,6 +74,11 @@ def write_csv(rows: list[dict], out_dir: Path, observed_at: date, source: str = 
         w.writeheader()
         w.writerows(rows)
     return path
+
+
+def today_pl() -> date:
+    """Dzisiejsza data w Polsce (przebiegi i ich sprawdzanie liczą dzień po polsku, niezależnie od strefy maszyny)."""
+    return datetime.now(ZoneInfo("Europe/Warsaw")).date()
 
 
 def already_done_today(conn, today: date, source: str = "otodom") -> bool:
@@ -161,7 +167,7 @@ def run_daily(conn, out_dir: str | Path = "data/raw", max_details: int | None = 
               geo_client: PoliteClient | None = None, history_backfill: int = HISTORY_BACKFILL_PER_RUN,
               api: OtodomApi | None = None, if_needed: bool = False,
               sources: tuple[str, ...] | None = None) -> int:
-    observed_at = observed_at or date.today()
+    observed_at = observed_at or today_pl()
     db.apply_schema(conn)
     client = client or PoliteClient()
     geo_client = geo_client or (PoliteClient(min_delay=0.3, max_delay=0.6) if isinstance(client, PoliteClient)
