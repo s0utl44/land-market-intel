@@ -10,7 +10,7 @@ services:
       - ./portal/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       - traefik.enable=true
-      - traefik.http.routers.lmi-portal.rule=Host(`${LMI_DOMAIN}`) && (Path(`/`) || Path(`/index.html`))
+      - traefik.http.routers.lmi-portal.rule=Host(`${LMI_DOMAIN}`) && (Path(`/`) || Path(`/index.html`) || PathPrefix(`/wspolne/`))
       - traefik.http.routers.lmi-portal.entrypoints=websecure
       - traefik.http.routers.lmi-portal.tls.certresolver=letsencrypt
       - traefik.http.routers.lmi-portal.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google},lmi-headers
