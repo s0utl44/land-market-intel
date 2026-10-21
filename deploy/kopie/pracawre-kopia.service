@@ -1,0 +1,8 @@
+[Unit]
+Description=Kopia zapasowa pracawre.com na Dysk Google (szyfrowana)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/lmi/deploy/kopie/kopia.sh

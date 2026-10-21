@@ -1,0 +1,9 @@
+[Unit]
+Description=Nocna kopia pracawre.com (02:40)
+
+[Timer]
+OnCalendar=*-*-* 02:40:00 Europe/Warsaw
+Persistent=true
+
+[Install]
+WantedBy=timers.target
