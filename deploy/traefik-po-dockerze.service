@@ -1,0 +1,17 @@
+# Po każdym (re)starcie Dockera (np. aktualizacja systemu) restartuje Traefika. Inaczej Traefik traci połączenie
+# z Dockerem, działa na starej liście stron i nie widzi nowych ani przebudowanych kontenerów (404 na nowej podstronie).
+# Instalacja: cp deploy/traefik-po-dockerze.service /etc/systemd/system/ && systemctl daemon-reload
+#             && systemctl enable --now traefik-po-dockerze.service
+[Unit]
+Description=Restart Traefika po starcie Dockera (pracawre.com)
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# chwila na start kontenerów; brak Traefika (np. inna nazwa) nie jest błędem
+ExecStart=/bin/sh -c 'sleep 15; docker restart traefik-traefik-1 >/dev/null 2>&1 || true'
+
+[Install]
+WantedBy=docker.service
