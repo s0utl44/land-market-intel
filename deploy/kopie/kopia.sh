@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Nocna kopia zapasowa pracawre.com -> Dysk współdzielony Google (szyfrowana AES-256 przed wysłaniem, RODO).
 #   radar-baza.dump  – baza radaru (pg_dump),  umowy-dane.tgz – generator (umowy, klienci, pośrednicy, zgłoszenia, wzory),
-#   ustawienia.tgz   – pliki .env obu projektów (klucze; potrzebne do odtworzenia serwera).
+#   protokoly-baza.dump, protokoly-zdjecia.tgz – protokoły WRE (baza i zdjęcia),
+#   ustawienia.tgz   – pliki .env projektów (klucze; potrzebne do odtworzenia serwera).
 # Rotacja: dzienne/<data> przez 14 dni, miesieczne/<rok-mies> (z 1. dnia miesiąca) przez ok. rok.
 # Ustawienia w /opt/kopie: google.json (klucz konta usługi), haslo (hasło szyfrowania), ustawienia (DYSK_ID=...).
 # Odtworzenie: deploy/kopie/README.md.
@@ -16,8 +17,13 @@ trap 'rm -rf "$TMP"' EXIT
 
 (cd /opt/lmi && docker compose exec -T db pg_dump -U lmi -Fc lmi) > "$TMP/radar-baza.dump"
 tar -C /opt -czf "$TMP/umowy-dane.tgz" umowy-dane
-tar -C /opt -czf "$TMP/ustawienia.tgz" lmi/.env umowy/.env
-for f in "$TMP/radar-baza.dump" "$TMP/umowy-dane.tgz" "$TMP/ustawienia.tgz"; do
+# protokoły (jeśli zainstalowane): baza + zdjęcia
+if [ -d /opt/protokoly ]; then
+  (cd /opt/protokoly && docker compose exec -T db pg_dump -U protokoly -Fc protokoly) > "$TMP/protokoly-baza.dump"
+  tar -C /opt -czf "$TMP/protokoly-zdjecia.tgz" protokoly-dane
+fi
+tar -C /opt -czf "$TMP/ustawienia.tgz" lmi/.env umowy/.env $( [ -f /opt/protokoly/.env ] && echo protokoly/.env )
+for f in "$TMP"/*.dump "$TMP"/*.tgz; do
   openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass "file:$K/haslo" -in "$f" -out "$f.enc"
   rm "$f"
 done
