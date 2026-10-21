@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>Radar Działek · DoneHome</title>
-<link rel="icon" href="/static/sygnet-donehome.svg">
+<link rel="icon" href="static/sygnet-donehome.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700&display=swap">
@@ -549,7 +549,7 @@ const syncOfferUse=()=>{$('#f-use').value=USE==='wszystkie'?'':USE};
 $('#use').onchange=async()=>{
   USE=$('#use').value; try{localStorage.setItem('use',USE)}catch(e){}
   syncOfferUse();
-  try{[OV,RANK]=await Promise.all([api('/api/overview'+useQ()),api('/api/ranking'+useQ())])}catch(e){return}
+  try{[OV,RANK]=await Promise.all([api('api/overview'+useQ()),api('api/ranking'+useQ())])}catch(e){return}
   rankLimit=PAGE; renderSummary(); renderRank(); loadChanges();
   if(selected)select(selected,false);
 };
@@ -558,14 +558,14 @@ const PAGE=20; let rankLimit=PAGE;
 async function load(){
   try{
     syncOfferUse();
-    [OV,RANK]=await Promise.all([api('/api/overview'+useQ()),api('/api/ranking'+useQ())]);
+    [OV,RANK]=await Promise.all([api('api/overview'+useQ()),api('api/ranking'+useQ())]);
   }catch(e){
     $('#status').innerHTML='<span><i class="dot bad"></i>Nie udało się pobrać danych. Odśwież stronę za chwilę.</span>';
     $('#rank-body').innerHTML='<tr><td class="l" colspan="8"><div class="empty">Brak połączenia z bazą danych.</div></td></tr>';
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges(); loadNews();
-  api('/api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('/api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
+  api('api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
@@ -576,12 +576,12 @@ function renderAttempt(){
 }
 function renderStatus(){
   const r=OV.last_run;
-  if(!r){$('#status').innerHTML='<span><i class="dot warn"></i>Pierwsze pobieranie danych jeszcze trwa</span><a href="/metabase/">Metabase ↗</a>';return}
+  if(!r){$('#status').innerHTML='<span><i class="dot warn"></i>Pierwsze pobieranie danych jeszcze trwa</span><a href="metabase/">Metabase ↗</a>';return}
   const t=new Date(r.finished_at);
   const age=(Date.now()-t)/36e5;
   const cls=r.status!=='ok'?'warn':age>30?'bad':'';
   const when=t.toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  $('#status').innerHTML=`<span><i class="dot ${cls}"></i>Aktualizacja: ${when}${age>30?' (ponad dobę temu)':''}</span><a href="/metabase/">Metabase ↗</a>`;
+  $('#status').innerHTML=`<span><i class="dot ${cls}"></i>Aktualizacja: ${when}${age>30?' (ponad dobę temu)':''}</span><a href="metabase/">Metabase ↗</a>`;
 }
 
 function renderSummary(){
@@ -600,7 +600,7 @@ function renderSummary(){
 let NEWS=[];
 const newsHidden=()=>{try{return JSON.parse(localStorage.getItem('news-hidden')||'[]')}catch(e){return []}};
 async function loadNews(){
-  try{NEWS=await api('/api/announcements')}catch(e){NEWS=[]}
+  try{NEWS=await api('api/announcements')}catch(e){NEWS=[]}
   const hidden=newsHidden(), items=NEWS.filter(n=>!hidden.includes(n.id)), box=$('#news');
   box.hidden=!items.length;
   box.innerHTML=items.map(n=>`<div class="news-item"><span class="tag">Nowość</span><div><b>${esc(n.title)}</b>${n.body?`<p>${esc(n.body)}</p>`:''}<small>${new Date(n.created_at).toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</small></div><button type="button" data-hide="${n.id}" aria-label="Ukryj tę nowość" title="Ukryj u mnie">×</button></div>`).join('');
@@ -618,7 +618,7 @@ const delta=(now,before,inv)=>{if(now==null||!before)return '';const d=(now/befo
   const up=d>0;return `<span class="delta ${(up!==!!inv)?'up':'down'}">${up?'▲':'▼'} ${nf(Math.abs(d),1)}%</span>`};
 async function loadChanges(){
   const id=++chReq;
-  let d; try{d=await api('/api/changes?days='+PERIOD+useQ('&'))}catch(e){$('#ch-charts').innerHTML='<div class="panel empty" style="grid-column:1/-1">Nie udało się pobrać zmian.</div>';return}
+  let d; try{d=await api('api/changes?days='+PERIOD+useQ('&'))}catch(e){$('#ch-charts').innerHTML='<div class="panel empty" style="grid-column:1/-1">Nie udało się pobrać zmian.</div>';return}
   if(id!==chReq)return; CH=d;
   const days=d.daily, last=days[days.length-1], inP=days.filter(x=>x.d>=d.since);
   const before=days.filter(x=>x.d<d.since).slice(-1)[0];
@@ -766,7 +766,7 @@ async function select(teryt,scroll){
   $('#t-tx-n').textContent=r&&r.tx_12m?r.tx_12m:''; $('#t-of-n').textContent=r&&r.supply?r.supply:'';
   if(scroll)sec.scrollIntoView({block:'start'});
   $('#charts').innerHTML='<div class="panel empty">Ładowanie wykresów…</div>';
-  try{ drawCharts(await api(`/api/municipality/${teryt}/weekly`+useQ())); }
+  try{ drawCharts(await api(`api/municipality/${teryt}/weekly`+useQ())); }
   catch(e){ $('#charts').innerHTML='<div class="panel empty">Nie udało się pobrać wykresów dla tej gminy.</div>'; }
   loadTx(teryt); loadPermits(teryt);
   offersLimit=OFFERS_PAGE; loadOffers();
@@ -780,7 +780,7 @@ $('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='Arro
 
 async function loadPermits(teryt){
   const box=$('#permits'); box.innerHTML='';
-  let d; try{d=await api(`/api/municipality/${teryt}/permits`)}catch(e){return}
+  let d; try{d=await api(`api/municipality/${teryt}/permits`)}catch(e){return}
   if(teryt!==selected||!d.summary.data_until)return;
   const s=d.summary, q=d.quarters.slice(-16), qmax=Math.max(1,...q.map(x=>x.houses));
   const ch=s.houses_prev_12m?(s.houses_12m/s.houses_prev_12m-1)*100:null;
@@ -796,7 +796,7 @@ const MPZP={budownictwoMieszkanioweJednorodzinne:'MN jednorodzinna',budownictwoM
 const mpzpTxt=v=>(v||'').split(';').filter(Boolean).map(x=>MPZP[x]||x.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase()).join(', ')||'–';
 async function loadTx(teryt,limit=10){
   const box=$('#tx'); box.innerHTML='<div class="panel empty">Ładowanie transakcji…</div>';
-  let d; try{d=await api(`/api/municipality/${teryt}/transactions?limit=${limit}`)}catch(e){box.innerHTML='<div class="panel empty">Nie udało się pobrać transakcji.</div>';return}
+  let d; try{d=await api(`api/municipality/${teryt}/transactions?limit=${limit}`)}catch(e){box.innerHTML='<div class="panel empty">Nie udało się pobrać transakcji.</div>';return}
   if(teryt!==selected)return;
   const s=d.summary;
   if(!s.data_until){box.innerHTML='<div class="panel empty">Ceny transakcyjne pojawią się po pierwszym pobraniu z RCN.</div>';return}
@@ -934,8 +934,8 @@ async function send(u,body,method='POST'){
 async function toggleFav(tr){
   const r=ROWS[tr.dataset.id]; if(!r)return;
   try{
-    if(r.fav)await send('/api/favorites/remove',{keys:r.listing_keys});
-    else await send('/api/favorites',{key:r.listing_keys[0]});
+    if(r.fav)await send('api/favorites/remove',{keys:r.listing_keys});
+    else await send('api/favorites',{key:r.listing_keys[0]});
   }catch(e){alert('Nie udało się zapisać ulubionych. Spróbuj ponownie.');return}
   r.fav=!r.fav;
   const users=new Set(r.fav_users||[]); r.fav?users.add(ME.user):users.delete(ME.user);
@@ -956,16 +956,16 @@ async function toggleComments(tr,btn){
   tr.after(row);
   const list=row.querySelector('.cm-list');
   const reload=async()=>{
-    try{const cs=await api('/api/comments?keys='+encodeURIComponent(r.listing_keys.join(',')));
+    try{const cs=await api('api/comments?keys='+encodeURIComponent(r.listing_keys.join(',')));
       list.innerHTML=cs.length?cs.map(cmItem).join(''):'<div class="na">Brak komentarzy. Dodaj pierwszy.</div>';
       r.comments=cs.length;
       document.querySelectorAll(`tr[data-id="${CSS.escape(r.id)}"] td.team`).forEach(td=>{td.innerHTML=teamCell(r);td.querySelector('.cmb').setAttribute('aria-expanded','true')});
     }catch(e){list.innerHTML='<div class="na">Nie udało się pobrać komentarzy.</div>'}};
   row.querySelector('form').addEventListener('submit',async ev=>{
     ev.preventDefault(); const ta=row.querySelector('textarea'), body=ta.value.trim(); if(!body)return;
-    try{await send('/api/comments',{key:r.listing_keys[0],body}); ta.value=''; reload()}catch(e){alert('Nie udało się dodać komentarza.')}});
+    try{await send('api/comments',{key:r.listing_keys[0],body}); ta.value=''; reload()}catch(e){alert('Nie udało się dodać komentarza.')}});
   list.addEventListener('click',async ev=>{const id=ev.target.dataset&&ev.target.dataset.del; if(!id||!confirm('Usunąć ten komentarz?'))return;
-    try{await send('/api/comments/'+id,null,'DELETE'); reload()}catch(e){alert('Nie udało się usunąć komentarza.')}});
+    try{await send('api/comments/'+id,null,'DELETE'); reload()}catch(e){alert('Nie udało się usunąć komentarza.')}});
   reload(); row.querySelector('textarea').focus();
 }
 function teamClicks(tbody){
@@ -976,7 +976,7 @@ function teamClicks(tbody){
 async function loadFavs(){
   const body=$('#favs-body');
   body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Ładowanie…</div></td></tr>';
-  let rows; try{rows=await api('/api/favorites')}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ulubionych.</div></td></tr>';return}
+  let rows; try{rows=await api('api/favorites')}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ulubionych.</div></td></tr>';return}
   body.innerHTML=rows.length?rows.map(r=>offerRow(r,{gmina:true})).join(''):'<tr><td colspan="6" class="l"><div class="empty">Nie masz jeszcze ulubionych. Kliknij ☆ przy ofercie w tabeli gminy.</div></td></tr>';
   $('#fav-btn').textContent=`★ Ulubione${rows.length?' ('+rows.length+')':''}`;
 }
@@ -994,7 +994,7 @@ async function loadOffers(){
   const id=++offersReq, body=$('#offers-body');
   body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Ładowanie ofert…</div></td></tr>';
   let rows;
-  try{rows=await api(`/api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
+  try{rows=await api(`api/municipality/${selected}/offers?${p}`)}catch(e){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Nie udało się pobrać ofert.</div></td></tr>';return}
   if(id!==offersReq)return;
   if(!rows.length){body.innerHTML='<tr><td colspan="6" class="l"><div class="empty">Brak aktywnych ofert spełniających filtry. Zmień lub wyczyść filtry.</div></td></tr>';$('#offers-more').innerHTML='';return}
   body.innerHTML=rows.map(r=>offerRow(r)).join('');
@@ -1091,24 +1091,24 @@ $('#fb-form').addEventListener('submit',async ev=>{
   try{
     const extra=REPORT?{problem,dzialka:REPORT.id,ogloszenia:(REPORT.offers||[{url:REPORT.url}]).map(o=>o.url).filter(Boolean).join(' | '),
       gmina:REPORT.municipality||fbContext().gmina,teryt:REPORT.teryt||fbContext().teryt}:{};
-    const r=await send('/api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | '),...extra}});
+    const r=await send('api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | '),...extra}});
     $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value=''; PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[];
     setTimeout(()=>$('#fb-dialog').close(),1400); if(ME.is_admin&&!$('#fbl').hidden)loadFbl();
   }catch(e){$('#fb-msg').textContent='Nie udało się wysłać. Spróbuj ponownie.';$('#fb-send').disabled=false}
 });
 async function loadFbl(){
   const list=$('#fbl-list'); list.innerHTML='<div class="empty">Ładowanie…</div>';
-  let rows; try{rows=await api('/api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
+  let rows; try{rows=await api('api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
   $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
   list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
     <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div>${r.context&&r.context.problem?`<div><span class="pill warn">${esc(r.context.problem)}</span></div>`:''}<p>${esc(r.body)}</p>${r.context&&r.context.ogloszenia?`<div class="meta">${r.context.ogloszenia.split(' | ').map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,'').slice(0,60))}</a>`).join(' · ')}</div>`:''}${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
     <div><button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
 }
 $('#fbl-list').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-fb]');if(!b)return;
-  try{await send(`/api/feedback/${b.dataset.fb}/status`,{status:b.dataset.st});loadFbl()}catch(e){alert('Nie udało się zmienić statusu.')}});
+  try{await send(`api/feedback/${b.dataset.fb}/status`,{status:b.dataset.st});loadFbl()}catch(e){alert('Nie udało się zmienić statusu.')}});
 $('#fbl-all').addEventListener('change',loadFbl);
 $('#fbl-copy').addEventListener('click',async()=>{
-  try{const r=await fetch('/api/feedback/export?status='+($('#fbl-all').checked?'wszystkie':'nowe'),{credentials:'same-origin'});
+  try{const r=await fetch('api/feedback/export?status='+($('#fbl-all').checked?'wszystkie':'nowe'),{credentials:'same-origin'});
     const txt=await r.text(); await navigator.clipboard.writeText(txt);
     $('#fbl-copy').textContent='Skopiowano ✓'; setTimeout(()=>$('#fbl-copy').textContent='Kopiuj wszystkie',1600);
   }catch(e){alert('Nie udało się skopiować. Otwórz /api/feedback/export i skopiuj ręcznie.')}});
@@ -1122,7 +1122,7 @@ const stPill=(state,stale)=>{const [c,t]=stale?['warn','bez znaku życia']:(ST[s
 const ago=t=>{if(!t)return '–';const m=Math.round((Date.now()-new Date(t))/6e4);return m<1?'przed chwilą':m<60?`${m} min temu`:m<1440?`${Math.round(m/60)} godz. temu`:new Date(t).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})};
 let sysTimer=null;
 async function loadSys(badgeOnly){
-  let d; try{d=await api('/api/admin/status')}catch(e){if(!badgeOnly)$('#sys-body').innerHTML='<div class="panel empty">Nie udało się pobrać statusu.</div>';return}
+  let d; try{d=await api('api/admin/status')}catch(e){if(!badgeOnly)$('#sys-body').innerHTML='<div class="panel empty">Nie udało się pobrać statusu.</div>';return}
   const b=$('#sys-badge'); b.hidden=!d.problems; b.textContent=d.problems;
   if(badgeOnly)return;
   // nie przerysowujemy panelu w trakcie pisania nowości (odświeżanie co minutę skasowałoby tekst)
@@ -1155,10 +1155,10 @@ async function loadSys(badgeOnly){
         <div class="tools"><label class="check">dni robocze <input type="number" id="news-days" min="1" max="30" value="4"></label><button class="btn primary" type="submit">Opublikuj</button></div>
       </form></div></div>`;
   $('#news-form').addEventListener('submit',async ev=>{ev.preventDefault();
-    try{await send('/api/announcements',{title:$('#news-title').value,body:$('#news-body').value,days:+$('#news-days').value||4})}catch(e){alert('Nie udało się opublikować: '+e.message);return}
+    try{await send('api/announcements',{title:$('#news-title').value,body:$('#news-body').value,days:+$('#news-days').value||4})}catch(e){alert('Nie udało się opublikować: '+e.message);return}
     await loadNews(); loadSys()});
   $('#news-admin').addEventListener('click',async ev=>{const id=ev.target.dataset&&ev.target.dataset.newsDel; if(!id||!confirm('Usunąć tę nowość ze strony?'))return;
-    try{await send('/api/announcements/'+id,null,'DELETE')}catch(e){alert('Nie udało się usunąć.');return}
+    try{await send('api/announcements/'+id,null,'DELETE')}catch(e){alert('Nie udało się usunąć.');return}
     await loadNews(); loadSys()});
 }
 function qualityPanel(q){

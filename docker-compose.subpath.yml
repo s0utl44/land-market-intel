@@ -1,0 +1,27 @@
+# Radar jako podstrona domeny (np. https://domena.pl/radar/) zamiast osobnego adresu.
+# Dokładane na końcu COMPOSE_FILE w .env, po web.yml (i google.yml, jeśli jest):
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.web.yml:docker-compose.google.yml:docker-compose.subpath.yml
+# W .env: LMI_DOMAIN=domena.pl, LMI_BASE_PATH=/radar (bez ukośnika na końcu).
+# Logowanie (/oauth2) zostaje w katalogu głównym domeny: jedno konto i jedna sesja dla wszystkich podstron.
+services:
+  web:
+    environment:
+      LMI_BASE_PATH: ${LMI_BASE_PATH:?ustaw LMI_BASE_PATH w .env, np. /radar}
+    labels:
+      - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN}`) && (Path(`${LMI_BASE_PATH}`) || PathPrefix(`${LMI_BASE_PATH}/`))
+      - traefik.http.routers.lmi.priority=50
+      - traefik.http.routers.lmi.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google},lmi-headers,lmi-slash,lmi-strip
+      # /radar -> /radar/ (strona używa adresów względnych)
+      - traefik.http.middlewares.lmi-slash.redirectregex.regex=^(https?://[^/]+${LMI_BASE_PATH})$$
+      - traefik.http.middlewares.lmi-slash.redirectregex.replacement=$${1}/
+      - traefik.http.middlewares.lmi-strip.stripprefix.prefixes=${LMI_BASE_PATH}
+
+  metabase:
+    environment:
+      MB_SITE_URL: https://${LMI_DOMAIN}${LMI_BASE_PATH}/metabase
+    labels:
+      - traefik.http.routers.lmi-mb.rule=Host(`${LMI_DOMAIN}`) && PathPrefix(`${LMI_BASE_PATH}/metabase`)
+      - traefik.http.routers.lmi-mb.priority=100   # przed stroną radaru, która łapie całe ${LMI_BASE_PATH}/
+      - traefik.http.routers.lmi-mb.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google},lmi-headers,lmi-mb-slash,lmi-mb-strip
+      - traefik.http.middlewares.lmi-mb-slash.redirectregex.regex=^(https?://[^/]+${LMI_BASE_PATH}/metabase)$$
+      - traefik.http.middlewares.lmi-mb-strip.stripprefix.prefixes=${LMI_BASE_PATH}/metabase

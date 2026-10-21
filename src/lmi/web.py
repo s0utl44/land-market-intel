@@ -11,6 +11,7 @@ import threading
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import quote
 
 import psycopg
 from psycopg import sql
@@ -26,6 +27,9 @@ STATIC = Path(__file__).parent / "web_static"
 
 app = FastAPI(title="Radar Działek", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+# adres strony w domenie, np. "/radar/" (podstrona); "/" = katalog główny domeny. Strona używa adresów względnych,
+# więc działa pod każdą ścieżką; to ustawienie potrzebne jest tylko do powrotu po wylogowaniu.
+BASE_PATH = "/" + os.environ.get("LMI_BASE_PATH", "").strip("/") + "/" if os.environ.get("LMI_BASE_PATH", "").strip("/") else "/"
 
 
 def _conn():
@@ -72,7 +76,8 @@ def _require_admin(request: Request) -> None:
 def me(request: Request):
     email = request.headers.get("x-auth-request-email")
     return {"email": email, "user": _user(request), "is_admin": _user(request) in _admins(),
-            "logout_url": "/oauth2/sign_out?rd=%2F" if email else None}
+            # logowanie jest wspólne dla domeny (/oauth2 w katalogu głównym); po wylogowaniu wracamy na podstronę
+            "logout_url": "/oauth2/sign_out?rd=" + quote(BASE_PATH, safe="") if email else None}
 
 
 SEGMENT_DEFAULT = "budowlana"
