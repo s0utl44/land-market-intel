@@ -116,7 +116,42 @@
     wypelnij(el);
   }
 
-  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny };
+  // Kartoteka (wspólna baza osób i mieszkań) – panel na całe okno w ramce, otwierany z Generatora i Protokołów
+  // (bez linku w pasku – decyzja użytkownika). parametry: {osoba: id} albo {mieszkanie: id}; poZamknieciu – np. odświeżenie.
+  function kartoteka(parametry, poZamknieciu) {
+    if (document.getElementById("pracawre-kartoteka")) return;
+    if (!document.getElementById("pracawre-kartoteka-styl")) {
+      var st = document.createElement("style");
+      st.id = "pracawre-kartoteka-styl";
+      st.textContent = "#pracawre-kartoteka{position:fixed;inset:0;z-index:2147483000;background:rgba(15,14,12,.5);display:flex;padding:14px;" +
+        "animation:pkPoj .18s ease-out}#pracawre-kartoteka iframe{flex:1;border:0;border-radius:16px;background:#f4f2ed;" +
+        "box-shadow:0 24px 70px rgba(0,0,0,.35)}html[data-theme=dark] #pracawre-kartoteka iframe{background:#17181a}" +
+        "@keyframes pkPoj{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}" +
+        "@media (max-width:640px){#pracawre-kartoteka{padding:0}#pracawre-kartoteka iframe{border-radius:0}}";
+      document.head.appendChild(st);
+    }
+    var q = "osadzona=1";
+    for (var k in parametry || {}) q += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(parametry[k]);
+    var tlo = document.createElement("div");
+    tlo.id = "pracawre-kartoteka";
+    tlo.innerHTML = '<iframe title="Kartoteka" src="/kartoteka/?' + q + '"></iframe>';
+    var poprzedni = document.activeElement, przewijanie = document.documentElement.style.overflow;
+    function zamknij() {
+      tlo.remove(); window.removeEventListener("message", wiad); document.removeEventListener("keydown", klaw);
+      document.documentElement.style.overflow = przewijanie;
+      if (poprzedni && poprzedni.focus) poprzedni.focus();
+      if (poZamknieciu) poZamknieciu();
+    }
+    function wiad(e) { if (e.origin === location.origin && e.data && e.data.typ === "kartoteka-zamknij") zamknij(); }
+    function klaw(e) { if (e.key === "Escape") zamknij(); }
+    tlo.addEventListener("click", function (e) { if (e.target === tlo) zamknij(); });
+    window.addEventListener("message", wiad); document.addEventListener("keydown", klaw);
+    document.documentElement.style.overflow = "hidden";
+    document.body.appendChild(tlo);
+    tlo.querySelector("iframe").focus();
+  }
+
+  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); });
   styl();
