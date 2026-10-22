@@ -13,8 +13,10 @@
   var APPS = [
     { href: "/umowy/", obszar: "umowy", nazwa: "Generator umów", krotko: "Umowy", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
     { href: "/protokoly/", obszar: "protokoly", nazwa: "Zarządzanie", krotko: "Zarządz.", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
-    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", krotko: "Radar", ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' }
+    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", krotko: "Radar", zastrzezony: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
+    { href: "/odprawa/", obszar: "odprawa", nazwa: "Odprawa", krotko: "Odprawa", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
   ];
+  // zastrzezony: zakładka ukryta, dopóki konto (panel Administracja) nie potwierdzi dostępu – bez mignięcia u osób bez uprawnień
   var IKONY = {
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
     light: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>',
@@ -89,9 +91,11 @@
     if (!el) return;
     styl();
     var sciezka = location.pathname;
+    var znane = kontoZapamietane();
     var apps = APPS.map(function (a) {
       var akt = sciezka.indexOf(a.href) === 0 || sciezka + "/" === a.href;
-      return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (akt ? ' aria-current="page"' : "") + ">" + svg(a.ikona) +
+      var ukryj = znane ? !widoczny(a, znane) : a.zastrzezony;
+      return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (akt ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" + svg(a.ikona) +
         '<span class="d">' + a.nazwa + '</span><span class="k">' + a.krotko + "</span></a>";
     }).join("");
     el.innerHTML =
@@ -119,10 +123,16 @@
   // Uprawnienia (panel Administracja): bez dostępu do obszaru – podstrona znika z paska; administrator – przycisk panelu.
   // Pamięć w sessionStorage, żeby pasek nie mrugał przy przechodzeniu między stronami.
   var kontoP = null;
+  function kontoZapamietane() {
+    try { return JSON.parse(sessionStorage.getItem("pracawre-konto") || "null"); } catch (e) { return null; }
+  }
+  function widoczny(a, k) {
+    var p = (k.obszary || {})[a.obszar];
+    return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
+  }
   function konto() {
     if (kontoP) return kontoP;
-    var zap = null;
-    try { zap = JSON.parse(sessionStorage.getItem("pracawre-konto") || "null"); } catch (e) {}
+    var zap = kontoZapamietane();
     var swieze = fetch("/administracja/api/ja", { credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (k) { if (k) try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {} return k; })
@@ -133,7 +143,10 @@
   }
   function uprawnieniaWPasku(el, k) {
     if (!k || !el) return;
-    el.querySelectorAll("[data-obszar]").forEach(function (a) { a.hidden = (k.obszary || {})[a.dataset.obszar] === "brak"; });
+    APPS.forEach(function (a) {
+      var link = el.querySelector('[data-obszar="' + a.obszar + '"]');
+      if (link) link.hidden = !widoczny(a, k);
+    });
     var adm = el.querySelector(".pp-adm");
     if (adm) {
       adm.hidden = !k.admin;
@@ -198,7 +211,8 @@
     { id: "umowy", nazwa: "Generator umów", sciezka: "/umowy" },
     { id: "protokoly", nazwa: "Zarządzanie", sciezka: "/protokoly" },
     { id: "kartoteka", nazwa: "Kartoteka", sciezka: "/kartoteka" },
-    { id: "radar", nazwa: "Radar działek", sciezka: "/radar" }
+    { id: "radar", nazwa: "Radar działek", sciezka: "/radar" },
+    { id: "odprawa", nazwa: "Odprawa", sciezka: "/odprawa" }
   ];
   var RODZAJE_ZGL = [["blad", "Błąd"], ["poprawka", "Poprawka"], ["pomysl", "Pomysł"]];
   var STANY_ZGL = { nowe: "Nowe", w_toku: "W toku", zrobione: "Zrobione", odrzucone: "Odrzucone" };
@@ -290,7 +304,8 @@
         }).join("") : '<div class="mz"><small>Jeszcze nic nie zgłaszano z tego konta.</small></div>';
       });
     }
-    var dostepneObszary = OBSZARY_ZGL;
+    var zastrzezone = APPS.filter(function (a) { return a.zastrzezony; }).map(function (a) { return a.obszar; });
+    var dostepneObszary = OBSZARY_ZGL.filter(function (o) { return zastrzezone.indexOf(o.id) < 0; });   // do odpowiedzi konta
     tlo.addEventListener("click", function (e) {
       if (e.target === tlo || e.target.closest("[data-x]")) return zamknij();
       var o = e.target.closest("[data-o]"), r = e.target.closest("[data-r]");
@@ -320,7 +335,7 @@
     rysuj(dostepneObszary);
     konto().then(function (k) {      // tylko obszary, do których konto ma dostęp
       if (!k || !document.body.contains(tlo)) return;
-      dostepneObszary = OBSZARY_ZGL.filter(function (o) { return o.id === "ogolne" || (k.obszary || {})[o.id] !== "brak"; });
+      dostepneObszary = OBSZARY_ZGL.filter(function (o) { var p = (k.obszary || {})[o.id]; return o.id === "ogolne" || p === "dostep" || p === "admin"; });
       rysuj(dostepneObszary);
     });
   }
