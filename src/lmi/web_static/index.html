@@ -524,7 +524,9 @@ const $=s=>document.querySelector(s);
 const nf=(v,d=0)=>v==null||isNaN(v)?'–':Number(v).toLocaleString('pl-PL',{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=(v,d=1)=>v==null?'–':nf(v*100,d)+'%';
 const sgn=v=>v==null?'–':(v>0?'+':v<0?'−':'')+nf(Math.abs(v*100),1)+'%';
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// linki z ogłoszeń i zgłoszeń: tylko http(s) – „javascript:” z cudzych danych nigdy nie trafi do href
+const escU=u=>/^https?:\/\//i.test(String(u??'').trim())?esc(String(u).trim()):'#';
 const lat=n=>{const t=n%10,h=n%100;return n===1?'rok':(t>=2&&t<=4&&(h<12||h>14))?'lata':'lat'};
 // wiek oferty: dni, potem miesiące, od 2 lat pełne lata
 const SRC={otodom:'Otodom',gratka:'Gratka','nieruchomosci-online':'Nieruchomości-online',adresowo:'Adresowo'};
@@ -655,7 +657,7 @@ async function loadChanges(){
   if(pm.length>1)miniChart(box,{title:'Pozwolenia na domy (GUNB)',sub:'miesięcznie, województwo',
     labels:pm.map(x=>new Date(x.month+'T00:00:00').toLocaleDateString('pl-PL',{month:'short',year:'2-digit'})),
     bars:[{name:'pozwolenia',cls:'o',color:'var(--good)',vals:pm.map(x=>x.houses)}],fmt:v=>nf(v)});
-  const offerLi=(o,right,sub)=>`<li><span class="g" data-t="${esc(o.teryt)}" title="Pokaż gminę ${esc(o.gmina)}">${esc(o.gmina)}</span>${o.url?`<a class="ext" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${right} ↗</a>`:`<span>${right}</span>`}<small>${sub}</small></li>`;
+  const offerLi=(o,right,sub)=>`<li><span class="g" data-t="${esc(o.teryt)}" title="Pokaż gminę ${esc(o.gmina)}">${esc(o.gmina)}</span>${o.url?`<a class="ext" href="${escU(o.url)}" target="_blank" rel="noopener noreferrer">${right} ↗</a>`:`<span>${right}</span>`}<small>${sub}</small></li>`;
   const list=(title,rows,fn,empty)=>`<div class="panel lst"><h3>${title}</h3>${rows.length?`<ol>${rows.map(fn).join('')}</ol>`:`<div class="na" style="font-size:.84rem">${empty}</div>`}</div>`;
   $('#ch-lists').innerHTML=
     list('Największe obniżki',d.cuts.slice(0,5),o=>offerLi(o,`<span class="pill warn">▼ ${nf(-o.change,1)}%</span>`,`${nf(o.area)} m² · ${nf(o.before)} → ${nf(o.price)} zł · ${nf(o.ppm2)} zł/m²`),'Brak obniżek w tym okresie.')+
@@ -919,14 +921,14 @@ function offerRow(r,opts={}){
     const cut=r.price_change<=-1?` · <b class="down" style="color:var(--bad)">▼ ${nf(-r.price_change,1)}%</b>`:r.price_change>=1?` · ▲ ${nf(r.price_change,1)}%`:'';
     // pozostałe ogłoszenia tej działki (inne portale / kopie): portal i cena, najświeższe pierwsze
     const others=(r.offers||[]).filter(x=>x.url!==r.url);
-    const more=others.length?`<span class="sub2 others">${others.slice(0,3).map(x=>`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${x.active?'aktywne':'nieaktywne'}${x.refreshed?', aktualizacja '+dFull(x.refreshed):''}"${x.active?'':' class="inactive"'}>${esc(SRC[x.source]||x.source)} ${nf(x.price)}</a>`).join(' · ')}${others.length>3?` · +${others.length-3}`:''}</span>`:'';
+    const more=others.length?`<span class="sub2 others">${others.slice(0,3).map(x=>`<a href="${escU(x.url)}" target="_blank" rel="noopener noreferrer" title="${x.active?'aktywne':'nieaktywne'}${x.refreshed?', aktualizacja '+dFull(x.refreshed):''}"${x.active?'':' class="inactive"'}>${esc(SRC[x.source]||x.source)} ${nf(x.price)}</a>`).join(' · ')}${others.length>3?` · +${others.length-3}`:''}</span>`:'';
     return `<tr data-id="${esc(r.id)}">
     <td class="l team">${teamCell(r)}</td>
     <td class="l two-line wide"><b>${esc(r.land_use||'działka')}</b>${r.land_use_source==='tytuł'||r.land_use_source==='opis'?`<span class="ar" title="Portal nie podaje rodzaju tej działki: ustalony z ${r.land_use_source==='tytuł'?'tytułu':'opisu'} ogłoszenia">*</span>`:''} · <span title="${nf(r.area/100,1)} ar">${nf(r.area)} m²</span>${fresh?' <span class="pill good">nowa</span>':''}${opts.gmina&&r.active===false?' <span class="pill mute" title="nie ma jej już w żadnym portalu">zniknęła</span>':''}${opts.gmina?`<span class="sub2">${esc(r.municipality||'–')}</span>`:''}${featLine(r.features)}</td>
     <td class="two-line" title="${esc(histTxt)}">${nf(r.price)} zł<span class="sub2"><b>${nf(r.ppm2)}</b> zł/m²${cut}</span></td>
     <td class="two-line" title="${r.listed_at?'wystawiona '+dFull(r.listed_at):'od pierwszego zauważenia przez Radar: '+dFull(r.first_seen)}">${r.listed_at?'':'≥ '}${age(r.age_days)}<span class="sub2">od ${dFull(r.start_date)}${r.relists>0?` · <b title="oferta była zdejmowana i wystawiana ponownie">ponownie ${r.relists}×</b>`:''}${pushedDays!=null&&pushedDays<=30?` · <b title="płatne podbicie ogłoszenia">podbita ${pushedDays===0?'dziś':pushedDays+' dni temu'}</b>`:''}</span></td>
     <td class="two-line" title="${r.views!=null?`Licznik z portalu ${SRC[r.views_source]||r.views_source}`+(r.views_per_day!=null?'; tempo: przyrost między pomiarami albo średnia od wystawienia':''):''}">${r.views!=null?`${nf(r.views)} wyśw.<span class="sub2">${r.views_per_day!=null?nf(r.views_per_day,r.views_per_day<10?1:0)+'/dzień':''}${r.saved!=null?(r.views_per_day!=null?' · ':'')+nf(r.saved)+' '+(r.saved===1?'zapis':'zapisów'):''}</span>`:'<span class="na">–</span>'}</td>
-    <td class="l two-line">${r.url?`<a class="ext" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" title="najświeższe ogłoszenie tej działki">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}${more}</td></tr>`}
+    <td class="l two-line">${r.url?`<a class="ext" href="${escU(r.url)}" target="_blank" rel="noopener noreferrer" title="najświeższe ogłoszenie tej działki">${esc(SRC[r.source]||r.source||'ogłoszenie')} ↗</a>`:'–'}${more}</td></tr>`}
 async function send(u,body,method='POST'){
   const r=await fetch(u,{method,headers:{'Content-Type':'application/json',Accept:'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined});
   if(r.status===401||r.status===403){location.reload();throw new Error('sesja wygasła')}
@@ -1102,7 +1104,7 @@ async function loadFbl(){
   let rows; try{rows=await api('api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
   $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
   list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
-    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div>${r.context&&r.context.problem?`<div><span class="pill warn">${esc(r.context.problem)}</span></div>`:''}<p>${esc(r.body)}</p>${r.context&&r.context.ogloszenia?`<div class="meta">${r.context.ogloszenia.split(' | ').map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,'').slice(0,60))}</a>`).join(' · ')}</div>`:''}${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
+    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div>${r.context&&r.context.problem?`<div><span class="pill warn">${esc(r.context.problem)}</span></div>`:''}<p>${esc(r.body)}</p>${r.context&&r.context.ogloszenia?`<div class="meta">${r.context.ogloszenia.split(' | ').map(u=>`<a href="${escU(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,'').slice(0,60))}</a>`).join(' · ')}</div>`:''}${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
     <div><button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
 }
 $('#fbl-list').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-fb]');if(!b)return;
