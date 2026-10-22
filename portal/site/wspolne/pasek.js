@@ -13,6 +13,7 @@
   var APPS = [
     { href: "/umowy/", nazwa: "Generator umów", krotko: "Umowy", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
     { href: "/protokoly/", nazwa: "Protokoły", krotko: "Protokoły", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
+    { href: "/kartoteka/", nazwa: "Kartoteka", krotko: "Kartoteka", ikona: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15 5h6M15 9h6M17 13h4"/>' },
     { href: "/radar/", nazwa: "Radar działek", krotko: "Radar", ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' }
   ];
   var IKONY = {
