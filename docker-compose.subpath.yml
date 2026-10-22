@@ -7,10 +7,12 @@ services:
   web:
     environment:
       LMI_BASE_PATH: ${LMI_BASE_PATH:?ustaw LMI_BASE_PATH w .env, np. /radar}
+      # administrator radaru także z panelu Administracja (nagłówek X-Pracawre-Poziom od Traefika, middleware wre-radar)
+      LMI_UPRAWNIENIA_Z_NAGLOWKA: "1"
     labels:
       - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN}`) && (Path(`${LMI_BASE_PATH}`) || PathPrefix(`${LMI_BASE_PATH}/`))
       - traefik.http.routers.lmi.priority=50
-      - traefik.http.routers.lmi.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google},lmi-headers,lmi-slash,lmi-strip
+      - traefik.http.routers.lmi.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google}${LMI_UPRAWNIENIA-,wre-radar},lmi-headers,lmi-slash,lmi-strip
       # /radar -> /radar/ (strona używa adresów względnych)
       - traefik.http.middlewares.lmi-slash.redirectregex.regex=^(https?://[^/]+${LMI_BASE_PATH})$$
       - traefik.http.middlewares.lmi-slash.redirectregex.replacement=$${1}/
@@ -22,6 +24,6 @@ services:
     labels:
       - traefik.http.routers.lmi-mb.rule=Host(`${LMI_DOMAIN}`) && PathPrefix(`${LMI_BASE_PATH}/metabase`)
       - traefik.http.routers.lmi-mb.priority=100   # przed stroną radaru, która łapie całe ${LMI_BASE_PATH}/
-      - traefik.http.routers.lmi-mb.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google},lmi-headers,lmi-mb-slash,lmi-mb-strip
+      - traefik.http.routers.lmi-mb.middlewares=${LMI_AUTH_MIDDLEWARE:-lmi-google}${LMI_UPRAWNIENIA-,wre-radar},lmi-headers,lmi-mb-slash,lmi-mb-strip
       - traefik.http.middlewares.lmi-mb-slash.redirectregex.regex=^(https?://[^/]+${LMI_BASE_PATH}/metabase)$$
       - traefik.http.middlewares.lmi-mb-strip.stripprefix.prefixes=${LMI_BASE_PATH}/metabase

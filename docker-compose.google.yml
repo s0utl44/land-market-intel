@@ -41,6 +41,18 @@ services:
       - traefik.http.middlewares.lmi-google.forwardauth.address=http://127.0.0.1:4180/
       - traefik.http.middlewares.lmi-google.forwardauth.trustForwardHeader=true
       - traefik.http.middlewares.lmi-google.forwardauth.authResponseHeaders=X-Auth-Request-Email,X-Auth-Request-User
+      # uprawnienia całej witryny (panel Administracja w usłudze kartoteki, 127.0.0.1:8098): po logowaniu Google
+      # Traefik pyta, czy konto ma dostęp do obszaru – 403 „Brak dostępu” albo nagłówek X-Pracawre-Poziom (dostep | admin)
+      - traefik.http.middlewares.wre-portal.forwardauth.address=http://127.0.0.1:8098/sprawdz/portal
+      - traefik.http.middlewares.wre-portal.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
+      - traefik.http.middlewares.wre-umowy.forwardauth.address=http://127.0.0.1:8098/sprawdz/umowy
+      - traefik.http.middlewares.wre-umowy.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
+      - traefik.http.middlewares.wre-protokoly.forwardauth.address=http://127.0.0.1:8098/sprawdz/protokoly
+      - traefik.http.middlewares.wre-protokoly.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
+      - traefik.http.middlewares.wre-kartoteka.forwardauth.address=http://127.0.0.1:8098/sprawdz/kartoteka
+      - traefik.http.middlewares.wre-kartoteka.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
+      - traefik.http.middlewares.wre-radar.forwardauth.address=http://127.0.0.1:8098/sprawdz/radar
+      - traefik.http.middlewares.wre-radar.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
 
   web:
     labels:

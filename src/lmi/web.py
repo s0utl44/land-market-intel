@@ -67,15 +67,23 @@ def _admins() -> set[str]:
     return {a.strip().lower() for a in os.environ.get("LMI_ADMINS", "").split(",") if a.strip()}
 
 
+def _is_admin(request: Request) -> bool:
+    """LMI_ADMINS albo poziom „admin” w obszarze radar z panelu Administracja (nagłówek ustawia Traefik –
+    ufamy mu tylko, gdy router ma middleware wre-radar: LMI_UPRAWNIENIA_Z_NAGLOWKA=1)."""
+    if os.environ.get("LMI_UPRAWNIENIA_Z_NAGLOWKA") == "1" and request.headers.get("x-pracawre-poziom") == "admin":
+        return True
+    return _user(request) in _admins()
+
+
 def _require_admin(request: Request) -> None:
-    if _user(request) not in _admins():
-        raise HTTPException(403, "tylko dla administratora (LMI_ADMINS)")
+    if not _is_admin(request):
+        raise HTTPException(403, "tylko dla administratora")
 
 
 @app.get("/api/me")
 def me(request: Request):
     email = request.headers.get("x-auth-request-email")
-    return {"email": email, "user": _user(request), "is_admin": _user(request) in _admins(),
+    return {"email": email, "user": _user(request), "is_admin": _is_admin(request),
             # logowanie jest wspólne dla domeny (/oauth2 w katalogu głównym); po wylogowaniu wracamy na podstronę
             "logout_url": "/oauth2/sign_out?rd=" + quote(BASE_PATH, safe="") if email else None}
 

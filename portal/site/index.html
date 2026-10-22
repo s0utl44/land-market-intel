@@ -92,6 +92,7 @@ h2{margin:0;font-weight:300;font-size:clamp(1.6rem,2.6vw,2.2rem);line-height:1.2
   .dh{padding-top:32px}
   .inner{margin:0 auto;gap:22px}
 }
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -139,10 +140,12 @@ h2{margin:0;font-weight:300;font-size:clamp(1.6rem,2.6vw,2.2rem);line-height:1.2
 </main>
 
 <script>
-// podstrona jeszcze nie wdrożona (404): kafelek "wkrótce" zamiast linku donikąd
+// podstrona jeszcze nie wdrożona (404): kafelek "wkrótce" zamiast linku donikąd; brak uprawnień (403): bez kafelka
 document.querySelectorAll('[data-app]').forEach(a => {
   // GET (nie HEAD): nie każda podstrona obsługuje HEAD
-  fetch(a.dataset.app, {credentials: 'same-origin', cache: 'no-store'}).then(r => { if (r.status === 404 || r.status >= 502){
+  fetch(a.dataset.app, {credentials: 'same-origin', cache: 'no-store'}).then(r => {
+    if (r.status === 403){ a.closest('li').hidden = true; return; }   // brak uprawnień (panel Administracja) – kafelek znika
+    if (r.status === 404 || r.status >= 502){
     a.setAttribute('aria-disabled', 'true'); a.removeAttribute('href');
     a.querySelector('b').insertAdjacentHTML('beforeend', '<span class="soon">wkrótce</span>'); }}).catch(() => {});
 });

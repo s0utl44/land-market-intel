@@ -11,9 +11,9 @@
   var html = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var APPS = [
-    { href: "/umowy/", nazwa: "Generator umów", krotko: "Umowy", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
-    { href: "/protokoly/", nazwa: "Protokoły", krotko: "Protokoły", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
-    { href: "/radar/", nazwa: "Radar działek", krotko: "Radar", ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' }
+    { href: "/umowy/", obszar: "umowy", nazwa: "Generator umów", krotko: "Umowy", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
+    { href: "/protokoly/", obszar: "protokoly", nazwa: "Protokoły", krotko: "Protokoły", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
+    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", krotko: "Radar", ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' }
   ];
   var IKONY = {
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
@@ -59,7 +59,9 @@
     ".pp .pp-apps a .k{display:none}" +
     ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
     ".pp .pp-wyl{color:#dcb874}" +
-    "@media (max-width:720px){.pp .pp-apps a .d{display:none}.pp .pp-apps a .k{display:inline}.pp .pp-dom span{display:none}.pp .pp-wyl span{display:none}}" +
+    ".pp [hidden]{display:none!important}" +
+    ".pp .pp-adm{color:#f3efe6}.pp .pp-adm[aria-current=page]{background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
+    "@media (max-width:720px){.pp .pp-apps a .d{display:none}.pp .pp-apps a .k{display:inline}.pp .pp-dom span{display:none}.pp .pp-wyl span{display:none}.pp .pp-adm span{display:none}}" +
     "@media (max-width:420px){.pp .pp-apps a .k{display:none}}" +
     "@media print{#pracawre-pasek{display:none!important}}";
 
@@ -88,7 +90,7 @@
     var sciezka = location.pathname;
     var apps = APPS.map(function (a) {
       var akt = sciezka.indexOf(a.href) === 0 || sciezka + "/" === a.href;
-      return '<a href="' + a.href + '"' + (akt ? ' aria-current="page"' : "") + ">" + svg(a.ikona) +
+      return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (akt ? ' aria-current="page"' : "") + ">" + svg(a.ikona) +
         '<span class="d">' + a.nazwa + '</span><span class="k">' + a.krotko + "</span></a>";
     }).join("");
     el.innerHTML =
@@ -97,12 +99,38 @@
       "<span><b>pracawre</b>.com</span></a>" +
       '<span class="pp-sep" aria-hidden="true"></span>' +
       '<div class="pp-apps">' + apps + "</div>" +
-      '<div class="pp-r"><button type="button" class="pp-motyw"></button>' +
+      '<div class="pp-r"><a class="pp-adm" href="/administracja/" hidden' + (sciezka.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") +
+      ' title="Administracja – konta i uprawnienia">' + svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') +
+      "<span>Administracja</span></a>" +
+      '<button type="button" class="pp-motyw"></button>' +
       '<a class="pp-wyl" href="/oauth2/sign_out?rd=%2F" title="Wyloguj">' +
       svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a></div>" +
       "</nav>";
     el.querySelector(".pp-motyw").addEventListener("click", function () { ustaw(KOLEJNY[wybor()]); });
     odswiezPrzycisk();
+    konto().then(function (k) { uprawnieniaWPasku(el, k); });
+  }
+
+  // Uprawnienia (panel Administracja): bez dostępu do obszaru – podstrona znika z paska; administrator – przycisk panelu.
+  // Pamięć w sessionStorage, żeby pasek nie mrugał przy przechodzeniu między stronami.
+  var kontoP = null;
+  function konto() {
+    if (kontoP) return kontoP;
+    var zap = null;
+    try { zap = JSON.parse(sessionStorage.getItem("pracawre-konto") || "null"); } catch (e) {}
+    var swieze = fetch("/administracja/api/ja", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (k) { if (k) try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {} return k; })
+      .catch(function () { return null; });
+    kontoP = zap ? Promise.resolve(zap) : swieze;
+    if (zap) swieze.then(function (k) { if (k) { kontoP = Promise.resolve(k); document.querySelectorAll("#pracawre-pasek").forEach(function (el) { uprawnieniaWPasku(el, k); }); } });
+    return kontoP;
+  }
+  function uprawnieniaWPasku(el, k) {
+    if (!k || !el) return;
+    el.querySelectorAll("[data-obszar]").forEach(function (a) { a.hidden = (k.obszary || {})[a.dataset.obszar] === "brak"; });
+    var adm = el.querySelector(".pp-adm");
+    if (adm) adm.hidden = !k.admin;
   }
 
   function sam() {
@@ -151,7 +179,7 @@
     tlo.querySelector("iframe").focus();
   }
 
-  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka };
+  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); });
   styl();
