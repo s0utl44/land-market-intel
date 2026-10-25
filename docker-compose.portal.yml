@@ -1,4 +1,4 @@
-# Strona startowa domeny (https://LMI_DOMAIN/): kafelki DoneHome (Radar działek) i WRE Nieruchomości (Generator umów).
+# Strona startowa domeny (https://LMI_DOMAIN/): pulpit WRE Nieruchomości – kafelki narzędzi, do których osoba ma dostęp.
 # Statyczny plik portal/site/index.html, za tym samym logowaniem Google co podstrony.
 # Dokładane w COMPOSE_FILE razem z docker-compose.subpath.yml (radar pod /radar, katalog główny wolny).
 services:
