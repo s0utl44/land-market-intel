@@ -208,3 +208,14 @@ def test_owner_and_agency_price_on_exact_odd_area():
     c, d = L("otodom", "3", area=1000, prices=(99_000.0,)), L("adresowo", "4", area=1000, prices=(88_000.0,))
     c.land_use = d.land_use = "budowlana"
     assert groups(dedup.deduplicate([c, d])) == [["3"], ["4"]]       # okrągły metraż: za mało pewne
+
+
+def test_exact_twin_wins_over_loose_location_match():
+    """dedup-v5 na serwerze: Adresowo 1014 m² / 99 tys. łączyło się po pinezce z innym ogłoszeniem N-online 1014 m² / 85 tys.,
+    a jego dokładny bliźniak (N-online 1014 m² / 99 tys., bez pinezki) zostawał osobno"""
+    links = dedup.deduplicate([
+        L("adresowo", "C", area=1014, prices=(99_000.0,), lat=52.0, lon=21.0),
+        L("nieruchomosci-online", "B", area=1014, prices=(85_000.0,), lat=52.0, lon=21.0),
+        L("nieruchomosci-online", "A", area=1014, prices=(99_000.0,)),
+    ])
+    assert groups(links) == [["A", "C"], ["B"]]

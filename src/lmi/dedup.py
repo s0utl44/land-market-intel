@@ -29,7 +29,7 @@ from datetime import date, timedelta
 from itertools import combinations
 from typing import Iterable
 
-ALGORITHM_VERSION = "dedup-v5"
+ALGORITHM_VERSION = "dedup-v6"
 PRICE_AREA_MIN_SCORE = 4
 
 METHOD_CONFIDENCE = {
@@ -324,12 +324,14 @@ def deduplicate(listings: list[Listing], params: DedupParams | None = None) -> l
 
     # od najmocniejszych par: słabsze nie mogą skleić grup, które się wykluczają
     def strength(p):
-        # najpierw mocniejsza metoda, w jej obrębie pary najbardziej zgodne (cena, metraż, odległość):
-        # słabsze dopasowanie nie może zająć miejsca dokładnego bliźniaka
+        # najpierw dokładni bliźniacy (metraż i cena do 0,5%) – niezależnie od metody: pinezka z ceną różną o 14%
+        # nie może zająć miejsca bliźniaka bez pinezki (dedup-v5, 1014 m² za 99 tys. vs 85 tys.); potem mocniejsza
+        # metoda, w jej obrębie pary najbardziej zgodne (cena, metraż, odległość)
         a, b = listings[p[0]], listings[p[1]]
         dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else 0.0
-        return (-_METHOD_RANK[p[2]], round(_price_gap(a, b), 3), round(_rel_diff(a.area_m2, b.area_m2), 3), dist,
-                a.key, b.key)
+        blizniak = _rel_diff(a.area_m2, b.area_m2) <= 0.005 and _price_gap(a, b) <= 0.005
+        return (not blizniak, -_METHOD_RANK[p[2]], round(_price_gap(a, b), 3), round(_rel_diff(a.area_m2, b.area_m2), 3),
+                dist, a.key, b.key)
 
     for i, j, method in sorted(candidate_pairs(listings, params), key=strength):
         ra, rb = uf.find(i), uf.find(j)
