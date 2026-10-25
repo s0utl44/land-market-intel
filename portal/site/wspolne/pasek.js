@@ -11,12 +11,13 @@
   var html = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var APPS = [
-    { href: "/umowy/", obszar: "umowy", nazwa: "Generator umów", krotko: "Umowy", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
-    { href: "/protokoly/", obszar: "protokoly", nazwa: "Zarządzanie", krotko: "Zarządz.", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
-    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", krotko: "Radar", zastrzezony: true, osobnyProjekt: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
-    { href: "/leady/", obszar: "leady", nazwa: "Leady", krotko: "Leady", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
-    { href: "/odprawa/", obszar: "odprawa", nazwa: "Odprawa", krotko: "Odprawa", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
+    { href: "/umowy/", obszar: "umowy", grupa: "dokumenty", opis: "Sprzedaż · najem · zarządzanie · PL / EN", nazwa: "Generator umów", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
+    { href: "/protokoly/", obszar: "protokoly", grupa: "dokumenty", opis: "Protokoły ze zdjęciami · weryfikacja najemcy", nazwa: "Zarządzanie", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
+    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", zastrzezony: true, osobnyProjekt: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
+    { href: "/leady/", obszar: "leady", grupa: "sprzedaz", opis: "Prywatne ogłoszenia mieszkań – telefony do właścicieli", nazwa: "Leady", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
+    { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Tygodniowy raport pracy agentów z HubSpot", nazwa: "Odprawa", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
   ];
+  // grupa i opis – zakładki w grupach (pasek) i kafelki na pulpicie (strona główna)
   // zastrzezony: zakładka ukryta, dopóki konto (panel Administracja) nie potwierdzi dostępu – bez mignięcia u osób bez uprawnień
   // osobnyProjekt: DoneHome, nie WRE (decyzja użytkownika 25.10: po zalogowaniu wszyscy widzą tylko WRE) – zakładka tylko
   // na jego własnej stronie, żeby było widać, gdzie się jest; poza nią ani w pasku, ani na stronie głównej
@@ -25,8 +26,7 @@
     light: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>',
     dark: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'
   };
-  var OPIS = { auto: "automatyczny (jak w systemie)", light: "jasny", dark: "ciemny" };
-  var KOLEJNY = { auto: "light", light: "dark", dark: "auto" };
+  var NAZWY_MOTYWOW = { auto: "Auto", light: "Jasny", dark: "Ciemny" };
 
   function wybor() {
     try { var w = localStorage.getItem(KLUCZ); return w === "light" || w === "dark" ? w : "auto"; } catch (e) { return "auto"; }
@@ -39,7 +39,7 @@
     html.setAttribute("data-motyw", wybor());
     if (html.classList) html.classList.toggle("dark", c);
     html.style.colorScheme = c ? "dark" : "light";
-    odswiezPrzycisk();
+    odswiezMotyw();
     try { window.dispatchEvent(new CustomEvent("pracawre-motyw", { detail: { ciemny: c, wybor: wybor() } })); } catch (e) {}
   }
   function ustaw(w) { try { localStorage.setItem(KLUCZ, w); } catch (e) {} zastosuj(); }
@@ -59,17 +59,36 @@
     ".pp svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
     ".pp .pp-dom{color:#f3efe6;padding-left:6px}.pp .pp-dom b{color:#c9a03c;font-weight:700}" +
     ".pp .pp-sep{width:1px;height:18px;background:rgba(255,255,255,.16);margin:0 6px;flex:none}" +
-    ".pp .pp-apps{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;min-width:0}.pp .pp-apps::-webkit-scrollbar{display:none}" +
-    ".pp .pp-apps a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
-    ".pp .pp-apps a .k{display:none}" +
-    ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
-    ".pp .pp-wyl{color:#dcb874}" +
     ".pp [hidden]{display:none!important}" +
-    ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:-2px}" +
-    ".pp .pp-adm{color:#f3efe6}.pp .pp-adm[aria-current=page]{background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
-    "@media (max-width:720px){.pp .pp-apps a .d{display:none}.pp .pp-apps a .k{display:inline}.pp .pp-dom span{display:none}.pp .pp-wyl span{display:none}.pp .pp-adm span{display:none}.pp .pp-zgl span{display:none}}" +
-    "@media (max-width:420px){.pp .pp-apps a .k{display:none}}" +
+    // zakładki w grupach (Dokumenty | Sprzedaż); grupa bez widocznych zakładek znika razem z kreską
+    ".pp .pp-apps{display:flex;align-items:center;gap:2px;min-width:0}" +
+    ".pp .pp-grp{display:flex;gap:2px}.pp .pp-grp+.pp-grp::before{content:'';width:1px;height:18px;align-self:center;background:rgba(255,255,255,.12);margin:0 6px}" +
+    ".pp .pp-apps a[aria-current=page],.pp .pp-lista a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
+    ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
+    // menu rozwijane: narzędzia (telefon) i konto
+    ".pp .pp-m{position:relative}" +
+    ".pp .pp-lista{position:absolute;top:36px;right:0;min-width:230px;background:#1d1f23;border:1px solid #33363c;border-radius:12px;padding:6px;" +
+    "box-shadow:0 18px 50px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:1px;z-index:70}" +
+    ".pp .pp-narz .pp-lista{left:0;right:auto}" +
+    ".pp .pp-lista a,.pp .pp-lista button{box-sizing:border-box;height:36px;padding:0 10px;width:100%}" +
+    ".pp .pp-lista .pp-grp{flex-direction:column}.pp .pp-lista .pp-grp+.pp-grp::before{width:auto;height:1px;margin:5px 4px}" +
+    ".pp .pp-lista .pp-gt{font-size:10.5px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:#8d887e;padding:10px 10px 4px}" +
+    ".pp .pp-lista hr{border:0;border-top:1px solid #33363c;margin:5px 4px}" +
+    ".pp .pp-kto{padding:8px 10px 10px;display:flex;flex-direction:column;gap:3px}.pp .pp-kto b{color:#f3efe6;font-size:14px}" +
+    ".pp .pp-kto small{color:#8d887e;font-weight:400;font-size:12px}" +
+    ".pp .pp-motywy{display:flex;gap:2px;margin:2px 4px 4px;background:#141518;border-radius:9px;padding:3px}" +
+    ".pp .pp-motywy button{flex:1;justify-content:center;height:28px;padding:0 6px;font-size:12px}" +
+    ".pp .pp-motywy button[aria-pressed=true]{background:#33363c;color:#fff}" +
+    ".pp .pp-av{width:24px;height:24px;border-radius:50%;background:#c9a03c;color:#141518;display:grid;place-items:center;font-size:11px;font-weight:900;position:relative}" +
+    ".pp .pp-av i{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e5534b;border:2px solid #141518}" +
+    ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-konto .pp-ch{width:12px;height:12px;opacity:.6}" +
+    ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:auto}" +
+    ".pp .pp-narz{display:none}" +
+    "@media (max-width:720px){.pp .pp-apps{display:none}.pp .pp-narz{display:block}.pp .pp-dom span,.pp .pp-konto .pp-imie{display:none}}" +
     "@media print{#pracawre-pasek{display:none!important}}";
+
+  // grupy zakładek – te same na pulpicie (strona główna) i w pasku (decyzja użytkownika 25.10)
+  var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }];
 
   function styl() {
     if (document.getElementById("pracawre-pasek-styl")) return;
@@ -80,48 +99,84 @@
   }
 
   function svg(d) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + "</svg>"; }
+  function esc(t) { return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
-  function odswiezPrzycisk() {
-    var b = document.querySelector(".pp-motyw");
-    if (!b) return;
-    var w = wybor();
-    b.innerHTML = svg(IKONY[w]);
-    b.title = "Motyw: " + OPIS[w] + " – kliknij: " + OPIS[KOLEJNY[w]];
-    b.setAttribute("aria-label", b.title);
+  function odswiezMotyw() {
+    document.querySelectorAll(".pp-motywy [data-motyw]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.motyw === wybor())); });
+  }
+
+  function link(a, znane) {
+    var ukryj = znane ? !wPasku(a, znane) : a.zastrzezony;
+    return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
+      svg(a.ikona) + "<span>" + a.nazwa + "</span></a>";
+  }
+  // zakładki pogrupowane; osobny projekt (Radar) na końcu, tylko na swojej stronie
+  function zakladki(znane, naglowki) {
+    var grupy = GRUPY.map(function (g) {
+      var w = APPS.filter(function (a) { return a.grupa === g.id; });
+      return '<div class="pp-grp" data-grupa="' + g.id + '">' + (naglowki ? '<div class="pp-gt">' + g.nazwa + "</div>" : "") +
+        w.map(function (a) { return link(a, znane); }).join("") + "</div>";
+    });
+    var reszta = APPS.filter(function (a) { return !a.grupa; }).map(function (a) { return link(a, znane); }).join("");
+    return grupy.join("") + (reszta ? '<div class="pp-grp">' + reszta + "</div>" : "");
   }
 
   function wypelnij(el) {
     if (!el) return;
     styl();
-    var sciezka = location.pathname;
     var znane = kontoZapamietane();
-    var apps = APPS.map(function (a) {
-      var akt = naStronie(a);
-      var ukryj = znane ? !wPasku(a, znane) : a.zastrzezony;
-      return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (akt ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" + svg(a.ikona) +
-        '<span class="d">' + a.nazwa + '</span><span class="k">' + a.krotko + "</span></a>";
-    }).join("");
+    var narzedzia = APPS.filter(naStronie)[0];
     el.innerHTML =
       '<nav class="pp" aria-label="pracawre.com">' +
       '<a class="pp-dom" href="/" title="Strona główna">' + svg('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>') +
       "<span><b>pracawre</b>.com</span></a>" +
       '<span class="pp-sep" aria-hidden="true"></span>' +
-      '<div class="pp-apps">' + apps + "</div>" +
-      '<div class="pp-r"><a class="pp-adm" href="/administracja/" hidden' + (sciezka.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") +
-      ' title="Administracja – konta i uprawnienia">' + svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') +
-      "<span>Administracja</span></a>" +
-      '<button type="button" class="pp-zgl" title="Zgłoś błąd albo uwagę">' +
-      svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
+      '<div class="pp-apps">' + zakladki(znane, false) + "</div>" +
+      // telefon: zakładki w jednym menu „Narzędzia”
+      '<div class="pp-m pp-narz"><button type="button" aria-haspopup="true" aria-expanded="false">' +
+      svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + "<span>" + (narzedzia ? narzedzia.nazwa : "Narzędzia") + "</span></button>" +
+      '<div class="pp-lista" hidden>' + zakladki(znane, true) + "</div></div>" +
+      // konto: imię, motyw, zgłoszenie błędu, administracja, wylogowanie – w jednym miejscu
+      '<div class="pp-r"><div class="pp-m pp-km"><button type="button" class="pp-konto" aria-haspopup="true" aria-expanded="false" title="Konto">' +
+      '<span class="pp-av">?</span><span class="pp-imie">Konto</span>' + svg('<path d="m6 9 6 6 6-6"/>').replace("<svg", '<svg class="pp-ch"') + "</button>" +
+      '<div class="pp-lista" hidden>' +
+      '<div class="pp-kto"><b>Konto</b><small></small></div><hr>' +
+      '<div class="pp-gt">Motyw</div><div class="pp-motywy">' +
+      ["auto", "light", "dark"].map(function (m) { return '<button type="button" data-motyw="' + m + '" aria-pressed="false">' + svg(IKONY[m]) + NAZWY_MOTYWOW[m] + "</button>"; }).join("") +
+      "</div><hr>" +
+      '<button type="button" data-zglos>' + svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
       "<span>Zgłoś błąd</span></button>" +
-      '<button type="button" class="pp-motyw"></button>' +
-      '<a class="pp-wyl" href="/oauth2/sign_out?rd=%2F" title="Wyloguj">' +
-      svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a></div>" +
-      "</nav>";
-    el.querySelector(".pp-motyw").addEventListener("click", function () { ustaw(KOLEJNY[wybor()]); });
-    el.querySelector(".pp-zgl").addEventListener("click", function () { zglos(); });
-    odswiezPrzycisk();
+      '<a class="pp-adm" href="/administracja/" hidden' + (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
+      svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') + '<span>Administracja</span><b class="pp-n" hidden></b></a>' +
+      '<a href="/oauth2/sign_out?rd=%2F">' + svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a>" +
+      "</div></div></div></nav>";
+    el.querySelectorAll(".pp-m").forEach(menu);
+    el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
+    el.querySelector("[data-zglos]").addEventListener("click", function () { zamknijMenu(); zglos(); });
+    odswiezMotyw();
+    if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); });
   }
+
+  // menu rozwijane: klik otwiera / zamyka; klik obok, Esc albo wybór pozycji zamyka
+  function zamknijMenu(oprocz) {
+    document.querySelectorAll(".pp-m").forEach(function (m) {
+      if (m === oprocz) return;
+      m.querySelector(".pp-lista").hidden = true;
+      m.querySelector("button").setAttribute("aria-expanded", "false");
+    });
+  }
+  function menu(m) {
+    var przycisk = m.querySelector("button"), lista = m.querySelector(".pp-lista");
+    przycisk.addEventListener("click", function () {
+      zamknijMenu(m);
+      lista.hidden = !lista.hidden;
+      przycisk.setAttribute("aria-expanded", String(!lista.hidden));
+    });
+    lista.addEventListener("click", function (e) { if (e.target.closest("a")) zamknijMenu(); });
+  }
+  document.addEventListener("click", function (e) { if (!e.target.closest || !e.target.closest(".pp-m")) zamknijMenu(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") zamknijMenu(); });
 
   // Uprawnienia (panel Administracja): bez dostępu do obszaru – podstrona znika z paska; administrator – przycisk panelu.
   // Pamięć w sessionStorage, żeby pasek nie mrugał przy przechodzeniu między stronami.
@@ -153,19 +208,23 @@
   function uprawnieniaWPasku(el, k) {
     if (!k || !el) return;
     APPS.forEach(function (a) {
-      var link = el.querySelector('[data-obszar="' + a.obszar + '"]');
-      if (link) link.hidden = !wPasku(a, k);
+      el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !wPasku(a, k); });
     });
-    var adm = el.querySelector(".pp-adm");
-    if (adm) {
-      adm.hidden = !k.admin;
-      var n = adm.querySelector(".pp-n");
-      if (!n) { n = document.createElement("b"); n.className = "pp-n"; adm.appendChild(n); }
-      n.textContent = k.zgloszeniaNowe || "";
-      n.hidden = !k.zgloszeniaNowe;
-      n.title = "Nowe zgłoszenia błędów";
-      adm.href = k.zgloszeniaNowe ? "/administracja/#zgloszenia" : "/administracja/";
-    }
+    el.querySelectorAll(".pp-grp").forEach(function (g) { g.hidden = !g.querySelector("a:not([hidden])"); });
+    var nazwa = k.nazwa || (k.email || "").split("@")[0];
+    el.querySelector(".pp-imie").textContent = nazwa.split(/\s+/)[0] || "Konto";
+    el.querySelector(".pp-av").innerHTML = esc(inicjaly(nazwa)) + (k.admin && k.zgloszeniaNowe ? "<i></i>" : "");
+    el.querySelector(".pp-kto").innerHTML = "<b>" + esc(nazwa) + "</b><small>" + esc(k.email || "") + "</small>";
+    var adm = el.querySelector(".pp-adm"), n = adm.querySelector(".pp-n");
+    adm.hidden = !k.admin;
+    n.textContent = k.zgloszeniaNowe || "";
+    n.hidden = !k.zgloszeniaNowe;
+    n.title = "Nowe zgłoszenia błędów";
+    adm.href = k.zgloszeniaNowe ? "/administracja/#zgloszenia" : "/administracja/";
+  }
+  function inicjaly(nazwa) {
+    var cz = nazwa.split(/[\s.]+/).filter(Boolean);
+    return ((cz[0] || "?")[0] + (cz.length > 1 ? cz[cz.length - 1][0] : "")).toUpperCase();
   }
 
   function sam() {
@@ -272,7 +331,6 @@
     var poprzedni = document.activeElement;
     function zamknij() { tlo.remove(); document.removeEventListener("keydown", klaw); document.removeEventListener("paste", wklej); if (poprzedni && poprzedni.focus) poprzedni.focus(); }
     function klaw(e) { if (e.key === "Escape") zamknij(); }
-    function esc(t) { return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
     function rysuj(dostepne) {
       var tx = tlo.querySelector("textarea"), opis = tx ? tx.value : "";
       tlo.innerHTML = '<div class="ok" role="dialog" aria-modal="true" aria-labelledby="pp-zgl-t">' +
@@ -364,7 +422,7 @@
     });
   }
 
-  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje };
+  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); });
   styl();

@@ -95,35 +95,23 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 
 <script>
 "use strict";
-// Kafelki: aplikacje WRE, do których konto ma dostęp (PracawrePasek.aplikacje – ta sama reguła co zakładki w pasku),
-// w grupach; Administracja – tylko dla administratorów. Konto z pamięci sesji, więc kafelki nie migają przy powrocie.
-const GRUPY = [
-  {nazwa: 'Dokumenty', kafle: [
-    {obszar: 'umowy', opis: 'Sprzedaż · najem · zarządzanie · PL / EN'},
-    {obszar: 'protokoly', opis: 'Protokoły ze zdjęciami · weryfikacja najemcy'}]},
-  {nazwa: 'Sprzedaż', kafle: [
-    {obszar: 'leady', opis: 'Prywatne ogłoszenia mieszkań – telefony do właścicieli'},
-    {obszar: 'odprawa', opis: 'Tygodniowy raport pracy agentów z HubSpot'}]},
-  {nazwa: 'Biuro', kafle: [
-    {obszar: 'administracja', opis: 'Konta, uprawnienia i zgłoszenia błędów'}]},
-];
-const ADMINISTRACJA = {obszar: 'administracja', href: '/administracja/', nazwa: 'Administracja',
-  ikona: '<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'};
+// Kafelki: aplikacje WRE, do których konto ma dostęp – grupy, nazwy, ikony i opisy z /wspolne/pasek.js (ta sama reguła
+// i kolejność co zakładki w pasku); grupa Biuro: Administracja – tylko dla administratorów.
+// Konto z pamięci sesji, więc kafelki nie migają przy powrocie na stronę.
+const ADMINISTRACJA = {obszar: 'administracja', grupa: 'biuro', href: '/administracja/', nazwa: 'Administracja',
+  opis: 'Konta, uprawnienia i zgłoszenia błędów', ikona: '<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function rysuj(k){
-  const dostepne = new Map(PracawrePasek.aplikacje(k).map(a => [a.obszar, a]));
-  if (k && k.admin) dostepne.set('administracja', ADMINISTRACJA);
-  const html = GRUPY.map(g => {
-    const kafle = g.kafle.filter(x => dostepne.has(x.obszar));
+  const dostepne = [...PracawrePasek.aplikacje(k), ...(k && k.admin ? [ADMINISTRACJA] : [])];
+  const html = [...PracawrePasek.grupy, {id: 'biuro', nazwa: 'Biuro'}].map(g => {
+    const kafle = dostepne.filter(a => a.grupa === g.id);
     if (!kafle.length) return '';
-    return `<section class="grupa"><h2>${esc(g.nazwa)}</h2><ul class="kafle">${kafle.map(x => {
-      const a = dostepne.get(x.obszar);
-      return `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
-        <span><b>${esc(a.nazwa)}</b><small>${esc(x.opis)}</small><span class="liczby" data-liczby="${x.obszar}"></span></span>
-        <span class="dalej" aria-hidden="true">→</span></a></li>`;
-    }).join('')}</ul></section>`;
+    return `<section class="grupa"><h2>${esc(g.nazwa)}</h2><ul class="kafle">${kafle.map(a =>
+      `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
+        <span><b>${esc(a.nazwa)}</b><small>${esc(a.opis)}</small><span class="liczby" data-liczby="${a.obszar}"></span></span>
+        <span class="dalej" aria-hidden="true">→</span></a></li>`).join('')}</ul></section>`;
   }).join('');
   document.getElementById('grupy').innerHTML = html ||
     '<div class="pusto">Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>';
