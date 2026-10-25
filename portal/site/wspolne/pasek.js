@@ -173,7 +173,8 @@
 
   // Kartoteka (wspólna baza osób i mieszkań) – panel na całe okno w ramce, otwierany z Generatora i Protokołów
   // (bez linku w pasku – decyzja użytkownika). parametry: {osoba: id} albo {mieszkanie: id}; poZamknieciu – np. odświeżenie.
-  function kartoteka(parametry, poZamknieciu) {
+  // poWyborze – tryb wyboru (Generator „Z kartoteki”): karta ma przycisk „Wstaw”, który zamyka panel i oddaje {tabela, id}.
+  function kartoteka(parametry, poZamknieciu, poWyborze) {
     if (document.getElementById("pracawre-kartoteka")) return;
     if (!document.getElementById("pracawre-kartoteka-styl")) {
       var st = document.createElement("style");
@@ -185,7 +186,7 @@
         "@media (max-width:640px){#pracawre-kartoteka{padding:0}#pracawre-kartoteka iframe{border-radius:0}}";
       document.head.appendChild(st);
     }
-    var q = "osadzona=1";
+    var q = "osadzona=1" + (poWyborze ? "&wybor=1" : "");
     for (var k in parametry || {}) q += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(parametry[k]);
     var tlo = document.createElement("div");
     tlo.id = "pracawre-kartoteka";
@@ -197,7 +198,11 @@
       if (poprzedni && poprzedni.focus) poprzedni.focus();
       if (poZamknieciu) poZamknieciu();
     }
-    function wiad(e) { if (e.origin === location.origin && e.data && e.data.typ === "kartoteka-zamknij") zamknij(); }
+    function wiad(e) {
+      if (e.origin !== location.origin || !e.data) return;
+      if (e.data.typ === "kartoteka-zamknij") zamknij();
+      if (e.data.typ === "kartoteka-wybor" && poWyborze) { zamknij(); poWyborze({ tabela: e.data.tabela, id: e.data.id }); }
+    }
     function klaw(e) { if (e.key === "Escape") zamknij(); }
     tlo.addEventListener("click", function (e) { if (e.target === tlo) zamknij(); });
     window.addEventListener("message", wiad); document.addEventListener("keydown", klaw);
