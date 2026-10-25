@@ -503,6 +503,7 @@ const useQ=(sep='?')=>`${sep}use=${encodeURIComponent(USE)}`;
 const syncOfferUse=()=>{$('#f-use').value=USE==='wszystkie'?'':USE};
 $('#use').onchange=async()=>{
   USE=$('#use').value; try{localStorage.setItem('use',USE)}catch(e){}
+  $('#k-offers').textContent='–';   // liczba poprzedniego typu nie może wisieć do czasu nowej
   syncOfferUse();
   try{[OV,RANK]=await Promise.all([api('api/overview'+useQ()),api('api/ranking'+useQ())])}catch(e){return}
   rankLimit=PAGE; renderSummary(); renderRank(); loadChanges();
@@ -542,7 +543,8 @@ function renderStatus(){
 }
 
 function renderSummary(){
-  $('#k-offers').textContent=nf(OV.active_offers);
+  // „Aktywne oferty” wpisuje tylko loadChanges (aktywne w ostatnim dniu). OV.active_offers = suma tygodniowa (aktywne
+  // kiedykolwiek w tygodniu) – migała tu najpierw i zmieniała się na mniejszą (25.10, zgłoszenie użytkownika)
   const w=OV.weeks_of_data||0, early=$('#early');
   if(w===0){
     early.hidden=false;
