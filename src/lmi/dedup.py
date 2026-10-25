@@ -2,7 +2,9 @@
 
 Reguły (od najmocniejszej):
   1. parcel_id   — ten sam znormalizowany identyfikator działki.
-  2. location    — odległość <= max_distance_m i różnica powierzchni <= location_area_tol.
+  2. location    — odległość <= max_distance_m, różnica powierzchni <= location_area_tol (1%) i cena <= location_price_tol
+                   (15%; przy okrągłym metrażu <= 3%). Pinezki portali bywają przybliżone (środek wsi, ulica), więc sama
+                   bliskość nie wystarcza – zgłoszenia 21.10: 1389 vs 1360 m² i 1800 vs 1755 m² z innymi cenami to różne działki.
   3. price_area  — "wspólne mianowniki", gdy któreś ogłoszenie nie ma dokładnej pinezki (albo obie
                    pinezki są do 1 km od siebie — wtedy o punkt więcej): ta sama gmina, oba wystawione w tym samym czasie (okresy
                    widoczności nachodzą na siebie albo przerwa <= price_area_max_gap_days, np. ponowne
@@ -27,7 +29,7 @@ from datetime import date, timedelta
 from itertools import combinations
 from typing import Iterable
 
-ALGORITHM_VERSION = "dedup-v4"
+ALGORITHM_VERSION = "dedup-v5"
 PRICE_AREA_MIN_SCORE = 4
 
 METHOD_CONFIDENCE = {
@@ -42,7 +44,9 @@ _METHOD_RANK = {"parcel_id": 3, "location": 2, "price_area": 1}
 @dataclass(frozen=True)
 class DedupParams:
     max_distance_m: float = 150.0
-    location_area_tol: float = 0.05
+    location_area_tol: float = 0.01
+    location_price_tol: float = 0.15
+    location_round_price_tol: float = 0.03   # okrągły metraż (1000 m²) w jednej wsi bywa u kilku działek
     price_area_area_tol: float = 0.005
     price_area_price_tol: float = 0.15   # powyżej 3% tylko przy identycznym, nieokrągłym metrażu i tym samym typie
     price_area_max_gap_days: int = 14
@@ -190,6 +194,17 @@ def _same_source_clash(a: Listing, b: Listing, params: DedupParams) -> bool:
                      and _price_gap(a, b) <= params.same_source_price_tol))
 
 
+def _round_area(a: Listing, b: Listing) -> bool:
+    return not (round(a.area_m2) % 100 and round(b.area_m2) % 100)
+
+
+def _location_match(a: Listing, b: Listing, params: DedupParams) -> bool:
+    """reguła pinezki: blisko, ten sam metraż (do 1%) i podobna cena – sama bliskość przybliżonych pinezek nie wystarcza"""
+    price_tol = params.location_round_price_tol if _round_area(a, b) else params.location_price_tol
+    return (_rel_diff(a.area_m2, b.area_m2) <= params.location_area_tol and _price_gap(a, b) <= price_tol
+            and haversine_m(a.lat, a.lon, b.lat, b.lon) <= params.max_distance_m)
+
+
 def attribute_score(a: Listing, b: Listing, params: DedupParams) -> int:
     """Punkty zgodności dla pary bez wspólnej dokładnej pinezki; 0 = wykluczone."""
     if _rel_diff(a.area_m2, b.area_m2) > params.price_area_area_tol:
@@ -197,7 +212,7 @@ def attribute_score(a: Listing, b: Listing, params: DedupParams) -> int:
     gap = _price_gap(a, b)
     if gap > params.price_area_price_tol:
         return 0
-    nonround = bool(round(a.area_m2) % 100 and round(b.area_m2) % 100)
+    nonround = not _round_area(a, b)
     if gap > 0.03 and not (nonround and _rel_diff(a.area_m2, b.area_m2) <= 0.002):
         # ta sama działka bywa u właściciela taniej niż u biura (np. 842 m²: 88 i 99 tys.), ale taką różnicę
         # przyjmujemy tylko przy identycznym, nieokrągłym metrażu
@@ -245,10 +260,7 @@ def candidate_pairs(listings: list[Listing], params: DedupParams) -> list[tuple[
                 b = listings[j]
                 if _parcel_conflict(a, b) or _same_source_clash(a, b, params):
                     continue
-                if (
-                    _rel_diff(a.area_m2, b.area_m2) <= params.location_area_tol
-                    and haversine_m(a.lat, a.lon, b.lat, b.lon) <= params.max_distance_m
-                ):
+                if _location_match(a, b, params):
                     pairs.append((i, j, "location"))
 
     # 3. price_area — wspólne mianowniki, gdy brak dokładnej pinezki po którejś stronie (albo pinezki blisko)
@@ -443,7 +455,7 @@ def explain_pair(a: Listing, b: Listing, params: DedupParams | None = None) -> s
     if _same_source_clash(a, b, params):
         return "ten sam portal, widoczne naraz, różna cena/metraż"
     dist = haversine_m(a.lat, a.lon, b.lat, b.lon) if a.has_coords and b.has_coords else None
-    if dist is not None and dist <= params.max_distance_m and _rel_diff(a.area_m2, b.area_m2) <= params.location_area_tol:
+    if dist is not None and _location_match(a, b, params):
         return "spełnia regułę pinezki (rozdzielone przez konflikt w grupie)"
     if not _overlap(a, b, params.price_area_max_gap_days):
         return "nie były widoczne w tym samym czasie"

@@ -25,9 +25,26 @@ def test_parcel_id_match_ignores_whitespace_and_case():
 
 
 def test_location_match_within_150m():
-    # ~100 m na północ
-    links = dedup.deduplicate([L("a", "1", lat=52.0, lon=21.0), L("b", "2", lat=52.0009, lon=21.0, area=1030)])
+    # ~100 m na północ, ten sam metraż (do 1%) i podobna cena
+    links = dedup.deduplicate([L("a", "1", lat=52.0, lon=21.0, area=1236),
+                               L("b", "2", lat=52.0009, lon=21.0, area=1240, prices=(110_000.0,))])
     assert groups(links) == [["1", "2"]]
+
+
+def test_location_needs_same_area_and_price():
+    """zgłoszenia z Radaru 21.10 (Kobierzyce): przybliżone pinezki obok siebie, a działki różne"""
+    blisko = dict(lat=52.0, lon=21.0)
+    # 1389 m² (Adresowo, właściciel) i 1360 m² (Otodom, biuro) – inny metraż
+    assert groups(dedup.deduplicate([L("adresowo", "1", area=1389, prices=(237_000.0,), **blisko),
+                                     L("otodom", "2", area=1360, prices=(245_000.0,), **blisko)])) == [["1"], ["2"]]
+    # ten sam nieokrągły metraż, cena o 30% inna
+    assert groups(dedup.deduplicate([L("a", "1", area=1755, prices=(300_000.0,), **blisko),
+                                     L("b", "2", area=1755, prices=(400_000.0,), **blisko)])) == [["1"], ["2"]]
+    # okrągłe 1000 m² w jednej wsi: łączymy tylko przy niemal tej samej cenie
+    assert groups(dedup.deduplicate([L("a", "1", prices=(590_000.0,), **blisko),
+                                     L("b", "2", prices=(540_000.0,), **blisko)])) == [["1"], ["2"]]
+    assert groups(dedup.deduplicate([L("a", "1", prices=(590_000.0,), **blisko),
+                                     L("b", "2", prices=(595_000.0,), **blisko)])) == [["1", "2"]]
 
 
 def test_location_too_far_or_area_too_different():
