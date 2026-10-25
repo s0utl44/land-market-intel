@@ -306,8 +306,15 @@
         }).join("") : '<div class="mz"><small>Jeszcze nic nie zgłaszano z tego konta.</small></div>';
       });
     }
-    var zastrzezone = APPS.filter(function (a) { return a.zastrzezony; }).map(function (a) { return a.obszar; });
-    var dostepneObszary = OBSZARY_ZGL.filter(function (o) { return zastrzezone.indexOf(o.id) < 0; });   // do odpowiedzi konta
+    // 25.10 (decyzja użytkownika): w zgłoszeniu tylko to, co osoba widzi w pasku – „Ogólne”, jej zakładki i Kartoteka
+    // (otwierana z Generatora i Zarządzania); bez potwierdzonego konta – tylko zakładki niezastrzeżone
+    function obszaryDla(k) {
+      var widac = APPS.filter(function (a) { return k ? widoczny(a, k) : !a.zastrzezony; }).map(function (a) { return a.obszar; });
+      if (widac.indexOf("umowy") >= 0 || widac.indexOf("protokoly") >= 0) widac.push("kartoteka");
+      if (k && (k.obszary || {}).kartoteka === "brak") widac = widac.filter(function (o) { return o !== "kartoteka"; });
+      return OBSZARY_ZGL.filter(function (o) { return o.id === "ogolne" || widac.indexOf(o.id) >= 0; });
+    }
+    var dostepneObszary = obszaryDla(kontoZapamietane());
     tlo.addEventListener("click", function (e) {
       if (e.target === tlo || e.target.closest("[data-x]")) return zamknij();
       var o = e.target.closest("[data-o]"), r = e.target.closest("[data-r]");
@@ -337,7 +344,9 @@
     rysuj(dostepneObszary);
     konto().then(function (k) {      // tylko obszary, do których konto ma dostęp
       if (!k || !document.body.contains(tlo)) return;
-      dostepneObszary = OBSZARY_ZGL.filter(function (o) { var p = (k.obszary || {})[o.id]; return o.id === "ogolne" || p === "dostep" || p === "admin"; });
+      dostepneObszary = obszaryDla(k);
+      stan.obszary = stan.obszary.filter(function (id) { return dostepneObszary.some(function (o) { return o.id === id; }); });
+      if (!stan.obszary.length) stan.obszary = ["ogolne"];
       rysuj(dostepneObszary);
     });
   }
