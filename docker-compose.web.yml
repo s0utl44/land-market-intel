@@ -11,12 +11,19 @@ services:
       - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN:?ustaw LMI_DOMAIN w .env}`)
       - traefik.http.routers.lmi.entrypoints=websecure
       - traefik.http.routers.lmi.tls.certresolver=letsencrypt
-      - traefik.http.routers.lmi.middlewares=lmi-auth,lmi-headers
+      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-auth,lmi-headers
       - traefik.http.routers.lmi.service=lmi-web
       - traefik.http.services.lmi-web.loadbalancer.server.port=8080
       - traefik.http.middlewares.lmi-auth.basicauth.users=${LMI_BASIC_AUTH:?ustaw LMI_BASIC_AUTH w .env}
       # login z bramki trafia do aplikacji (ulubione i komentarze na osobę); Traefik nadpisuje ten nagłówek
       - traefik.http.middlewares.lmi-auth.basicauth.headerField=X-Auth-Request-User
+      # lmi-czysc – PIERWSZY w każdym routerze (audyt 25.10): usuwa nagłówki uprawnień przysłane przez przeglądarkę.
+      # Ustawia je dopiero forwardAuth wre-<obszar>; bez tego router bez wre-* (tryb awaryjny Odprawy, LMI_UPRAWNIENIA=)
+      # przepuściłby podrobione „X-Pracawre-Poziom: admin”. Pusta wartość = usunięcie nagłówka.
+      - traefik.http.middlewares.lmi-czysc.headers.customRequestHeaders.X-Pracawre-Poziom=
+      - traefik.http.middlewares.lmi-czysc.headers.customRequestHeaders.X-Pracawre-Rola=
+      - traefik.http.middlewares.lmi-czysc.headers.customRequestHeaders.X-Auth-Request-Email=
+      - traefik.http.middlewares.lmi-czysc.headers.customRequestHeaders.X-Auth-Request-User=
       - traefik.http.middlewares.lmi-headers.headers.stsSeconds=31536000
       - traefik.http.middlewares.lmi-headers.headers.frameDeny=true
       - traefik.http.middlewares.lmi-headers.headers.contentTypeNosniff=true
@@ -36,7 +43,7 @@ services:
       - traefik.http.routers.lmi-mb.entrypoints=websecure
       - traefik.http.routers.lmi-mb.tls.certresolver=letsencrypt
       # lmi-auth i lmi-headers są zdefiniowane na usłudze web
-      - traefik.http.routers.lmi-mb.middlewares=lmi-auth,lmi-headers,lmi-mb-slash,lmi-mb-strip
+      - traefik.http.routers.lmi-mb.middlewares=lmi-czysc,lmi-auth,lmi-headers,lmi-mb-slash,lmi-mb-strip
       - traefik.http.routers.lmi-mb.service=lmi-mb
       - traefik.http.services.lmi-mb.loadbalancer.server.port=3000
       # /metabase -> /metabase/ (bez ukośnika Metabase gubi ścieżki zasobów)

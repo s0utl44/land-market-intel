@@ -22,6 +22,9 @@ services:
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
       OAUTH2_PROXY_COOKIE_NAME: _radar_auth
       OAUTH2_PROXY_COOKIE_SECURE: "true"
+      # jawne Lax (audyt 25.10): bez atrybutu Chrome przez 2 min po każdym odświeżeniu ciasteczka (co godzinę) wysyła je
+      # także z formularza POST innej strony – okno na CSRF w przyciskach bez treści zapytania (np. „Biorę” w Leadach)
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
       OAUTH2_PROXY_COOKIE_EXPIRE: 72h        # 3 dni (decyzja 22.10)
       OAUTH2_PROXY_COOKIE_REFRESH: 1h
       OAUTH2_PROXY_CUSTOM_TEMPLATES_DIR: /templates
@@ -56,8 +59,8 @@ services:
 
   web:
     labels:
-      - traefik.http.routers.lmi.middlewares=lmi-google,lmi-headers
+      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-google,lmi-headers
 
   metabase:
     labels:
-      - traefik.http.routers.lmi-mb.middlewares=lmi-google,lmi-headers,lmi-mb-slash,lmi-mb-strip
+      - traefik.http.routers.lmi-mb.middlewares=lmi-czysc,lmi-google,lmi-headers,lmi-mb-slash,lmi-mb-strip
