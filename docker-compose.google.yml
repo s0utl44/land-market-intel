@@ -42,19 +42,33 @@ services:
       - traefik.http.routers.lmi-oauth.service=lmi-oauth
       - traefik.http.services.lmi-oauth.loadbalancer.server.port=4180
       - traefik.http.middlewares.lmi-google.forwardauth.address=http://127.0.0.1:4180/
+      - traefik.http.middlewares.lmi-google.forwardauth.maxResponseBodySize=1048576
       - traefik.http.middlewares.lmi-google.forwardauth.trustForwardHeader=true
       - traefik.http.middlewares.lmi-google.forwardauth.authResponseHeaders=X-Auth-Request-Email,X-Auth-Request-User
+      # maxResponseBodySize (ostrzeżenie Traefika 25.10): odpowiedź sprawdzania najwyżej 1 MB (strona logowania ~135 KB, „Brak dostępu” ~2 KB);
+      # wre-*: trustForwardHeader=false – Kartoteka nie czyta X-Forwarded-*, więc nie przekazujemy ich z przeglądarki.
+      # lmi-google zostaje przy true: oauth2-proxy buduje z nich adres powrotu po zalogowaniu.
       # uprawnienia całej witryny (panel Administracja w usłudze kartoteki, 127.0.0.1:8098): po logowaniu Google
       # Traefik pyta, czy konto ma dostęp do obszaru – 403 „Brak dostępu” albo nagłówek X-Pracawre-Poziom (dostep | admin)
       - traefik.http.middlewares.wre-portal.forwardauth.address=http://127.0.0.1:8098/sprawdz/portal
+      - traefik.http.middlewares.wre-portal.forwardauth.maxResponseBodySize=1048576
+      - traefik.http.middlewares.wre-portal.forwardauth.trustForwardHeader=false
       - traefik.http.middlewares.wre-portal.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
       - traefik.http.middlewares.wre-umowy.forwardauth.address=http://127.0.0.1:8098/sprawdz/umowy
+      - traefik.http.middlewares.wre-umowy.forwardauth.maxResponseBodySize=1048576
+      - traefik.http.middlewares.wre-umowy.forwardauth.trustForwardHeader=false
       - traefik.http.middlewares.wre-umowy.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
       - traefik.http.middlewares.wre-protokoly.forwardauth.address=http://127.0.0.1:8098/sprawdz/protokoly
+      - traefik.http.middlewares.wre-protokoly.forwardauth.maxResponseBodySize=1048576
+      - traefik.http.middlewares.wre-protokoly.forwardauth.trustForwardHeader=false
       - traefik.http.middlewares.wre-protokoly.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
       - traefik.http.middlewares.wre-kartoteka.forwardauth.address=http://127.0.0.1:8098/sprawdz/kartoteka
+      - traefik.http.middlewares.wre-kartoteka.forwardauth.maxResponseBodySize=1048576
+      - traefik.http.middlewares.wre-kartoteka.forwardauth.trustForwardHeader=false
       - traefik.http.middlewares.wre-kartoteka.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
       - traefik.http.middlewares.wre-radar.forwardauth.address=http://127.0.0.1:8098/sprawdz/radar
+      - traefik.http.middlewares.wre-radar.forwardauth.maxResponseBodySize=1048576
+      - traefik.http.middlewares.wre-radar.forwardauth.trustForwardHeader=false
       - traefik.http.middlewares.wre-radar.forwardauth.authResponseHeaders=X-Pracawre-Poziom,X-Pracawre-Rola
 
   web:
