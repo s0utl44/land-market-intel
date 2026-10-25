@@ -53,6 +53,26 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .kafel small{display:block;margin-top:3px;font-size:.88rem;line-height:1.45;color:var(--szary)}
 .kafel .dalej{margin-left:auto;font-size:1.2rem;color:var(--zloto-c);transition:transform .15s}
 .kafel:hover .dalej{transform:translateX(3px)}
+.liczby{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.liczby:empty{display:none}
+.liczba{font-size:.78rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--hover);border:1px solid var(--linia);color:var(--tekst)}
+.liczba.wazne{background:var(--zloto);border-color:var(--zloto);color:#1f1d1a}
+
+/* moje zadania z HubSpot (Leady → /leady/api/pulpit): zaległe, dziś, najbliższy tydzień */
+.zadania{list-style:none;margin:0;padding:0;background:var(--karta);border:1px solid var(--linia);border-radius:14px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
+.zadanie{display:flex;gap:14px;align-items:flex-start;padding:13px 18px;border-top:1px solid var(--linia)}
+.zadanie:first-child{border-top:0}
+.zadanie .ik{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--hover);color:var(--zloto-c)}
+.zadanie .ik svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.zadanie .tx{min-width:0;flex:1}
+.zadanie b{display:block;font-size:.98rem}
+.zadanie .gdzie{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:3px;font-size:.84rem}
+.zadanie .gdzie a{color:var(--zloto-c);text-decoration:none;font-weight:700}.zadanie .gdzie a:hover{text-decoration:underline}
+.zadanie .kiedy{flex:none;font-size:.82rem;font-weight:700;color:var(--szary);white-space:nowrap;padding-top:2px}
+.zadanie.zalegle .kiedy{color:#b3261e}
+:root[data-theme="dark"] .zadanie.zalegle .kiedy{color:#f08f88}
+.zadanie .pilne{font-size:.66rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#b3261e;margin-left:6px}
+.zadania-info{margin:10px 0 0;font-size:.84rem;color:var(--szary)}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
 .stopka{margin-top:auto;font-size:.78rem;color:var(--szary)}
 @media (max-width:640px){.powitanie{border-left:0;padding-left:0}}
@@ -68,6 +88,7 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
       <p id="dzis"></p>
     </div>
   </header>
+  <section class="grupa" id="naDzis" hidden><h2>Moje zadania</h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
   <div id="grupy"></div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
@@ -100,7 +121,8 @@ function rysuj(k){
     return `<section class="grupa"><h2>${esc(g.nazwa)}</h2><ul class="kafle">${kafle.map(x => {
       const a = dostepne.get(x.obszar);
       return `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
-        <span><b>${esc(a.nazwa)}</b><small>${esc(x.opis)}</small></span><span class="dalej" aria-hidden="true">→</span></a></li>`;
+        <span><b>${esc(a.nazwa)}</b><small>${esc(x.opis)}</small><span class="liczby" data-liczby="${x.obszar}"></span></span>
+        <span class="dalej" aria-hidden="true">→</span></a></li>`;
     }).join('')}</ul></section>`;
   }).join('');
   document.getElementById('grupy').innerHTML = html ||
@@ -115,7 +137,78 @@ function powitaj(k){
   document.getElementById('dzis').textContent = new Date().toLocaleDateString('pl-PL', {weekday:'long', day:'numeric', month:'long'});
 }
 
-PracawrePasek.konto().then(k => { powitaj(k); rysuj(k); });
+// --- liczby na kafelkach (25.10, decyzja użytkownika): co jest do zrobienia, bez wchodzenia w narzędzie ---------------
+// Każda aplikacja podaje swoje liczby; błąd albo brak odpowiedzi = kafelek bez liczb (pulpit działa dalej).
+const odm = (n, jedna, kilka, wiele) => `${n} ${n === 1 ? jedna : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? kilka : wiele}`;
+function liczby(obszar, lista){
+  const el = document.querySelector(`[data-liczby="${obszar}"]`);
+  if (el) el.innerHTML = lista.filter(([n]) => n > 0).map(([n, tekst, wazne]) => `<span class="liczba${wazne ? ' wazne' : ''}">${esc(tekst)}</span>`).join('');
+}
+async function pobierz(url, opcje){
+  const r = await fetch(url, {credentials:'same-origin', ...opcje});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function liczbyLeadow(){
+  pobierz('/leady/api/pulpit').then(d => {
+    liczby('leady', [[d.do_wziecia, `${d.do_wziecia} do wzięcia`],
+      [d.moje.nowy, odm(d.moje.nowy, 'nowy u mnie', 'nowe u mnie', 'nowych u mnie'), true],
+      [d.moje.ponownie, `${d.moje.ponownie} do ponownego telefonu`, true],
+      [d.moje.zakwal, odm(d.moje.zakwal, 'zakwalifikowany', 'zakwalifikowane', 'zakwalifikowanych')]]);
+    zadania(d.zadania);
+  }).catch(() => {});
+}
+function liczbyUmow(){
+  pobierz('/umowy/api/szkiceLista', {method:'POST', headers:{'Content-Type':'application/json'}, body:'[]'}).then(d => {
+    const n = (d.wynik || []).length;
+    liczby('umowy', [[n, odm(n, 'niezapisana umowa', 'niezapisane umowy', 'niezapisanych umów'), true]]);
+  }).catch(() => {});
+}
+
+// --- moje zadania z HubSpot: zaległe, dziś i najbliższy tydzień; każde z linkiem do kontaktu / transakcji -----------
+const IKONY_ZADAN = {
+  CALL: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  EMAIL: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
+  TODO: '<path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+};
+const DZIEN = 864e5;
+const poczatekDnia = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+function kiedy(termin){
+  const t = new Date(termin), dni = Math.round((poczatekDnia(t) - poczatekDnia(new Date())) / DZIEN);
+  const godz = t.getHours() || t.getMinutes() ? ' ' + t.toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'}) : '';
+  if (dni === 0) return 'dziś' + godz;
+  if (dni === 1) return 'jutro' + godz;
+  if (dni < 0) return 'zaległe · ' + (dni === -1 ? 'wczoraj' : t.toLocaleDateString('pl-PL', {day:'numeric', month:'short'}));
+  return t.toLocaleDateString('pl-PL', {weekday:'short', day:'numeric', month:'short'});
+}
+const linkHubSpot = u => /^https:\/\/app\.hubspot\.com\//.test(u || '') ? u : '';
+function zadania(z){
+  const sekcja = document.getElementById('naDzis'), info = document.getElementById('zadaniaInfo');
+  sekcja.hidden = false;
+  const granica = poczatekDnia(new Date()) + 8 * DZIEN;       // do końca 7. dnia od dziś
+  const blisko = z.lista.filter(x => !x.termin || new Date(x.termin).getTime() < granica);
+  const pozniej = z.lista.length - blisko.length;
+  document.getElementById('zadania').innerHTML = blisko.map(x => {
+    const zalegle = x.termin && poczatekDnia(new Date(x.termin)) < poczatekDnia(new Date());
+    const gdzie = x.gdzie.map(g => {
+      const nazwa = esc(g.nazwa || (g.typ === 'kontakt' ? 'kontakt' : 'transakcja')), link = linkHubSpot(g.link);
+      return link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${nazwa}</a>` : `<span>${nazwa}</span>`;
+    }).join('');
+    return `<li class="zadanie${zalegle ? ' zalegle' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IKONY_ZADAN[x.typ] || IKONY_ZADAN.TODO}</svg></span>
+      <span class="tx"><b>${esc(x.tytul)}${x.pilne ? '<span class="pilne">pilne</span>' : ''}</b>${gdzie ? `<span class="gdzie">${gdzie}</span>` : ''}</span>
+      <span class="kiedy">${x.termin ? esc(kiedy(x.termin)) : 'bez terminu'}</span></li>`;
+  }).join('') || `<li class="zadanie"><span class="tx">${z.blad ? esc('Nie udało się pobrać zadań: ' + z.blad) : 'Nic zaległego ani zaplanowanego na najbliższy tydzień.'}</span></li>`;
+  info.hidden = !pozniej;
+  info.textContent = pozniej ? `Później: ${odm(pozniej, 'zadanie', 'zadania', 'zadań')} – w HubSpot.` : '';
+}
+
+PracawrePasek.konto().then(k => {
+  powitaj(k); rysuj(k);
+  const ma = obszar => PracawrePasek.aplikacje(k).some(a => a.obszar === obszar);
+  if (ma('leady')) liczbyLeadow();
+  if (ma('umowy')) liczbyUmow();
+  if (k && k.zgloszeniaNowe) liczby('administracja', [[k.zgloszeniaNowe, odm(k.zgloszeniaNowe, 'nowe zgłoszenie', 'nowe zgłoszenia', 'nowych zgłoszeń'), true]]);
+});
 </script>
 </body>
 </html>
