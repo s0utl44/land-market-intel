@@ -57,7 +57,7 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .liczba{font-size:.78rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--hover);border:1px solid var(--linia);color:var(--tekst)}
 .liczba.wazne{background:var(--zloto);border-color:var(--zloto);color:#1f1d1a}
 
-/* moje zadania z HubSpot (Leady → /leady/api/pulpit): zaległe, dziś, najbliższy tydzień */
+/* moje zadania z HubSpot (Leady → /leady/api/zadania): zaległe, dziś, najbliższy tydzień */
 .zadania{list-style:none;margin:0;padding:0;background:var(--karta);border:1px solid var(--linia);border-radius:14px;overflow:hidden;
   box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
 .zadanie{display:flex;gap:14px;align-items:flex-start;padding:13px 18px;border-top:1px solid var(--linia)}
@@ -143,8 +143,9 @@ function liczbyLeadow(){
       [d.moje.nowy, odm(d.moje.nowy, 'nowy u mnie', 'nowe u mnie', 'nowych u mnie'), true],
       [d.moje.ponownie, `${d.moje.ponownie} do ponownego telefonu`, true],
       [d.moje.zakwal, odm(d.moje.zakwal, 'zakwalifikowany', 'zakwalifikowane', 'zakwalifikowanych')]]);
-    zadania(d.zadania);
   }).catch(() => {});
+  // zadania osobno: liczby na kafelku nie czekają na HubSpot
+  pobierz('/leady/api/zadania').then(zadania).catch(() => {});
 }
 function liczbyUmow(){
   pobierz('/umowy/api/szkiceLista', {method:'POST', headers:{'Content-Type':'application/json'}, body:'[]'}).then(d => {

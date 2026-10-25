@@ -44,8 +44,11 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+  # Metabase – własne zestawienia z bazy Radaru „wyklikiwane” jak w Excelu. 25.10 (decyzja użytkownika): nieużywany, a zajmował
+  # ~900 MB pamięci – uruchamiany tylko na żądanie: docker compose --profile metabase up -d metabase (zapisane raporty zostają).
   metabase:
     image: metabase/metabase:v0.50.36
+    profiles: ["metabase"]
     restart: unless-stopped
     depends_on:
       db:
