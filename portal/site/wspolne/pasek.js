@@ -56,11 +56,11 @@
     ".pp a:hover,.pp button:hover{background:rgba(255,255,255,.07);color:#fff}" +
     ".pp a:focus-visible,.pp button:focus-visible{outline:2px solid #c9a03c;outline-offset:-2px}" +
     ".pp svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
-    ".pp .pp-dom{color:#f3efe6;padding-left:6px}.pp .pp-dom b{color:#c9a03c;font-weight:700}" +
+    ".pp .pp-dom{padding:0 8px 0 4px}.pp .pp-dom img{height:24px;width:auto;display:block}" +
     ".pp .pp-sep{width:1px;height:18px;background:rgba(255,255,255,.16);margin:0 6px;flex:none}" +
     ".pp [hidden]{display:none!important}" +
     // zakładki w grupach (Dokumenty | Sprzedaż); grupa bez widocznych zakładek znika razem z kreską
-    ".pp .pp-apps{display:flex;align-items:center;gap:2px;min-width:0}" +
+    ".pp .pp-apps{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}.pp .pp-apps::-webkit-scrollbar{display:none}" +
     ".pp .pp-grp{display:flex;gap:2px}.pp .pp-grp+.pp-grp::before{content:'';width:1px;height:18px;align-self:center;background:rgba(255,255,255,.12);margin:0 6px}" +
     ".pp .pp-apps a[aria-current=page],.pp .pp-lista a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
     ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
@@ -83,8 +83,34 @@
     ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-konto .pp-ch{width:12px;height:12px;opacity:.6}" +
     ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:auto}" +
     ".pp .pp-narz{display:none}" +
-    "@media (max-width:720px){.pp .pp-apps{display:none}.pp .pp-narz{display:block}.pp .pp-dom span,.pp .pp-konto .pp-imie{display:none}}" +
-    "@media print{#pracawre-pasek{display:none!important}}";
+    "@media (max-width:980px){.pp .pp-apps{display:none}.pp .pp-narz{display:block}.pp .pp-konto .pp-imie{display:none}}" +
+    "@media print{#pracawre-pasek,.pw-app{display:none!important}}" +
+    // pasek aplikacji pod wspólnym paskiem (Generator umów, Zarządzanie) – decyzja użytkownika 25.10: wszędzie jednakowy,
+    // bez własnego logo (logo WRE jest we wspólnym pasku). Aplikacja daje tylko znaczniki: .pw-app > .pw-app-tytul,
+    // .pw-app-nav > .pw-app-link (aria-current=page), .pw-app-akcje > .pw-app-btn (.pri – główna akcja, .ikona – sama ikona)
+    ".pw-app{position:sticky;top:0;z-index:30;box-sizing:border-box;display:flex;align-items:center;gap:6px;height:56px;min-width:0;" +
+    "padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));background:rgba(248,246,241,.92);" +
+    "backdrop-filter:blur(10px);border-bottom:1px solid #e2ddd2;color:#1f1d1a;font:600 14px/1 Lato,'Segoe UI',system-ui,sans-serif}" +
+    "html[data-theme=dark] .pw-app{background:rgba(23,24,26,.92);border-color:#2e3034;color:#e6e3dc}" +
+    ".pw-app *{box-sizing:border-box}" +
+    ".pw-app-tytul{flex:none;font-size:16px;font-weight:900;white-space:nowrap;margin-right:10px;color:inherit;text-decoration:none}" +
+    ".pw-app-nav{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}.pw-app-nav::-webkit-scrollbar{display:none}" +
+    ".pw-app-link,.pw-app-btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;" +
+    "height:36px;padding:0 14px;border-radius:999px;white-space:nowrap;font-weight:600;transition:background .15s,border-color .15s,color .15s}" +
+    ".pw-app-link{color:#6b665d}.pw-app-link:hover{background:rgba(0,0,0,.05);color:#1f1d1a}" +
+    ".pw-app-link[aria-current=page]{background:#1f1d1a;color:#fff}" +
+    "html[data-theme=dark] .pw-app-link{color:#a39e94}html[data-theme=dark] .pw-app-link:hover{background:rgba(255,255,255,.06);color:#fff}" +
+    "html[data-theme=dark] .pw-app-link[aria-current=page]{background:#e6e3dc;color:#17181a}" +
+    ".pw-app-akcje{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}" +
+    ".pw-app-btn{position:relative;border:1px solid #e2ddd2;background:#fff;color:#1f1d1a}.pw-app-btn:hover{border-color:#c9a03c}" +
+    ".pw-app-btn.pri{background:#1f1d1a;border-color:#1f1d1a;color:#fff;font-weight:700}.pw-app-btn.pri:hover{background:#9b7a26;border-color:#9b7a26}" +
+    ".pw-app-btn.ikona{width:36px;padding:0}" +
+    "html[data-theme=dark] .pw-app-btn{background:#222427;border-color:#3a3c40;color:#e6e3dc}" +
+    "html[data-theme=dark] .pw-app-btn.pri{background:#e6e3dc;border-color:#e6e3dc;color:#17181a}html[data-theme=dark] .pw-app-btn.pri:hover{background:#d9b55a;border-color:#d9b55a}" +
+    ".pw-app-link svg,.pw-app-btn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
+    ".pw-app-link:focus-visible,.pw-app-btn:focus-visible{outline:2px solid #c9a03c;outline-offset:2px}" +
+    "@media (max-width:1250px){.pw-app-link svg,.pw-app-btn:not(.pri):not(.ikona) svg{display:none}.pw-app-link,.pw-app-btn{padding:0 11px}.pw-app-btn.ikona{padding:0}}" +
+    "@media (max-width:900px){.pw-app{overflow-x:auto}.pw-app-tytul{display:none}}";
 
   // grupy zakładek – te same na pulpicie (strona główna) i w pasku (decyzja użytkownika 25.10)
   var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }, { id: "rynek", nazwa: "Rynek" }];
@@ -124,8 +150,7 @@
     var narzedzia = APPS.filter(naStronie)[0];
     el.innerHTML =
       '<nav class="pp" aria-label="pracawre.com">' +
-      '<a class="pp-dom" href="/" title="Strona główna">' + svg('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>') +
-      "<span><b>pracawre</b>.com</span></a>" +
+      '<a class="pp-dom" href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
       '<span class="pp-sep" aria-hidden="true"></span>' +
       '<div class="pp-apps">' + zakladki(znane, false) + "</div>" +
       // telefon: zakładki w jednym menu „Narzędzia”
