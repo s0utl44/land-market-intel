@@ -237,29 +237,6 @@ def test_transactions_endpoint_and_ranking(client, pg_conn):
     assert rank["9900022"]["tx_12m"] is None
 
 
-def test_feedback_flow(client, monkeypatch):
-    monkeypatch.setenv("LMI_ADMINS", "Dlys, szef@donehome.pl")
-    kasia = {"X-Auth-Request-User": "kasia"}
-    admin = {"X-Auth-Request-User": "dlys"}
-    r = client.post("/api/feedback", headers=kasia, json={
-        "kind": "błąd", "body": "  Oferta za 450 tys. jest podwójnie  ",
-        "context": {"gmina": "Kąty Wrocławskie", "widok": "karta gminy", "haslo": "nie zapisuj",
-                    "obszary": "Wykres „Mediana ceny za m²” | Oferta: budowlana, 1050 m²"}})
-    fid = r.json()["id"]
-    assert client.post("/api/feedback", headers=kasia, json={"kind": "inne", "body": "abc"}).status_code == 400
-    assert client.get("/api/feedback", headers=kasia).status_code == 403           # nie admin
-    assert client.get("/api/me", headers=admin).json()["is_admin"] is True
-    rows = client.get("/api/feedback", headers=admin).json()
-    assert [(x["id"], x["author"], x["body"]) for x in rows] == [(fid, "kasia", "Oferta za 450 tys. jest podwójnie")]
-    assert "haslo" not in rows[0]["context"] and rows[0]["context"]["gmina"] == "Kąty Wrocławskie"
-    txt = client.get("/api/feedback/export", headers=admin).text
-    assert f"#{fid} [błąd]" in txt and "gmina: Kąty Wrocławskie" in txt
-    assert "  - Wykres „Mediana ceny za m²”\n  - Oferta: budowlana, 1050 m²" in txt
-    assert client.post(f"/api/feedback/{fid}/status", headers=admin, json={"status": "zrobione"}).status_code == 200
-    assert client.get("/api/feedback", headers=admin).json() == []
-    assert len(client.get("/api/feedback", headers=admin, params={"status": "wszystkie"}).json()) == 1
-
-
 def test_admin_status(client, pg_conn, monkeypatch):
     monkeypatch.setenv("LMI_ADMINS", "x")
     admin = {"X-Auth-Request-User": "x"}
@@ -412,16 +389,6 @@ def test_offer_links_freshest_listing_and_lowest_price(client, pg_conn, tmp_path
     assert {x["source"] for x in o["offers"]} == {"otodom", "gratka"}
 
 
-def test_offer_report_keeps_problem_and_links(client, monkeypatch):
-    monkeypatch.setenv("LMI_ADMINS", "x")
-    r = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: nieaktualna / archiwalna",
-                                             "context": {"problem": "nieaktualna / archiwalna", "dzialka": "P-abc",
-                                                         "ogloszenia": "https://a.example/1 | https://b.example/2"}})
-    assert r.status_code == 200
-    txt = client.get("/api/feedback/export", headers={"X-Auth-Request-User": "x"}).text
-    assert "Problem z ofertą: nieaktualna / archiwalna" in txt and "ogłoszenie: https://b.example/2" in txt
-
-
 def test_announcements_visible_for_four_business_days(client, pg_conn, monkeypatch):
     from datetime import date
 
@@ -462,20 +429,10 @@ def test_permits_in_ranking_and_card(client, pg_conn):
     assert client.get("/api/changes", params={"days": 7}).json()["permits"]
 
 
-def test_feedback_offer_state_by_keys_and_old_urls(client, pg_conn, monkeypatch):
-    """25.10: zgłoszenie oferty prowadzi do niej i pokazuje jej stan dziś – po kluczach ogłoszeń (nowe zgłoszenia)
-    albo po adresach URL (zgłoszenia sprzed 25.10, które zapisywały tylko linki)"""
-    monkeypatch.setenv("LMI_ADMINS", "x")
-    admin = {"X-Auth-Request-User": "x"}
+def test_offers_by_keys_for_report_link(client):
+    """25.10: link ze zgłoszenia oferty (#teryt/zgloszenie=klucze) – oferty, w których te ogłoszenia są dziś"""
     oferta = client.get("/api/municipality/" + client.get("/api/ranking").json()[0]["teryt"] + "/offers").json()[0]
-    nowe = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: inne", "context": {
-        "problem": "inne", "dzialka": oferta["id"], "klucze": ",".join(oferta["listing_keys"])}}).json()["id"]
-    url = pg_conn.execute("SELECT url FROM core.listing_observations WHERE source_id || ':' || source_listing_id = %s "
-                          "AND url IS NOT NULL LIMIT 1", (oferta["listing_keys"][0],)).fetchone()[0]
-    stare = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: inne",
-                                               "context": {"dzialka": oferta["id"], "ogloszenia": url}}).json()["id"]
-    for fid in (nowe, stare):
-        d = client.get(f"/api/feedback/{fid}/offers", headers=admin).json()
-        assert [o["id"] for o in d["oferty"]] == [oferta["id"]] and oferta["listing_keys"][0] in d["klucze"]
-    assert client.get(f"/api/feedback/{nowe}/offers").status_code == 403          # tylko administrator
-    assert client.get("/api/feedback/999999/offers", headers=admin).status_code == 404
+    d = client.get("/api/offers/by-keys", params={"keys": ",".join(oferta["listing_keys"])}).json()
+    assert [o["id"] for o in d] == [oferta["id"]]
+    assert client.get("/api/offers/by-keys", params={"keys": "bez-dwukropka"}).status_code == 400
+    assert client.get("/api/feedback").status_code == 404          # dawne zgłoszenia Radaru: teraz wspólne (Administracja)

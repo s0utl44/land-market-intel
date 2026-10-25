@@ -212,22 +212,7 @@ td.wide{min-width:200px}
 .qlab{display:flex;justify-content:space-between;color:var(--muted);font-size:.72rem}
 @media (max-width:760px){.tx-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* zaznaczanie obszarów do zgłoszenia */
-body.picking .pickable{cursor:crosshair}
-.pick-hover{outline:2px dashed var(--gold)!important;outline-offset:2px}
-.pick-sel{outline:3px solid var(--gold)!important;outline-offset:2px;background-color:var(--gold-soft)!important}
-.pick-bar{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;width:min(760px,calc(100vw - 32px));
   background:var(--brand);color:var(--brand-ink);border:1px solid var(--gold);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;box-shadow:0 14px 40px rgb(0 0 0 / .35)}
-.pick-bar b{display:block;font-weight:600}
-.pick-bar span{font-size:.84rem;color:var(--brand-muted)}
-.pick-actions{display:flex;gap:8px;flex-wrap:wrap}
-.pick-bar .btn{background:transparent;color:var(--brand-ink);border-color:rgb(203 160 82 / .7)}
-.pick-bar .btn.primary{background:var(--gold);color:#1f2a36}
-.pick-bar .btn:disabled{opacity:.45;cursor:not-allowed}
-.fb-areas{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:170px;overflow:auto}
-.fb-areas li{display:flex;gap:8px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--line-2);border-radius:7px;padding:6px 8px;font-size:.84rem}
-.fb-areas li span{flex:1;overflow-wrap:anywhere}
-.fb-areas li button{all:unset;cursor:pointer;color:var(--muted);font-weight:700;padding:0 4px}
-.fb-areas .none{background:none;border:0;color:var(--muted);padding:0}
 /* status systemu */
 .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font-size:.72rem;font-weight:700}
 .sys-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -258,19 +243,10 @@ dialog#fb-dialog::backdrop{background:rgb(15 20 27 / .55)}
 .fb-problem label{flex-direction:row!important;align-items:center;gap:6px!important;font-size:.88rem;cursor:pointer}
 @media (max-width:560px){.fb-problem{grid-template-columns:1fr}}
 #fb-form textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:8px 10px;font:inherit;font-size:.92rem;resize:vertical}
-.fb-hint,.fb-ctx{margin:0;color:var(--muted);font-size:.84rem}
+.fb-hint{margin:0;color:var(--muted);font-size:.84rem}
 .fb-actions{display:flex;justify-content:flex-end;gap:8px}
 .fb-msg{margin:0;font-size:.86rem;font-weight:600}
-.fbl-list{display:flex;flex-direction:column}
-.fbl-item{padding:12px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:4px 12px}
-.fbl-item:first-child{border-top:0}
-.fbl-item .meta{font-size:.78rem;color:var(--muted)}
-.fbl-item p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
-.fbl-item.done{opacity:.55}
-.fbl-item .fbl-akcje{display:flex;flex-direction:column;gap:6px;align-items:stretch}
-.fbl-stan{grid-column:1/-1;margin-top:6px;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
-.fbl-stan .podsum{padding:8px 12px;font-size:.86rem;background:var(--bg)}
-.fbl-stan .podsum b{color:var(--ink)}
+.zgl-info{margin:0 0 10px;padding:9px 12px;border:1px solid var(--gold);border-radius:8px;background:var(--gold-soft);font-size:.88rem}
 #offers-body tr.hl,#offers-body tr.hl td{background:var(--gold-soft)!important}
 #offers-body tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 /* zespół: ulubione i komentarze */
@@ -292,7 +268,7 @@ tr.cm-row td{background:var(--bg);white-space:normal;text-align:left;padding:12p
 .cm-item p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-form{display:flex;gap:8px;align-items:flex-start;max-width:760px}
 .cm-form textarea{flex:1;min-height:58px;resize:vertical;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;font:inherit;font-size:.9rem}
-#fav-btn.on,#fbl-btn.on,#sys-btn.on{border-color:var(--gold);color:var(--gold-ink)}
+#fav-btn.on,#sys-btn.on{border-color:var(--gold);color:var(--gold-ink)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
 footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
@@ -324,9 +300,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
     </div>
     <div class="status" id="status"><span>Ładowanie danych…</span></div>
     <div class="top-actions">
-      <button type="button" class="btn" id="fb-btn" aria-haspopup="dialog">Zgłoś uwagę</button>
       <button type="button" class="btn" id="sys-btn" aria-controls="sys" aria-expanded="false" hidden>Status<span class="badge" id="sys-badge" hidden></span></button>
-      <button type="button" class="btn" id="fbl-btn" aria-controls="fbl" aria-expanded="false" hidden>Zgłoszenia</button>
       <button type="button" class="btn" id="fav-btn" aria-controls="favs" aria-expanded="false">★ Ulubione</button>
     </div>
   </div>
@@ -382,17 +356,6 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
     <div id="sys-body"></div>
   </section>
 
-  <section id="fbl" aria-labelledby="h-fbl" hidden>
-    <div class="head">
-      <div><h2 id="h-fbl">Zgłoszenia od zespołu</h2>
-        <p>Błędy i propozycje poprawek wysłane przyciskiem „Zgłoś uwagę”. „Kopiuj wszystkie” kopiuje otwarte zgłoszenia jako tekst, gotowy do wklejenia w rozmowę.</p></div>
-      <div class="tools">
-        <label class="check"><input type="checkbox" id="fbl-all"> pokaż też zrobione</label>
-        <button type="button" class="btn" id="fbl-copy">Kopiuj wszystkie</button>
-      </div>
-    </div>
-    <div class="panel"><div id="fbl-list" class="fbl-list"></div></div>
-  </section>
 
   <section id="favs" aria-labelledby="h-favs" hidden>
     <div class="head">
@@ -475,6 +438,7 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
         <label><span class="label">Sortuj</span>
           <select id="f-sort"><option value="ppm2">najtańsze za m²</option><option value="price">najtańsze</option><option value="area">największe</option><option value="newest">najnowsze</option><option value="longest">najdłużej na rynku</option><option value="cut">największa obniżka</option><option value="pushed">ostatnio podbite</option><option value="saved">najczęściej zapisywane</option><option value="views">najczęściej oglądane</option><option value="views_rate">najszybciej rośnie zainteresowanie</option></select></label>
       </div>
+      <p class="zgl-info" id="zgl-info" role="status" hidden></p>
       <div class="scroll">
         <table>
           <thead><tr><th class="l"><span class="sr">Zespół</span></th><th class="l">Działka</th><th>Cena</th><th>Na rynku</th><th>Zainteresowanie</th><th class="l">Ogłoszenie</th></tr></thead>
@@ -489,17 +453,12 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   </div>
 </main>
 
-<div class="pick-bar" id="pick-bar" role="region" aria-label="Zaznaczanie obszarów do zgłoszenia" hidden>
-  <div><b>Zaznacz obszary, których dotyczy uwaga</b><span id="pick-count">Kliknij jeden lub kilka elementów strony: wiersz, wykres, kafelek. Ponowne kliknięcie odznacza.</span></div>
-  <div class="pick-actions"><button type="button" class="btn" id="pick-cancel">Anuluj</button><button type="button" class="btn" id="pick-skip">Uwaga ogólna</button><button type="button" class="btn primary" id="pick-next" disabled>Dalej →</button></div>
-</div>
 
 <dialog id="fb-dialog" aria-labelledby="fb-title">
   <form method="dialog" id="fb-form">
-    <h2 id="fb-title">Zgłoś uwagę</h2>
-    <p class="fb-hint">Opisz, co jest nie tak albo co poprawić. Zaznaczone obszary dołączymy do zgłoszenia.</p>
-    <div><span class="label">Zaznaczone obszary</span><ul class="fb-areas" id="fb-areas"></ul></div>
-    <fieldset class="fb-problem" id="fb-problem" hidden><legend class="label">Co jest nie tak z tą ofertą?</legend>
+    <h2 id="fb-title">Zgłoś problem z ofertą</h2>
+    <p class="fb-hint">Wybierz, co jest nie tak. Zgłoszenie trafi do administratora razem z linkiem prowadzącym dokładnie do tej oferty.</p>
+    <fieldset class="fb-problem" id="fb-problem"><legend class="label">Co jest nie tak z tą ofertą?</legend>
       <label><input type="radio" name="fb-pr" value="nieaktualna / archiwalna"> nieaktualna lub archiwalna</label>
       <label><input type="radio" name="fb-pr" value="duplikat innej oferty (niepołączony)"> duplikat innej oferty</label>
       <label><input type="radio" name="fb-pr" value="błędnie połączona z inną działką"> błędnie połączona z inną działką</label>
@@ -507,12 +466,9 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
       <label><input type="radio" name="fb-pr" value="zły typ, metraż albo cena"> zły typ, metraż albo cena</label>
       <label><input type="radio" name="fb-pr" value="inne" checked> inne</label>
     </fieldset>
-    <label id="fb-kind-wrap"><span class="label">Rodzaj</span>
-      <select id="fb-kind"><option>błąd</option><option>poprawka danych</option><option>pomysł</option></select></label>
     <label><span class="label">Opis</span>
-      <textarea id="fb-body" required minlength="3" maxlength="4000" rows="6" placeholder="Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”"></textarea></label>
-    <p class="fb-ctx" id="fb-ctx"></p>
-    <div class="fb-actions"><button type="button" class="btn" id="fb-back">← Zaznacz inne</button><span style="flex:1"></span><button type="button" class="btn" id="fb-cancel">Anuluj</button><button type="submit" class="btn primary" id="fb-send">Wyślij</button></div>
+      <textarea id="fb-body" maxlength="4000" rows="5" placeholder="Opcjonalnie: szczegóły, np. link do oferty, z którą to duplikat"></textarea></label>
+    <div class="fb-actions"><button type="button" class="btn" id="fb-cancel">Anuluj</button><button type="submit" class="btn primary" id="fb-send">Wyślij</button></div>
     <p class="fb-msg" id="fb-msg" role="status"></p>
   </form>
 </dialog>
@@ -574,7 +530,9 @@ async function load(){
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges(); loadNews();
-  api('api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);$('#fbl-btn').hidden=false;api('api/feedback').then(r=>{if(r.length)$('#fbl-btn').textContent=`Zgłoszenia (${r.length})`}).catch(()=>{})}if(m.user&&m.user!=='zespół'){$('#status').insertAdjacentHTML('beforeend',`<span class="user">${esc(m.email||m.user)}</span>${m.logout_url?`<a href="${m.logout_url}">Wyloguj</a>`:''}`)}}).catch(()=>{});
+  api('api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;loadSys(true);setInterval(()=>loadSys(true),180000);}}).catch(()=>{});
+  const zgl=zgloszenieZAdresu();
+  if(zgl){pokazZgloszenie(zgl);return}
   const h=location.hash.slice(1);
   const first=RANK.find(r=>r.teryt===h)||RANK.find(r=>r.rank===1)||RANK[0];
   if(first) select(first.teryt,false);
@@ -585,12 +543,12 @@ function renderAttempt(){
 }
 function renderStatus(){
   const r=OV.last_run;
-  if(!r){$('#status').innerHTML='<span><i class="dot warn"></i>Pierwsze pobieranie danych jeszcze trwa</span><a href="metabase/">Metabase ↗</a>';return}
+  if(!r){$('#status').innerHTML='<span><i class="dot warn"></i>Pierwsze pobieranie danych jeszcze trwa</span>';return}
   const t=new Date(r.finished_at);
   const age=(Date.now()-t)/36e5;
   const cls=r.status!=='ok'?'warn':age>30?'bad':'';
   const when=t.toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  $('#status').innerHTML=`<span><i class="dot ${cls}"></i>Aktualizacja: ${when}${age>30?' (ponad dobę temu)':''}</span><a href="metabase/">Metabase ↗</a>`;
+  $('#status').innerHTML=`<span><i class="dot ${cls}"></i>Aktualizacja: ${when}${age>30?' (ponad dobę temu)':''}</span>`;
 }
 
 function renderSummary(){
@@ -1013,170 +971,62 @@ async function loadOffers(){
   const nx=$('#offers-next'); if(nx)nx.onclick=()=>{offersLimit=Math.min(1000,offersLimit+OFFERS_PAGE);loadOffers()};
 }
 
-// --- zgłoszenia błędów i poprawek ----------------------------------------------------------------
-function fbContext(){
-  const r=selected&&RANK.find(x=>x.teryt===selected);
-  return {gmina:r?r.name:'',teryt:selected||'',widok:!$('#favs').hidden?'ulubione':selected?'karta gminy':'ranking',
-          adres:location.href,przegladarka:navigator.userAgent.slice(0,120),ekran:`${innerWidth}×${innerHeight}`};
-}
-// tryb zaznaczania: najpierw obszary strony, potem opis
-const PICKABLE='#permits .panel, .news-item, #ch-lists li, .panel.mini, #rank-body tr[data-t], #offers-body tr[data-id], #favs-body tr[data-id], #tx tbody tr, .panel.chart, .tx-cards > .panel, .summary > div, #gm-facts .pill, .filters label, .notice:not([hidden]), #fbl .fbl-item, section > .head, .brand';
-let PICK=[], picking=false, hoverEl=null;
-const clean=t=>(t||'').replace(/\s+/g,' ').trim();
-function describe(el){
-  const gm=selected&&RANK.find(x=>x.teryt===selected), g=gm?` (gmina ${gm.name})`:'';
-  if(el.matches('#rank-body tr'))return 'Ranking gmin: wiersz '+clean(el.querySelector('.gm b')?.innerText);
-  if(el.matches('#offers-body tr, #favs-body tr')){const r=ROWS[el.dataset.id];
-    return 'Oferta'+g+': '+(r?`${r.land_use||'–'}, ${nf(r.area)} m², ${nf(r.price)} zł, ${nf(r.ppm2)} zł/m², ${r.url||''}`:clean(el.innerText).slice(0,160));}
-  if(el.matches('#tx tbody tr'))return 'Transakcja RCN'+g+': '+[...el.cells].slice(0,6).map(c=>clean(c.innerText)).join(' · ');
-  if(el.matches('.panel.chart'))return 'Wykres „'+clean(el.querySelector('h3')?.innerText)+'”'+g;
-  if(el.matches('.panel.mini'))return 'Zmiany w województwie, wykres „'+clean(el.querySelector('h3')?.innerText)+'” ('+PERIOD_TXT[PERIOD]+')';
-  if(el.matches('#ch-lists li'))return 'Zmiany, „'+clean(el.closest('.lst')?.querySelector('h3')?.innerText)+'”: '+clean(el.innerText).slice(0,160);
-  if(el.matches('.tx-cards > .panel'))return 'Ceny transakcyjne'+g+': '+clean(el.innerText).slice(0,120);
-  if(el.matches('.summary > div'))return 'Podsumowanie: '+clean(el.innerText).slice(0,120);
-  if(el.matches('#gm-facts .pill'))return 'Karta gminy'+g+': '+clean(el.innerText);
-  if(el.matches('.filters label'))return 'Filtr ofert: '+clean(el.querySelector('.label')?.innerText);
-  if(el.matches('section > .head'))return 'Sekcja „'+clean(el.querySelector('h2')?.innerText)+'”'+g;
-  return clean(el.innerText).slice(0,140)||el.tagName.toLowerCase();
-}
-function pickCount(){
-  $('#pick-next').disabled=!PICK.length;
-  $('#pick-count').textContent=PICK.length?`Zaznaczono: ${PICK.length}. Kliknij kolejne albo „Dalej”.`:'Kliknij jeden lub kilka elementów strony: wiersz, wykres, kafelek. Ponowne kliknięcie odznacza.';
-}
-function pickStart(){
-  picking=true; document.body.classList.add('picking'); $('#pick-bar').hidden=false; pickCount();
-  document.querySelectorAll(PICKABLE).forEach(e=>e.classList.add('pickable'));
-}
-function pickStop(keep){
-  picking=false; document.body.classList.remove('picking'); $('#pick-bar').hidden=true;
-  if(hoverEl){hoverEl.classList.remove('pick-hover');hoverEl=null}
-  document.querySelectorAll('.pickable').forEach(e=>e.classList.remove('pickable'));
-  if(!keep){PICK.forEach(p=>p.el.classList.remove('pick-sel'));PICK=[]}
-}
-document.addEventListener('mouseover',ev=>{if(!picking||ev.target.closest('#pick-bar'))return;
-  const el=ev.target.closest(PICKABLE); if(el===hoverEl)return;
-  if(hoverEl)hoverEl.classList.remove('pick-hover'); hoverEl=el; if(el)el.classList.add('pick-hover');},true);
-document.addEventListener('click',ev=>{if(!picking||ev.target.closest('#pick-bar'))return;
-  const el=ev.target.closest(PICKABLE); ev.preventDefault(); ev.stopPropagation(); if(!el)return;
-  const i=PICK.findIndex(p=>p.el===el);
-  if(i>=0){PICK.splice(i,1);el.classList.remove('pick-sel')}else{PICK.push({el,text:describe(el)});el.classList.add('pick-sel')}
-  pickCount();},true);
-document.addEventListener('keydown',ev=>{if(picking&&ev.key==='Escape')pickStop(false)});
-function renderAreas(){
-  $('#fb-areas').innerHTML=PICK.length?PICK.map((p,i)=>`<li><span>${esc(p.text)}</span><button type="button" data-rm="${i}" aria-label="Usuń obszar">×</button></li>`).join('')
-    :'<li class="none">Uwaga ogólna, bez zaznaczonego obszaru.</li>';
-}
-$('#fb-areas').addEventListener('click',ev=>{const i=ev.target.dataset&&ev.target.dataset.rm; if(i==null)return;
-  PICK[+i].el.classList.remove('pick-sel'); PICK.splice(+i,1); renderAreas();});
-let REPORT=null;   // zgłoszenie konkretnej oferty (przycisk ⚑ w wierszu)
+// --- zgłoszenie oferty (⚑) → wspólne zgłoszenia witryny ------------------------------------------------------
+// 25.10 (decyzja użytkownika): „Zgłoś błąd” i przegląd zgłoszeń są wspólne dla całej witryny (pasek, panel Administracja).
+// Radar dokłada tylko ⚑ przy ofercie: zgłoszenie dostaje link #teryt/zgloszenie=źródło:numer,…, który otwiera gminę
+// z podświetloną ofertą i pokazuje, jak jej ogłoszenia są pogrupowane dziś – czyli czy poprawka zadziałała.
+let REPORT=null;
 function reportOffer(tr){
-  const r=ROWS[tr.dataset.id]; if(!r)return;
-  if(picking)pickStop(false);
-  PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[{el:tr,text:describe(tr)}]; tr.classList.add('pick-sel');
-  REPORT=r; $('#fb-kind').value='poprawka danych';
-  openFbDialog();
-}
-function openFbDialog(){
-  pickStop(true); renderAreas(); const c=fbContext(); $('#fb-msg').textContent=''; $('#fb-send').disabled=false;
-  $('#fb-ctx').textContent=`Dołączymy też: ${c.widok}${c.gmina?' · '+c.gmina:''}${REPORT?' · linki do wszystkich ogłoszeń tej działki':''}.`;
-  $('#fb-problem').hidden=!REPORT; $('#fb-kind-wrap').hidden=!!REPORT; $('#fb-back').hidden=!!REPORT;
-  $('#fb-title').textContent=REPORT?'Zgłoś problem z ofertą':'Zgłoś uwagę';
-  $('#fb-body').required=!REPORT;
-  $('.fb-hint').textContent=REPORT?'Wybierz, co jest nie tak. Opis jest opcjonalny, np. z którą ofertą to duplikat albo jaka powinna być gmina.':'Opisz, co jest nie tak albo co poprawić. Zaznaczone obszary dołączymy do zgłoszenia.';
-  $('#fb-body').placeholder=REPORT?'Opcjonalnie: szczegóły, np. link do oferty, z którą to duplikat':'Co jest nie tak albo co poprawić? Np. „gmina Kąty Wrocławskie: oferta za 450 tys. jest podwójnie”';
+  REPORT=ROWS[tr.dataset.id]; if(!REPORT)return;
+  $('#fb-msg').textContent=''; $('#fb-send').disabled=false; $('#fb-body').value='';
   $('#fb-dialog').showModal(); $('#fb-body').focus();
 }
-$('#fb-btn').addEventListener('click',ev=>{ev.stopPropagation(); if(picking){pickStop(false);return} PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[]; pickStart()});
-$('#pick-cancel').addEventListener('click',()=>pickStop(false));
-$('#pick-skip').addEventListener('click',()=>{PICK.forEach(p=>p.el.classList.remove('pick-sel'));PICK=[];openFbDialog()});
-$('#pick-next').addEventListener('click',openFbDialog);
-$('#fb-back').addEventListener('click',()=>{$('#fb-dialog').close();pickStart();PICK.forEach(p=>p.el.classList.add('pick-sel'))});
-$('#fb-dialog').addEventListener('close',()=>{if(!picking){PICK.forEach(p=>p.el.classList.remove('pick-sel'))}REPORT=null});
-$('#fb-cancel').addEventListener('click',()=>{$('#fb-dialog').close();PICK=[]});
+const linkDoOferty=r=>`${location.origin}${location.pathname}#${r.teryt||selected}/zgloszenie=${encodeURIComponent(r.listing_keys.join(','))}`;
+$('#fb-cancel').addEventListener('click',()=>$('#fb-dialog').close());
+$('#fb-dialog').addEventListener('close',()=>{REPORT=null});
 $('#fb-form').addEventListener('submit',async ev=>{
-  ev.preventDefault();
-  const problem=REPORT?(document.querySelector('input[name="fb-pr"]:checked')||{}).value:null;
-  let body=$('#fb-body').value.trim(); if(REPORT&&body.length<3)body=`Oferta: ${problem}`; if(body.length<3)return;
+  ev.preventDefault(); const r=REPORT; if(!r)return;
+  const problem=(document.querySelector('input[name="fb-pr"]:checked')||{}).value||'inne';
+  const gmina=r.municipality||(RANK.find(x=>x.teryt===selected)||{}).name||'';
+  const opis=[`Radar – problem z ofertą: ${problem}`, $('#fb-body').value.trim(),
+    `Oferta${gmina?' (gmina '+gmina+')':''}: ${r.land_use||'działka'}, ${nf(r.area)} m², ${nf(r.price)} zł`,
+    'Ogłoszenia:', ...(r.offers||[{url:r.url}]).map(o=>o.url).filter(Boolean)].filter(Boolean).join('\n');
   $('#fb-send').disabled=true; $('#fb-msg').textContent='Wysyłanie…';
   try{
-    const extra=REPORT?{problem,dzialka:REPORT.id,klucze:(REPORT.listing_keys||[]).join(','),ogloszenia:(REPORT.offers||[{url:REPORT.url}]).map(o=>o.url).filter(Boolean).join(' | '),
-      gmina:REPORT.municipality||fbContext().gmina,teryt:REPORT.teryt||fbContext().teryt}:{};
-    const r=await send('api/feedback',{kind:$('#fb-kind').value,body,context:{...fbContext(),obszary:PICK.map(p=>p.text).join(' | '),...extra}});
-    $('#fb-msg').textContent=`Dziękujemy! Zgłoszenie #${r.id} zapisane.`; $('#fb-body').value=''; PICK.forEach(p=>p.el.classList.remove('pick-sel')); PICK=[];
-    setTimeout(()=>$('#fb-dialog').close(),1400); if(ME.is_admin&&!$('#fbl').hidden)loadFbl();
+    const res=await fetch('/administracja/api/zgloszenia',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({obszary:['radar'],rodzaj:'poprawka',opis,adres:linkDoOferty(r),strona:`Radar – oferta ${nf(r.area)} m²${gmina?', '+gmina:''}`,
+        przegladarka:navigator.userAgent,ekran:`${innerWidth}×${innerHeight}`})});
+    if(!res.ok)throw new Error(res.status);
+    $('#fb-msg').textContent='Dziękujemy! Zgłoszenie trafiło do administratora.'; setTimeout(()=>$('#fb-dialog').close(),1400);
   }catch(e){$('#fb-msg').textContent='Nie udało się wysłać. Spróbuj ponownie.';$('#fb-send').disabled=false}
 });
-async function loadFbl(){
-  const list=$('#fbl-list'); list.innerHTML='<div class="empty">Ładowanie…</div>';
-  let rows; try{rows=await api('api/feedback?status='+($('#fbl-all').checked?'wszystkie':'nowe'))}catch(e){list.innerHTML='<div class="empty">Nie udało się pobrać zgłoszeń.</div>';return}
-  $('#fbl-btn').textContent='Zgłoszenia'+(rows.filter(r=>r.status==='nowe').length?` (${rows.filter(r=>r.status==='nowe').length})`:'');
-  list.innerHTML=rows.length?rows.map(r=>`<div class="fbl-item${r.status==='zrobione'?' done':''}">
-    <div><div class="meta">#${r.id} · <b>${esc(r.kind)}</b> · ${new Date(r.created_at).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${who(r.author)}${r.context&&r.context.gmina?' · '+esc(r.context.gmina):''}${r.context&&r.context.widok?' · '+esc(r.context.widok):''}</div>${r.context&&r.context.problem?`<div><span class="pill warn">${esc(r.context.problem)}</span></div>`:''}<p>${esc(r.body)}</p>${r.context&&r.context.ogloszenia?`<div class="meta">${r.context.ogloszenia.split(' | ').map(u=>`<a href="${escU(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,'').slice(0,60))}</a>`).join(' · ')}</div>`:''}${r.context&&r.context.obszary?`<div class="meta">Obszary: ${esc(r.context.obszary)}</div>`:''}</div>
-    <div class="fbl-akcje">${r.context&&(r.context.dzialka||r.context.ogloszenia)?`<button type="button" class="btn" data-stan="${r.id}">Stan teraz</button>`:''}${r.context&&r.context.teryt?`<button type="button" class="btn" data-idz="${r.id}" data-teryt="${esc(r.context.teryt)}">Pokaż w gminie</button>`:''}<button type="button" class="btn" data-fb="${r.id}" data-st="${r.status==='nowe'?'zrobione':'nowe'}">${r.status==='nowe'?'Zrobione':'Przywróć'}</button></div></div>`).join(''):'<div class="empty">Brak zgłoszeń.</div>';
-  FBL=Object.fromEntries(rows.map(r=>[r.id,r]));
-}
-$('#fbl-list').addEventListener('click',async ev=>{
-  const stan=ev.target.closest('button[data-stan]'), idz=ev.target.closest('button[data-idz]');
-  if(stan)return pokazStan(stan);
-  if(idz)return pokazWGminie(idz.dataset.idz, idz.dataset.teryt);
-  const b=ev.target.closest('button[data-fb]');if(!b)return;
-  try{await send(`api/feedback/${b.dataset.fb}/status`,{status:b.dataset.st});loadFbl()}catch(e){alert('Nie udało się zmienić statusu.')}});
-// --- zgłoszenie → dokładnie to miejsce (25.10, prośba użytkownika): stan zgłoszonej oferty dziś i przejście do gminy ---
-let FBL={};             // zgłoszenia z ostatniego wczytania listy (id → zgłoszenie)
-let HL=null;            // oferty do podświetlenia po wczytaniu tabeli gminy: {ids, info}
+
+// link ze zgłoszenia → gmina, zakładka ofert bez filtrów, podświetlenie i stan ogłoszeń dziś
+let HL=null;            // {ids: oferty do podświetlenia, oferty: wszystkie działki z ogłoszeniami ze zgłoszenia}
 const ofert=n=>n===1?'1 oferta':n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?`${n} oferty`:`${n} ofert`;
-async function stanZgloszenia(id){
-  const d=await api(`api/feedback/${id}/offers`);
-  if(!d.oferty.length)throw new Error('brak');
-  return d;
+function zgloszenieZAdresu(){
+  const m=location.hash.match(/^#(\d+)\/zgloszenie=(.+)$/);
+  return m?{teryt:m[1],klucze:decodeURIComponent(m[2]).split(',').filter(Boolean)}:null;
 }
-async function pokazStan(btn){
-  const item=btn.closest('.fbl-item'), stary=item.querySelector('.fbl-stan');
-  if(stary){stary.remove();btn.textContent='Stan teraz';return}
-  btn.disabled=true;
-  const box=document.createElement('div'); box.className='fbl-stan'; item.appendChild(box);
-  try{
-    const z=FBL[btn.dataset.stan], c=z.context||{}, d=await stanZgloszenia(btn.dataset.stan);
-    const wtedy=(c.ogloszenia||'').split(' | ').filter(Boolean).length;
-    // przy zgłoszeniu: jedna oferta (działka) z tymi ogłoszeniami; teraz: tyle działek, ile grup po deduplikacji
-    box.innerHTML=`<div class="podsum">Przy zgłoszeniu: <b>1 oferta</b>${wtedy?` z ${wtedy} ${wtedy===1?'ogłoszeniem':'ogłoszeniami'}`:''} · Teraz: <b>${ofert(d.oferty.length)}</b>${d.oferty.length>1?' – ogłoszenia są rozdzielone':''}${d.oferty.some(o=>o.active===false)?' · część już zniknęła z portali':''}</div>
-      <div class="scroll"><table><tbody>${d.oferty.map(o=>offerRow(o,{gmina:true})).join('')}</tbody></table></div>`;
-    teamClicks(box.querySelector('tbody'));   // ulubione, komentarze i ⚑ działają jak w tabeli gminy
-    btn.textContent='Ukryj stan';
-  }catch(e){box.innerHTML='<div class="podsum">Nie znaleziono ogłoszeń z tego zgłoszenia w bieżących danych (mogły zniknąć z portali dawno temu).</div>'}
-  btn.disabled=false;
-}
-async function pokazWGminie(id, teryt){
-  let ids=[];
-  try{ids=(await stanZgloszenia(id)).oferty.filter(o=>o.active!==false).map(o=>o.id)}catch(e){}
-  // wszystkie filtry wyczyszczone i pełna lista – inaczej zgłoszona oferta mogłaby się nie zmieścić
-  ['#f-use','#f-min','#f-max','#f-ppm2','#f-age','#f-seller','#f-media'].forEach(s=>{$(s).value=''});
-  HL={ids:new Set(ids), zgl:id};
-  await select(teryt,true); tab('t-of');
+async function pokazZgloszenie(z){
+  let oferty=[]; try{oferty=await api('api/offers/by-keys?keys='+encodeURIComponent(z.klucze.join(',')))}catch(e){}
+  HL={ids:new Set(oferty.filter(o=>o.active!==false).map(o=>o.id)),oferty};
+  ['#f-use','#f-min','#f-max','#f-ppm2','#f-age','#f-seller','#f-media'].forEach(s=>{$(s).value=''});   // zgłoszona oferta musi być w tabeli
+  await select(z.teryt,true); tab('t-of');
 }
 function podswietlZgloszone(body){
   if(!HL)return;
-  const {ids,zgl}=HL; HL=null;
+  const {ids,oferty}=HL; HL=null;
   const wiersze=[...body.querySelectorAll('tr[data-id]')].filter(tr=>ids.has(tr.dataset.id));
   wiersze.forEach(tr=>tr.classList.add('hl'));
   if(wiersze.length)wiersze[0].scrollIntoView({block:'center',behavior:'smooth'});
-  else alert(`Ofert ze zgłoszenia #${zgl} nie ma wśród aktywnych w tej gminie – zniknęły z portali. Szczegóły: „Stan teraz” w zgłoszeniu.`);
+  const zniknely=oferty.length-ids.size;
+  $('#zgl-info').hidden=false;
+  $('#zgl-info').innerHTML=!oferty.length?'<b>Zgłoszona oferta:</b> nie ma już jej ogłoszeń w danych Radaru.'
+    :`<b>Zgłoszona oferta</b> – jej ogłoszenia są dziś ${oferty.length>1?`rozdzielone na <b>${ofert(oferty.length)}</b>`:'<b>razem, w jednej ofercie</b>'}`
+     +(zniknely?` · ${zniknely===oferty.length?'wszystkie zniknęły':'część zniknęła'} z portali`:'')+(wiersze.length?' · podświetlone poniżej':'');
 }
-$('#fbl-all').addEventListener('change',loadFbl);
-$('#fbl-copy').addEventListener('click',async()=>{
-  try{const r=await fetch('api/feedback/export?status='+($('#fbl-all').checked?'wszystkie':'nowe'),{credentials:'same-origin'});
-    const txt=await r.text(); await navigator.clipboard.writeText(txt);
-    $('#fbl-copy').textContent='Skopiowano ✓'; setTimeout(()=>$('#fbl-copy').textContent='Kopiuj wszystkie',1600);
-  }catch(e){alert('Nie udało się skopiować. Otwórz /api/feedback/export i skopiuj ręcznie.')}});
-$('#fbl-btn').addEventListener('click',()=>{
-  const sec=$('#fbl'), open=sec.hidden; sec.hidden=!open; $('#fbl-btn').classList.toggle('on',open);
-  $('#fbl-btn').setAttribute('aria-expanded',String(open)); if(open){loadFbl();sec.scrollIntoView({block:'start'})}});
-// --- status systemu (administrator) ---------------------------------------------------------------
-const SRCN={...SRC,rcn:'RCN (ceny transakcyjne)'};
-const ST={ok:['ok','OK'],warning:['warn','ostrzeżenie'],running:['running','trwa'],error:['bad','błąd'],blocked:['bad','blokada 403'],layout_changed:['bad','zmiana strony']};
-const stPill=(state,stale)=>{const [c,t]=stale?['warn','bez znaku życia']:(ST[state]||['warn',state]);return `<span class="st ${c}">${t}</span>`};
-const ago=t=>{if(!t)return '–';const m=Math.round((Date.now()-new Date(t))/6e4);return m<1?'przed chwilą':m<60?`${m} min temu`:m<1440?`${Math.round(m/60)} godz. temu`:new Date(t).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})};
-let sysTimer=null;
+
 async function loadSys(badgeOnly){
   let d; try{d=await api('api/admin/status')}catch(e){if(!badgeOnly)$('#sys-body').innerHTML='<div class="panel empty">Nie udało się pobrać statusu.</div>';return}
   const b=$('#sys-badge'); b.hidden=!d.problems; b.textContent=d.problems;

@@ -76,9 +76,6 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("rcn-coverage", help="kompletność RCN per powiat: usługa vs baza (do porównań)")
     s.add_argument("--since", default="2024-01-01")
 
-    s = sub.add_parser("feedback", help="zgłoszenia ze strony jako tekst do skopiowania")
-    s.add_argument("--wszystkie", action="store_true", help="także oznaczone jako zrobione")
-
     s = sub.add_parser("check-otodom", help="szybki test scrapera bez bazy (wypisuje tylko liczby)")
     s.add_argument("--region", default="dolnoslaskie")
 
@@ -294,13 +291,6 @@ def main(argv: list[str] | None = None) -> int:
                     for i, k in enumerate(("service", "db_rows", "db_tx", "land_tx")):
                         tot[i] += c[k]
                 print(f"{'razem':<7}{tot[0]:>11}{tot[1]:>10}{tot[2]:>12}{tot[3]:>12}")
-            elif args.cmd == "feedback":
-                import os as _os
-
-                from . import web
-
-                _os.environ.setdefault("LMI_DATABASE_URL", conn.info.dsn)
-                print(web.feedback_text(web.feedback_rows(None if args.wszystkie else "nowe")), end="")
             elif args.cmd == "demo":
                 return _demo(conn, args.out_dir, args.regions, args.weeks)
         except db.ImportRejected as exc:

@@ -16,7 +16,7 @@ from urllib.parse import quote
 import psycopg
 from psycopg import sql
 from fastapi import Body, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 
@@ -797,7 +797,6 @@ def admin_status(request: Request):
                               SELECT DISTINCT ON (teryt_prefix, period_start) gaps FROM scrape.rcn_fetch_log
                               ORDER BY teryt_prefix, period_start, fetched_at DESC) l WHERE gaps IS NOT NULL) AS gaps
                    FROM scrape.rcn_parcels""")[0]
-    feedback_open = _rows("SELECT count(*) AS n FROM app.feedback WHERE status = 'nowe'")[0]["n"]
 
     issues = []
     names = {x["source"]: x["name"] for x in sources}
@@ -834,9 +833,6 @@ def admin_status(request: Request):
     if gaps:
         issues.append({"level": "info", "title": f"RCN: luki w usłudze geoportalu ({len(gaps)})",
                        "detail": "; ".join(gaps[:5]), "when": rcn["last_fetch"]})
-    if feedback_open:
-        issues.append({"level": "info", "title": f"Nowe zgłoszenia od zespołu: {feedback_open}",
-                       "detail": "przycisk „Zgłoszenia”", "when": None})
     last2 = _rows("""SELECT run_id, created_at AS run_at, algorithm_version, report FROM core.dedup_runs
                      ORDER BY run_id DESC LIMIT 2""")
     quality = last2[0] if last2 else None
@@ -859,102 +855,17 @@ def admin_status(request: Request):
             "problems": sum(1 for i in issues if i["level"] in ("bad", "warn"))}
 
 
-# --- zgłoszenia błędów i poprawek ----------------------------------------------------------------
+# --- link ze zgłoszenia oferty ------------------------------------------------------------------------
+# 25.10 (decyzja użytkownika): zgłoszenia są wspólne dla całej witryny (pasek „Zgłoś błąd”, panel Administracja). Zgłoszenie
+# oferty (⚑) zapisuje link #teryt/zgloszenie=źródło:numer,… – strona szuka po nim ofert, w których te ogłoszenia są dziś.
 
-FEEDBACK_KINDS = ("błąd", "poprawka danych", "pomysł")
-
-
-@app.post("/api/feedback")
-def feedback_add(request: Request, kind: str = Body(...), body: str = Body(...), context: dict = Body({})):
-    body = body.strip()
-    if kind not in FEEDBACK_KINDS:
-        raise HTTPException(400, f"rodzaj: jeden z {', '.join(FEEDBACK_KINDS)}")
-    if not 3 <= len(body) <= 4000:
-        raise HTTPException(400, "opis: od 3 do 4000 znaków")
-    # kontekst tylko z dozwolonych, krótkich pól (bez dowolnych danych z przeglądarki)
-    # klucze – ogłoszenia zgłoszonej oferty (źródło:numer): po nich panel zgłoszeń znajduje ją także po zmianie grupowania
-    ctx = {k: str(v)[:1500 if k in ("obszary", "ogloszenia", "klucze") else 300] for k, v in (context or {}).items()
-           if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta", "obszary",
-                    "problem", "dzialka", "ogloszenia", "klucze")
-           and v not in (None, "")}
-    import json as _json
-    with _conn() as conn:
-        row = conn.execute("""INSERT INTO app.feedback (user_email, kind, body, context) VALUES (%s, %s, %s, %s)
-                              RETURNING feedback_id AS id""", (_user(request), kind, body, _json.dumps(ctx))).fetchone()
-    return row
-
-
-def feedback_rows(status: str | None = "nowe") -> list[dict]:
-    return _rows("""SELECT feedback_id AS id, created_at, user_email AS author, kind, body, context, status
-                    FROM app.feedback WHERE %(s)s::text IS NULL OR status = %(s)s
-                    ORDER BY created_at""", {"s": status})
-
-
-def feedback_text(rows: list[dict]) -> str:
-    """Zgłoszenia jako zwykły tekst do skopiowania (np. do rozmowy z Claude)."""
-    if not rows:
-        return "Brak zgłoszeń."
-    out = [f"Zgłoszenia z Radaru Działek ({len(rows)}):", ""]
-    for r in rows:
-        c = dict(r["context"] or {})
-        areas = c.pop("obszary", None)
-        links = c.pop("ogloszenia", None)
-        problem = c.pop("problem", None)
-        c.pop("przegladarka", None)
-        ctx = ", ".join(f"{k}: {v}" for k, v in c.items())
-        when = r["created_at"].strftime("%Y-%m-%d %H:%M") if hasattr(r["created_at"], "strftime") else r["created_at"]
-        out.append(f"#{r['id']} [{r['kind']}] {when} · {r['author']}" + (f" · {r['status']}" if r["status"] != "nowe" else ""))
-        if problem:
-            out.append(f"Problem z ofertą: {problem}")
-        out.append(r["body"])
-        if links:
-            out.extend(f"  ogłoszenie: {u.strip()}" for u in links.split(" | "))
-        if areas:
-            out.extend(f"  - {a.strip()}" for a in areas.split(" | "))
-        if ctx:
-            out.append(f"(gdzie: {ctx})")
-        out.append("")
-    return "\n".join(out).rstrip() + "\n"
-
-
-@app.get("/api/feedback")
-def feedback_list(request: Request, status: str = "nowe"):
-    _require_admin(request)
-    return feedback_rows(None if status == "wszystkie" else status)
-
-
-@app.get("/api/feedback/export", response_class=PlainTextResponse)
-def feedback_export(request: Request, status: str = "nowe"):
-    _require_admin(request)
-    return feedback_text(feedback_rows(None if status == "wszystkie" else status))
-
-
-def _zgloszone_klucze(context: dict) -> list[str]:
-    """ogłoszenia zgłoszonej oferty: klucze źródło:numer (zgłoszenia od 25.10) albo – w starszych – po adresach URL"""
-    if context.get("klucze"):
-        return [k for k in context["klucze"].split(",") if ":" in k][:30]
-    urls = [u.strip() for u in (context.get("ogloszenia") or "").split(" | ") if u.strip()][:30]
-    if not urls:
-        return []
-    return [r["k"] for r in _rows("""SELECT DISTINCT source_id || ':' || source_listing_id AS k
-                                     FROM core.listing_observations WHERE url = ANY(%(u)s)""", {"u": urls})]
-
-
-@app.get("/api/feedback/{feedback_id}/offers")
-def feedback_offers(request: Request, feedback_id: int):
-    """Zgłoszona oferta dziś (25.10, prośba użytkownika: zgłoszenie ma prowadzić dokładnie do miejsca i pokazać, czy poprawka
-    zadziałała): działki według bieżącej deduplikacji, w których są ogłoszenia ze zgłoszenia – także nieaktywne."""
-    _require_admin(request)
-    found = _rows("SELECT context FROM app.feedback WHERE feedback_id = %(i)s", {"i": feedback_id})
-    if not found:
-        raise HTTPException(404, "nie ma takiego zgłoszenia")
-    keys = _zgloszone_klucze(found[0]["context"] or {})
-    if not keys:
-        return {"klucze": [], "oferty": []}
+@app.get("/api/offers/by-keys")
+def offers_by_keys(request: Request, keys: str):
+    """działki według bieżącej deduplikacji, w których są podane ogłoszenia (także nieaktywne) – czy poprawka zadziałała"""
+    klucze = _keys(keys)
     scope = """l.property_key IN (SELECT l2.property_key FROM links l2
                                   WHERE l2.source_id || ':' || l2.source_listing_id = ANY(%(keys)s))"""
-    return {"klucze": keys,
-            "oferty": _offers(scope, ["true"], {"me": _user(request), "limit": 50, "keys": keys}, "newest")}
+    return _offers(scope, ["true"], {"me": _user(request), "limit": 50, "keys": klucze}, "newest")
 
 
 @app.get("/api/municipality/{teryt}/permits")
@@ -1025,20 +936,6 @@ def announcement_remove(request: Request, announcement_id: int):
                            (announcement_id,))
     if cur.rowcount == 0:
         raise HTTPException(404, "nie ma takiej nowości")
-    return {"ok": True}
-
-
-@app.post("/api/feedback/{feedback_id}/status")
-def feedback_status(request: Request, feedback_id: int, status: str = Body(..., embed=True)):
-    _require_admin(request)
-    if status not in ("nowe", "zrobione"):
-        raise HTTPException(400, "status: nowe albo zrobione")
-    with _conn() as conn:
-        cur = conn.execute("""UPDATE app.feedback SET status = %s,
-                              resolved_at = CASE WHEN %s = 'zrobione' THEN now() END WHERE feedback_id = %s""",
-                           (status, status, feedback_id))
-    if cur.rowcount == 0:
-        raise HTTPException(404, "nie ma takiego zgłoszenia")
     return {"ok": True}
 
 

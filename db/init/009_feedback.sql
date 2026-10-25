@@ -1,4 +1,5 @@
--- Zgłoszenia błędów i propozycji poprawek ze strony (przycisk "Zgłoś uwagę").
+-- Archiwum: dawne zgłoszenia ze strony Radaru (do 25.10.2026). Nowe zgłoszenia są wspólne dla całej witryny
+-- (pasek „Zgłoś błąd”, panel Administracja w Kartotece) – tabela zostaje tylko z historią.
 CREATE TABLE IF NOT EXISTS app.feedback (
     feedback_id     bigserial PRIMARY KEY,
     created_at      timestamptz NOT NULL DEFAULT now(),
