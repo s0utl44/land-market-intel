@@ -460,3 +460,22 @@ def test_permits_in_ranking_and_card(client, pg_conn):
     d = client.get("/api/municipality/9900011/permits").json()
     assert d["summary"]["houses_12m"] == 1 and d["summary"]["total_12m"] == 2 and len(d["quarters"]) == 2
     assert client.get("/api/changes", params={"days": 7}).json()["permits"]
+
+
+def test_feedback_offer_state_by_keys_and_old_urls(client, pg_conn, monkeypatch):
+    """25.10: zgłoszenie oferty prowadzi do niej i pokazuje jej stan dziś – po kluczach ogłoszeń (nowe zgłoszenia)
+    albo po adresach URL (zgłoszenia sprzed 25.10, które zapisywały tylko linki)"""
+    monkeypatch.setenv("LMI_ADMINS", "x")
+    admin = {"X-Auth-Request-User": "x"}
+    oferta = client.get("/api/municipality/" + client.get("/api/ranking").json()[0]["teryt"] + "/offers").json()[0]
+    nowe = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: inne", "context": {
+        "problem": "inne", "dzialka": oferta["id"], "klucze": ",".join(oferta["listing_keys"])}}).json()["id"]
+    url = pg_conn.execute("SELECT url FROM core.listing_observations WHERE source_id || ':' || source_listing_id = %s "
+                          "AND url IS NOT NULL LIMIT 1", (oferta["listing_keys"][0],)).fetchone()[0]
+    stare = client.post("/api/feedback", json={"kind": "poprawka danych", "body": "Oferta: inne",
+                                               "context": {"dzialka": oferta["id"], "ogloszenia": url}}).json()["id"]
+    for fid in (nowe, stare):
+        d = client.get(f"/api/feedback/{fid}/offers", headers=admin).json()
+        assert [o["id"] for o in d["oferty"]] == [oferta["id"]] and oferta["listing_keys"][0] in d["klucze"]
+    assert client.get(f"/api/feedback/{nowe}/offers").status_code == 403          # tylko administrator
+    assert client.get("/api/feedback/999999/offers", headers=admin).status_code == 404

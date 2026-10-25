@@ -872,9 +872,10 @@ def feedback_add(request: Request, kind: str = Body(...), body: str = Body(...),
     if not 3 <= len(body) <= 4000:
         raise HTTPException(400, "opis: od 3 do 4000 znaków")
     # kontekst tylko z dozwolonych, krótkich pól (bez dowolnych danych z przeglądarki)
-    ctx = {k: str(v)[:1500 if k in ("obszary", "ogloszenia") else 300] for k, v in (context or {}).items()
+    # klucze – ogłoszenia zgłoszonej oferty (źródło:numer): po nich panel zgłoszeń znajduje ją także po zmianie grupowania
+    ctx = {k: str(v)[:1500 if k in ("obszary", "ogloszenia", "klucze") else 300] for k, v in (context or {}).items()
            if k in ("gmina", "teryt", "widok", "adres", "przegladarka", "ekran", "oferta", "obszary",
-                    "problem", "dzialka", "ogloszenia")
+                    "problem", "dzialka", "ogloszenia", "klucze")
            and v not in (None, "")}
     import json as _json
     with _conn() as conn:
@@ -926,6 +927,34 @@ def feedback_list(request: Request, status: str = "nowe"):
 def feedback_export(request: Request, status: str = "nowe"):
     _require_admin(request)
     return feedback_text(feedback_rows(None if status == "wszystkie" else status))
+
+
+def _zgloszone_klucze(context: dict) -> list[str]:
+    """ogłoszenia zgłoszonej oferty: klucze źródło:numer (zgłoszenia od 25.10) albo – w starszych – po adresach URL"""
+    if context.get("klucze"):
+        return [k for k in context["klucze"].split(",") if ":" in k][:30]
+    urls = [u.strip() for u in (context.get("ogloszenia") or "").split(" | ") if u.strip()][:30]
+    if not urls:
+        return []
+    return [r["k"] for r in _rows("""SELECT DISTINCT source_id || ':' || source_listing_id AS k
+                                     FROM core.listing_observations WHERE url = ANY(%(u)s)""", {"u": urls})]
+
+
+@app.get("/api/feedback/{feedback_id}/offers")
+def feedback_offers(request: Request, feedback_id: int):
+    """Zgłoszona oferta dziś (25.10, prośba użytkownika: zgłoszenie ma prowadzić dokładnie do miejsca i pokazać, czy poprawka
+    zadziałała): działki według bieżącej deduplikacji, w których są ogłoszenia ze zgłoszenia – także nieaktywne."""
+    _require_admin(request)
+    found = _rows("SELECT context FROM app.feedback WHERE feedback_id = %(i)s", {"i": feedback_id})
+    if not found:
+        raise HTTPException(404, "nie ma takiego zgłoszenia")
+    keys = _zgloszone_klucze(found[0]["context"] or {})
+    if not keys:
+        return {"klucze": [], "oferty": []}
+    scope = """l.property_key IN (SELECT l2.property_key FROM links l2
+                                  WHERE l2.source_id || ':' || l2.source_listing_id = ANY(%(keys)s))"""
+    return {"klucze": keys,
+            "oferty": _offers(scope, ["true"], {"me": _user(request), "limit": 50, "keys": keys}, "newest")}
 
 
 @app.get("/api/municipality/{teryt}/permits")
