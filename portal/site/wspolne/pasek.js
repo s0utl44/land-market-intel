@@ -13,14 +13,13 @@
   var APPS = [
     { href: "/umowy/", obszar: "umowy", grupa: "dokumenty", opis: "Sprzedaż · najem · zarządzanie · PL / EN", nazwa: "Generator umów", ikona: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>' },
     { href: "/protokoly/", obszar: "protokoly", grupa: "dokumenty", opis: "Protokoły ze zdjęciami · weryfikacja najemcy", nazwa: "Zarządzanie", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
-    { href: "/radar/", obszar: "radar", nazwa: "Radar działek", zastrzezony: true, osobnyProjekt: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
+    { href: "/radar/", obszar: "radar", grupa: "rynek", opis: "Działki na Dolnym Śląsku – oferty, ceny, pozwolenia", nazwa: "Radar działek", zastrzezony: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
     { href: "/leady/", obszar: "leady", grupa: "sprzedaz", opis: "Prywatne ogłoszenia mieszkań – telefony do właścicieli", nazwa: "Leady", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
     { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Tygodniowy raport pracy agentów z HubSpot", nazwa: "Odprawa", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
   ];
   // grupa i opis – zakładki w grupach (pasek) i kafelki na pulpicie (strona główna)
   // zastrzezony: zakładka ukryta, dopóki konto (panel Administracja) nie potwierdzi dostępu – bez mignięcia u osób bez uprawnień
-  // osobnyProjekt: DoneHome, nie WRE (decyzja użytkownika 25.10: po zalogowaniu wszyscy widzą tylko WRE) – zakładka tylko
-  // na jego własnej stronie, żeby było widać, gdzie się jest; poza nią ani w pasku, ani na stronie głównej
+  // (Radar działek – decyzja użytkownika 25.10: zakładka i kafelek tylko u osób z dostępem; logowanie bez logo DoneHome)
   var IKONY = {
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
     light: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>',
@@ -88,7 +87,7 @@
     "@media print{#pracawre-pasek{display:none!important}}";
 
   // grupy zakładek – te same na pulpicie (strona główna) i w pasku (decyzja użytkownika 25.10)
-  var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }];
+  var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }, { id: "rynek", nazwa: "Rynek" }];
 
   function styl() {
     if (document.getElementById("pracawre-pasek-styl")) return;
@@ -106,19 +105,16 @@
   }
 
   function link(a, znane) {
-    var ukryj = znane ? !wPasku(a, znane) : a.zastrzezony;
+    var ukryj = znane ? !widoczny(a, znane) : a.zastrzezony;
     return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
       svg(a.ikona) + "<span>" + a.nazwa + "</span></a>";
   }
-  // zakładki pogrupowane; osobny projekt (Radar) na końcu, tylko na swojej stronie
   function zakladki(znane, naglowki) {
-    var grupy = GRUPY.map(function (g) {
+    return GRUPY.map(function (g) {
       var w = APPS.filter(function (a) { return a.grupa === g.id; });
       return '<div class="pp-grp" data-grupa="' + g.id + '">' + (naglowki ? '<div class="pp-gt">' + g.nazwa + "</div>" : "") +
         w.map(function (a) { return link(a, znane); }).join("") + "</div>";
-    });
-    var reszta = APPS.filter(function (a) { return !a.grupa; }).map(function (a) { return link(a, znane); }).join("");
-    return grupy.join("") + (reszta ? '<div class="pp-grp">' + reszta + "</div>" : "");
+    }).join("");
   }
 
   function wypelnij(el) {
@@ -189,10 +185,9 @@
     return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
   }
   function naStronie(a) { return location.pathname.indexOf(a.href) === 0 || location.pathname + "/" === a.href; }
-  function wPasku(a, k) { return widoczny(a, k) && (!a.osobnyProjekt || naStronie(a)); }
-  // aplikacje WRE, do których konto ma dostęp (kafelki strony głównej); k = null – tylko te bez zastrzeżeń
+  // aplikacje, do których konto ma dostęp (kafelki strony głównej); k = null – tylko te bez zastrzeżeń
   function aplikacje(k) {
-    return APPS.filter(function (a) { return !a.osobnyProjekt && (k ? widoczny(a, k) : !a.zastrzezony); });
+    return APPS.filter(function (a) { return k ? widoczny(a, k) : !a.zastrzezony; });
   }
   function konto() {
     if (kontoP) return kontoP;
@@ -208,7 +203,7 @@
   function uprawnieniaWPasku(el, k) {
     if (!k || !el) return;
     APPS.forEach(function (a) {
-      el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !wPasku(a, k); });
+      el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !widoczny(a, k); });
     });
     el.querySelectorAll(".pp-grp").forEach(function (g) { g.hidden = !g.querySelector("a:not([hidden])"); });
     var nazwa = k.nazwa || (k.email || "").split("@")[0];
@@ -380,7 +375,7 @@
     // 25.10 (decyzja użytkownika): w zgłoszeniu tylko to, co osoba widzi w pasku – „Ogólne”, jej zakładki i Kartoteka
     // (otwierana z Generatora i Zarządzania); bez potwierdzonego konta – tylko zakładki niezastrzeżone
     function obszaryDla(k) {
-      var widac = APPS.filter(function (a) { return k ? wPasku(a, k) : !a.zastrzezony; }).map(function (a) { return a.obszar; });
+      var widac = APPS.filter(function (a) { return k ? widoczny(a, k) : !a.zastrzezony; }).map(function (a) { return a.obszar; });
       if (widac.indexOf("umowy") >= 0 || widac.indexOf("protokoly") >= 0) widac.push("kartoteka");
       if (k && (k.obszary || {}).kartoteka === "brak") widac = widac.filter(function (o) { return o !== "kartoteka"; });
       return OBSZARY_ZGL.filter(function (o) { return o.id === "ogolne" || widac.indexOf(o.id) >= 0; });
