@@ -191,7 +191,12 @@ function zadania(z){
 }
 
 PracawrePasek.konto().then(k => {
-  powitaj(k); rysuj(k);
+  powitaj(k);
+  if (!PracawrePasek.aplikacje || !PracawrePasek.grupy){      // pasek z pamięci przeglądarki sprzed wdrożenia
+    document.getElementById('grupy').innerHTML = '<div class="pusto">Strona się zaktualizowała – odśwież ją (Ctrl+F5).</div>';
+    return;
+  }
+  rysuj(k);
   const ma = obszar => PracawrePasek.aplikacje(k).some(a => a.obszar === obszar);
   if (ma('leady')) liczbyLeadow();
   if (ma('umowy')) liczbyUmow();
