@@ -12,7 +12,7 @@ services:
     labels:
       - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN}`) && (Path(`${LMI_BASE_PATH}`) || PathPrefix(`${LMI_BASE_PATH}/`))
       - traefik.http.routers.lmi.priority=50
-      - traefik.http.routers.lmi.middlewares=lmi-czysc,${LMI_AUTH_MIDDLEWARE:-lmi-google}${LMI_UPRAWNIENIA-,wre-radar},lmi-headers,lmi-slash,lmi-strip
+      - traefik.http.routers.lmi.middlewares=lmi-czysc,${LMI_AUTH_MIDDLEWARE:-lmi-google}${LMI_UPRAWNIENIA-,wre-radar},lmi-limit,lmi-headers,lmi-csp,lmi-slash,lmi-strip
       # /radar -> /radar/ (strona używa adresów względnych)
       - traefik.http.middlewares.lmi-slash.redirectregex.regex=^(https?://[^/]+${LMI_BASE_PATH})$$
       - traefik.http.middlewares.lmi-slash.redirectregex.replacement=$${1}/

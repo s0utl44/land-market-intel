@@ -59,7 +59,7 @@ services:
 
   web:
     labels:
-      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-google,lmi-headers
+      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-google,lmi-limit,lmi-headers,lmi-csp
 
   metabase:
     labels:

@@ -11,7 +11,7 @@ services:
       - traefik.http.routers.lmi.rule=Host(`${LMI_DOMAIN:?ustaw LMI_DOMAIN w .env}`)
       - traefik.http.routers.lmi.entrypoints=websecure
       - traefik.http.routers.lmi.tls.certresolver=letsencrypt
-      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-auth,lmi-headers
+      - traefik.http.routers.lmi.middlewares=lmi-czysc,lmi-auth,lmi-limit,lmi-headers,lmi-csp
       - traefik.http.routers.lmi.service=lmi-web
       - traefik.http.services.lmi-web.loadbalancer.server.port=8080
       - traefik.http.middlewares.lmi-auth.basicauth.users=${LMI_BASIC_AUTH:?ustaw LMI_BASIC_AUTH w .env}
@@ -33,6 +33,15 @@ services:
       - traefik.http.middlewares.lmi-headers.headers.permissionsPolicy=camera=(self), microphone=(), geolocation=(), payment=(), usb=()
       # druga linia obrony przed wstrzykniętym kodem (pełna CSP wymaga przeniesienia skryptów inline – w planie)
       - traefik.http.middlewares.lmi-headers.headers.contentSecurityPolicy=base-uri 'self'; object-src 'none'; frame-ancestors 'self'
+      # lmi-csp – pełna polityka dla aplikacji WRE (audyt 25.10, etap 1): skrypty, połączenia i ramki tylko z pracawre.com,
+      # czcionki Google, obrazki także z portali (miniatury w Leadach). Na razie TYLKO ZGŁASZA (Report-Only → Kartoteka
+      # /csp-raport, docker logs … | grep CSP); po kilku dniach bez zgłoszeń: zmienić nazwę nagłówka na Content-Security-Policy.
+      # Etap 2: bez 'unsafe-inline' w script-src (odciski skryptów z budowania). Metabase ma własną CSP – bez lmi-csp.
+      - "traefik.http.middlewares.lmi-csp.headers.customResponseHeaders.Content-Security-Policy-Report-Only=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; report-uri /csp-raport"
+      # lmi-limit – największe zapytanie do aplikacji (audyt 25.10): Traefik odrzuca większe (413), zanim dotrą do aplikacji.
+      # Stoi PO logowaniu (lmi-google, wre-*), więc obcy nie wyśle nawet bajtu treści. 10 MB = zrzut ekranu w „Zgłoś błąd”.
+      # Większe limity mają Generator (umowy-limit) i Protokoły (protokoly-limit) – zdefiniowane w ich repozytoriach.
+      - traefik.http.middlewares.lmi-limit.buffering.maxRequestBodyBytes=10485760
 
   metabase:
     environment:
