@@ -8,7 +8,6 @@ Wypisuje tylko słowo kluczowe, liczbę obok niego i nazwy pól JSON — bez tek
 Użycie na serwerze:
     docker compose run --rm -T -v "$PWD/scripts:/scripts:ro" --entrypoint python app /scripts/probe_interest.py
 """
-import json
 import re
 import sys
 
