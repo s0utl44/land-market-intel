@@ -40,9 +40,10 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .powitanie h1 em{font-family:"Lora",Georgia,serif;font-weight:500;color:var(--zloto-c)}
 .powitanie p{margin:6px 0 0;color:var(--szary)}
 
-#grupy{display:flex;flex-direction:column;gap:32px}
+/* 28.10 (decyzja użytkownika: kafelki ułożone równo): grupy obok siebie w kolumnach, w grupie kafelki jeden pod drugim */
+#grupy{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:28px 20px;align-items:start}
 .grupa h2{margin:0 0 14px;font-size:.72rem;font-weight:900;letter-spacing:.28em;text-transform:uppercase;color:var(--zloto-c)}
-.kafle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.kafle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 .kafel{height:100%;display:flex;gap:16px;align-items:center;padding:20px;border-radius:14px;text-decoration:none;color:inherit;
   background:var(--karta);border:1px solid var(--linia);box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05);
   transition:transform .15s,border-color .15s,background .15s}
@@ -58,7 +59,8 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .liczba.wazne{background:var(--zloto);border-color:var(--zloto);color:#1f1d1a}
 
 /* moje zadania z HubSpot (Leady → /leady/api/zadania): zaległe, dziś, najbliższy tydzień */
-.zadania{list-style:none;margin:0;padding:0;background:var(--karta);border:1px solid var(--linia);border-radius:14px;overflow:hidden;
+/* 28.10 (decyzja użytkownika): widać ok. 5 zadań, resztę przewija się w ramce – pulpit nie jest nimi zasypany */
+.zadania{list-style:none;margin:0;padding:0;background:var(--karta);border:1px solid var(--linia);border-radius:14px;overflow:auto;max-height:330px;
   box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
 .zadanie{display:flex;gap:14px;align-items:flex-start;padding:13px 18px;border-top:1px solid var(--linia)}
 .zadanie:first-child{border-top:0}
@@ -88,7 +90,7 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
       <p id="dzis"></p>
     </div>
   </header>
-  <section class="grupa" id="naDzis" hidden><h2>Moje zadania</h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
+  <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
   <div id="grupy"></div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
@@ -188,6 +190,7 @@ function zadania(z){
       <span class="tx"><b>${esc(x.tytul)}${x.pilne ? '<span class="pilne">pilne</span>' : ''}</b>${gdzie ? `<span class="gdzie">${gdzie}</span>` : ''}</span>
       <span class="kiedy">${x.termin ? esc(kiedy(x.termin)) : 'bez terminu'}</span></li>`;
   }).join('') || `<li class="zadanie"><span class="tx">${z.blad ? esc('Nie udało się pobrać zadań: ' + z.blad) : 'Nic zaległego ani zaplanowanego na najbliższy tydzień.'}</span></li>`;
+  document.getElementById('zadaniaN').textContent = blisko.length > 5 ? `· ${blisko.length}` : '';
   info.hidden = !pozniej;
   info.textContent = pozniej ? `Później: ${odm(pozniej, 'zadanie', 'zadania', 'zadań')} – w HubSpot.` : '';
 }

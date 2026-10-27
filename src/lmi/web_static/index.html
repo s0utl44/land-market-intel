@@ -284,10 +284,12 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   .logo{height:26px}
   .brand h1{font-size:1rem}
 }
-/* 28.10 (decyzja użytkownika): widok agenta – tylko najważniejsze: ranking gmin (oferty, zł/m², trend), karta gminy, ulubione.
-   Bez kafelków województwa, wykresów zmian i kolumn analitycznych (ocena, akty RCN, pozwolenia). Agent = osoba bez poziomu admin
-   w Radarze albo administrator z włączonym „Widokiem agenta” w menu konta. */
-html.radar-agent .summary-band,html.radar-agent #changes,html.radar-agent #status,html.radar-agent #sys-btn,html.radar-agent #sys,
+.rank-scroll{max-height:min(520px,62vh);overflow:auto}
+.rank-scroll thead th{position:sticky;top:0;z-index:1;background:var(--surface)}
+/* 28.10 (decyzje użytkownika): widok agenta – podsumowanie z wykresami i listami (obniżki, nowe, zniknęły) ZOSTAJE, bo to
+   ważne dla agentów; chowamy tylko pasek stanu, panel administratora i kolumny analityczne rankingu (ocena, akty RCN, pozwolenia).
+   Agent = osoba bez poziomu admin w Radarze albo administrator z włączonym „Widokiem agenta” w menu konta. */
+html.radar-agent #status,html.radar-agent #sys-btn,html.radar-agent #sys,
 html.radar-agent label.check:has(#show-small){display:none!important}
 html.radar-agent #rank-table th:nth-child(3),html.radar-agent #rank-table td:nth-child(3):not([colspan]),
 html.radar-agent #rank-table th:nth-child(7),html.radar-agent #rank-table td:nth-child(7),
@@ -345,7 +347,7 @@ html.radar-agent #rank-table th:nth-child(8),html.radar-agent #rank-table td:nth
 
   <section id="changes" aria-labelledby="h-ch">
     <div class="head">
-      <div><h2 id="h-ch">Co się zmieniło</h2>
+      <div><h2 id="h-ch">Podsumowanie</h2>
         <p id="ch-note">Nowe i wycofane oferty, obniżki i ceny w całym województwie. Okres wybierasz nad kafelkami.</p></div>
     </div>
     <div class="ch-charts" id="ch-charts"><div class="panel empty" style="grid-column:1/-1">Ładowanie…</div></div>
@@ -390,7 +392,7 @@ html.radar-agent #rank-table th:nth-child(8),html.radar-agent #rank-table td:nth
       </div>
     </div>
     <div class="panel">
-      <div class="scroll">
+      <div class="scroll rank-scroll">
         <table id="rank-table">
           <thead><tr>
             <th aria-sort="none" data-k="rank"><button type="button">#</button></th>
@@ -524,7 +526,8 @@ $('#use').onchange=async()=>{
   rankLimit=PAGE; renderSummary(); renderRank(); loadChanges();
   if(selected)select(selected,false);
 };
-const PAGE=20; let rankLimit=PAGE;
+// 28.10 (decyzja użytkownika): ranking jako przewijana lista (wszystkie gminy w ramce), bez przewijania pół strony
+const PAGE=1e9; let rankLimit=PAGE;
 
 async function load(){
   try{
