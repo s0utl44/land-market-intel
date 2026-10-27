@@ -15,7 +15,7 @@
     { href: "/protokoly/", obszar: "protokoly", grupa: "dokumenty", opis: "Protokoły ze zdjęciami · weryfikacja najemcy", nazwa: "Zarządzanie", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
     { href: "/radar/", obszar: "radar", grupa: "rynek", opis: "Działki na Dolnym Śląsku – oferty, ceny, pozwolenia", nazwa: "Radar działek", zastrzezony: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
     { href: "/leady/", obszar: "leady", grupa: "sprzedaz", opis: "Prywatne ogłoszenia mieszkań – telefony do właścicieli", nazwa: "Leady", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
-    { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Tygodniowy raport pracy agentów z HubSpot", nazwa: "Odprawa", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
+    { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Tygodniowy raport pracy agentów z HubSpot", nazwa: "Odprawa", zastrzezony: true, tylkoAdmin: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
   ];
   // grupa i opis – zakładki w grupach (pasek) i kafelki na pulpicie (strona główna)
   // zastrzezony: zakładka ukryta, dopóki konto (panel Administracja) nie potwierdzi dostępu – bez mignięcia u osób bez uprawnień
@@ -42,6 +42,21 @@
     try { window.dispatchEvent(new CustomEvent("pracawre-motyw", { detail: { ciemny: c, wybor: wybor() } })); } catch (e) {}
   }
   function ustaw(w) { try { localStorage.setItem(KLUCZ, w); } catch (e) {} zastosuj(); }
+
+  // Widok agenta (28.10, decyzja użytkownika): administrator ogląda całą witrynę tak, jak agent – przełącznik w menu konta,
+  // pamiętany w localStorage (wspólny dla wszystkich podstron). Aplikacje pytają PracawrePasek.widokAgenta() i słuchają
+  // zdarzenia „pracawre-widok-agenta”. Tylko wygląd strony – uprawnienia serwera bez zmian.
+  var KLUCZ_AGENT = "pracawre-widok-agenta";
+  function widokAgenta() { try { return localStorage.getItem(KLUCZ_AGENT) === "1"; } catch (e) { return false; } }
+  function ustawWidokAgenta(v) {
+    try { localStorage.setItem(KLUCZ_AGENT, v ? "1" : "0"); } catch (e) {}
+    zmianaWidoku();
+  }
+  function zmianaWidoku() {
+    html.classList.toggle("pw-agent", widokAgenta());
+    document.querySelectorAll("#pracawre-pasek").forEach(function (el) { var k = kontoZapamietane(); if (k) uprawnieniaWPasku(el, k); });
+    try { window.dispatchEvent(new CustomEvent("pracawre-widok-agenta", { detail: { agent: widokAgenta() } })); } catch (e) {}
+  }
 
   var CSS =
     "@view-transition{navigation:auto}" +
@@ -83,6 +98,10 @@
     ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-konto .pp-ch{width:12px;height:12px;opacity:.6}" +
     ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:auto}" +
     ".pp .pp-narz{display:none}" +
+    ".pp .pp-ag{height:24px;padding:0 9px;border-radius:999px;background:#c9a03c;color:#141518;font-size:11.5px;font-weight:900}" +
+    ".pp .pp-ag:hover{background:#e0b850;color:#141518}" +
+    ".pp .pp-lista .pp-agent[aria-pressed=true]{color:#fff;background:rgba(201,160,60,.16)}" +
+    ".pp .pp-lista .pp-agent b{margin-left:auto;font-size:11px;color:#8d887e}" +
     "@media (max-width:980px){.pp .pp-apps{display:none}.pp .pp-narz{display:block}.pp .pp-konto .pp-imie{display:none}}" +
     "@media print{#pracawre-pasek,.pw-app{display:none!important}}" +
     // pasek aplikacji pod wspólnym paskiem (Generator umów, Zarządzanie) – decyzja użytkownika 25.10: wszędzie jednakowy,
@@ -158,7 +177,7 @@
       svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + "<span>" + (narzedzia ? narzedzia.nazwa : "Narzędzia") + "</span></button>" +
       '<div class="pp-lista" hidden>' + zakladki(znane, true) + "</div></div>" +
       // konto: imię, motyw, zgłoszenie błędu, administracja, wylogowanie – w jednym miejscu
-      '<div class="pp-r"><div class="pp-m pp-km"><button type="button" class="pp-konto" aria-haspopup="true" aria-expanded="false" title="Konto">' +
+      '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button><div class="pp-m pp-km"><button type="button" class="pp-konto" aria-haspopup="true" aria-expanded="false" title="Konto">' +
       '<span class="pp-av">?</span><span class="pp-imie">Konto</span>' + svg('<path d="m6 9 6 6 6-6"/>').replace("<svg", '<svg class="pp-ch"') + "</button>" +
       '<div class="pp-lista" hidden>' +
       '<div class="pp-kto"><b>Konto</b><small></small></div><hr>' +
@@ -167,6 +186,8 @@
       "</div><hr>" +
       '<button type="button" data-zglos>' + svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
       "<span>Zgłoś błąd</span></button>" +
+      '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
+      '<span>Widok agenta</span><b>wył.</b></button>' +
       '<a class="pp-adm" href="/administracja/" hidden' + (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
       svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') + '<span>Administracja</span><b class="pp-n" hidden></b></a>' +
       '<a href="/oauth2/sign_out?rd=%2F">' + svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a>" +
@@ -174,6 +195,8 @@
     el.querySelectorAll(".pp-m").forEach(menu);
     el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
     el.querySelector("[data-zglos]").addEventListener("click", function () { zamknijMenu(); zglos(); });
+    el.querySelector("[data-agent]").addEventListener("click", function () { zamknijMenu(); ustawWidokAgenta(!widokAgenta()); });
+    el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); });
@@ -207,6 +230,7 @@
   }
   function widoczny(a, k) {
     var p = (k.obszary || {})[a.obszar];
+    if (a.tylkoAdmin && k.admin && widokAgenta()) return false;   // widok agenta: bez zakładek tylko dla administratorów
     return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
   }
   function naStronie(a) { return location.pathname.indexOf(a.href) === 0 || location.pathname + "/" === a.href; }
@@ -235,8 +259,13 @@
     el.querySelector(".pp-imie").textContent = nazwa.split(/\s+/)[0] || "Konto";
     el.querySelector(".pp-av").innerHTML = esc(inicjaly(nazwa)) + (k.admin && k.zgloszeniaNowe ? "<i></i>" : "");
     el.querySelector(".pp-kto").innerHTML = "<b>" + esc(nazwa) + "</b><small>" + esc(k.email || "") + "</small>";
-    var adm = el.querySelector(".pp-adm"), n = adm.querySelector(".pp-n");
-    adm.hidden = !k.admin;
+    var adm = el.querySelector(".pp-adm"), n = adm.querySelector(".pp-n"), ag = widokAgenta() && k.admin;
+    adm.hidden = !k.admin || ag;
+    var przel = el.querySelector("[data-agent]");
+    przel.hidden = !k.admin;
+    przel.setAttribute("aria-pressed", String(ag));
+    przel.querySelector("b").textContent = ag ? "wł." : "wył.";
+    el.querySelector("[data-agent-wyl]").hidden = !ag;
     n.textContent = k.zgloszeniaNowe || "";
     n.hidden = !k.zgloszeniaNowe;
     n.title = "Nowe zgłoszenia błędów";
@@ -442,9 +471,10 @@
     });
   }
 
-  window.PracawrePasek = { wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
-  window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); });
+  window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
+  html.classList.toggle("pw-agent", widokAgenta());
   styl();
   zastosuj();
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sam); else sam();

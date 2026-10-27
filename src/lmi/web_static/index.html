@@ -7,6 +7,13 @@
 <title>Radar Działek · DoneHome</title>
 <link rel="icon" href="static/sygnet-donehome.svg">
 <script src="/wspolne/pasek.js"></script>
+<script>
+// widok agenta od pierwszej klatki (bez mignięcia pełnego widoku): konto z pamięci sesji paska; api/me potwierdza niżej
+(function(){var k=null;try{k=JSON.parse(sessionStorage.getItem('pracawre-konto')||'null')}catch(e){}
+  var ag=!(k&&k.admin)||(window.PracawrePasek&&PracawrePasek.widokAgenta&&PracawrePasek.widokAgenta());
+  document.documentElement.classList.toggle('radar-agent',!!ag);
+  window.addEventListener('pracawre-widok-agenta',function(){location.reload()});})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700&display=swap">
@@ -277,6 +284,14 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;justify
   .logo{height:26px}
   .brand h1{font-size:1rem}
 }
+/* 28.10 (decyzja użytkownika): widok agenta – tylko najważniejsze: ranking gmin (oferty, zł/m², trend), karta gminy, ulubione.
+   Bez kafelków województwa, wykresów zmian i kolumn analitycznych (ocena, akty RCN, pozwolenia). Agent = osoba bez poziomu admin
+   w Radarze albo administrator z włączonym „Widokiem agenta” w menu konta. */
+html.radar-agent .summary-band,html.radar-agent #changes,html.radar-agent #status,html.radar-agent #sys-btn,html.radar-agent #sys,
+html.radar-agent label.check:has(#show-small){display:none!important}
+html.radar-agent #rank-table th:nth-child(3),html.radar-agent #rank-table td:nth-child(3):not([colspan]),
+html.radar-agent #rank-table th:nth-child(7),html.radar-agent #rank-table td:nth-child(7),
+html.radar-agent #rank-table th:nth-child(8),html.radar-agent #rank-table td:nth-child(8){display:none}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 </style>
 </head>
@@ -521,7 +536,9 @@ async function load(){
     return;
   }
   renderStatus(); renderAttempt(); renderSummary(); renderRank(); loadChanges(); loadNews();
-  api('api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;}}).catch(()=>{});
+  api('api/me').then(m=>{ME=m;if(m.is_admin){$('#sys-btn').hidden=false;}
+    const ag=!m.is_admin||(window.PracawrePasek&&PracawrePasek.widokAgenta&&PracawrePasek.widokAgenta());
+    document.documentElement.classList.toggle('radar-agent',!!ag);}).catch(()=>{});
   const zgl=zgloszenieZAdresu();
   if(zgl){pokazZgloszenie(zgl);return}
   const h=location.hash.slice(1);

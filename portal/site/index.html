@@ -104,7 +104,8 @@ const ADMINISTRACJA = {obszar: 'administracja', grupa: 'biuro', href: '/administ
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function rysuj(k){
-  const dostepne = [...PracawrePasek.aplikacje(k), ...(k && k.admin ? [ADMINISTRACJA] : [])];
+  const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // 28.10: widok agenta – bez Administracji
+  const dostepne = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];
   const html = [...PracawrePasek.grupy, {id: 'biuro', nazwa: 'Biuro'}].map(g => {
     const kafle = dostepne.filter(a => a.grupa === g.id);
     if (!kafle.length) return '';
@@ -198,6 +199,7 @@ PracawrePasek.konto().then(k => {
     return;
   }
   rysuj(k);
+  window.addEventListener('pracawre-widok-agenta', () => location.reload());
   const ma = obszar => PracawrePasek.aplikacje(k).some(a => a.obszar === obszar);
   if (ma('leady')) liczbyLeadow();
   if (ma('umowy')) liczbyUmow();
