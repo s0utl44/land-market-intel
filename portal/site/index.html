@@ -139,7 +139,7 @@ async function pobierz(url, opcje){
 }
 function liczbyLeadow(){
   pobierz('/leady/api/pulpit').then(d => {
-    liczby('leady', [[d.do_wziecia, `${d.do_wziecia} do wzięcia`],
+    liczby('leady', [[d.do_wziecia, odm(d.do_wziecia, 'lead', 'leady', 'leadów')],
       [d.moje.nowy, odm(d.moje.nowy, 'nowy u mnie', 'nowe u mnie', 'nowych u mnie'), true],
       [d.moje.ponownie, `${d.moje.ponownie} do ponownego telefonu`, true],
       [d.moje.zakwal, odm(d.moje.zakwal, 'zakwalifikowany', 'zakwalifikowane', 'zakwalifikowanych')]]);
