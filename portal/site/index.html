@@ -75,6 +75,10 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .zadanie.zalegle .kiedy{color:#b3261e}
 :root[data-theme="dark"] .zadanie.zalegle .kiedy{color:#f08f88}
 .zadanie .pilne{font-size:.66rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#b3261e;margin-left:6px}
+/* 28.10: odhaczenie zadania wprost z pulpitu (Leady → HubSpot COMPLETED) */
+.zadanie .ok{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--linia);background:var(--karta);color:var(--zloto-c);
+  font:900 14px/1 Lato,sans-serif;cursor:pointer}.zadanie .ok:hover{background:var(--zloto);color:#1f1d1a;border-color:var(--zloto)}
+.zadanie .ok[disabled]{opacity:.4;pointer-events:none}
 .zadania-info{margin:10px 0 0;font-size:.84rem;color:var(--szary)}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
 .stopka{margin-top:auto;font-size:.78rem;color:var(--szary)}
@@ -159,12 +163,23 @@ function zadania(z){
     }).join('');
     return `<li class="zadanie${zalegle ? ' zalegle' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IKONY_ZADAN[x.typ] || IKONY_ZADAN.TODO}</svg></span>
       <span class="tx"><b>${esc(x.tytul)}${x.pilne ? '<span class="pilne">pilne</span>' : ''}</b>${gdzie ? `<span class="gdzie">${gdzie}</span>` : ''}</span>
-      <span class="kiedy">${x.termin ? esc(kiedy(x.termin)) : 'bez terminu'}</span></li>`;
+      <span class="kiedy">${x.termin ? esc(kiedy(x.termin)) : 'bez terminu'}</span>
+      <button class="ok" data-zrobione="${esc(x.id)}" title="Odhacz – zadanie zrobione (zapis w HubSpot)" aria-label="Zrobione">✓</button></li>`;
   }).join('') || `<li class="zadanie"><span class="tx">${z.blad ? esc('Nie udało się pobrać zadań: ' + z.blad) : 'Nic zaległego ani zaplanowanego na najbliższy tydzień.'}</span></li>`;
   document.getElementById('zadaniaN').textContent = blisko.length > 5 ? `· ${blisko.length}` : '';
   info.hidden = !pozniej;
   info.textContent = pozniej ? `Później: ${odm(pozniej, 'zadanie', 'zadania', 'zadań')} – w HubSpot.` : '';
 }
+
+document.getElementById('zadania').addEventListener('click', async e => {
+  const b = e.target.closest('[data-zrobione]'); if (!b) return;
+  b.disabled = true;
+  try {
+    const r = await fetch('/leady/api/zadanie/' + encodeURIComponent(b.dataset.zrobione) + '/zrobione', {method: 'POST', credentials: 'same-origin'});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+    const li = b.closest('li'); li.style.opacity = .35; setTimeout(() => li.remove(), 400);
+  } catch (err) { b.disabled = false; alert('Nie udało się odhaczyć: ' + (err.message || err)); }
+});
 
 PracawrePasek.konto().then(k => {
   powitaj(k);
