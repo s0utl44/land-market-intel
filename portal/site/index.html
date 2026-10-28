@@ -124,31 +124,9 @@ function powitaj(k){
   document.getElementById('dzis').textContent = new Date().toLocaleDateString('pl-PL', {weekday:'long', day:'numeric', month:'long'});
 }
 
-// --- liczby na kafelkach (25.10, decyzja użytkownika): co jest do zrobienia, bez wchodzenia w narzędzie ---------------
-// Każda aplikacja podaje swoje liczby; błąd albo brak odpowiedzi = kafelek bez liczb (pulpit działa dalej).
 const odm = (n, jedna, kilka, wiele) => `${n} ${n === 1 ? jedna : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? kilka : wiele}`;
-function liczby(obszar, lista){ DO[obszar] = lista.filter(([n]) => n > 0); rysujDo(); }
-async function pobierz(url, opcje){
-  const r = await fetch(url, {credentials:'same-origin', ...opcje});
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}
-function liczbyLeadow(){
-  pobierz('/leady/api/pulpit').then(d => {
-    liczby('leady', [[d.do_wziecia, odm(d.do_wziecia, 'lead', 'leady', 'leadów')],
-      [d.moje.nowy, odm(d.moje.nowy, 'nowy u mnie', 'nowe u mnie', 'nowych u mnie'), true],
-      [d.moje.ponownie, `${d.moje.ponownie} do ponownego telefonu`, true],
-      [d.moje.zakwal, odm(d.moje.zakwal, 'zakwalifikowany', 'zakwalifikowane', 'zakwalifikowanych')]]);
-  }).catch(() => {});
-  // zadania osobno: liczby na kafelku nie czekają na HubSpot
-  pobierz('/leady/api/zadania').then(zadania).catch(() => {});
-}
-function liczbyUmow(){
-  pobierz('/umowy/api/szkiceLista', {method:'POST', headers:{'Content-Type':'application/json'}, body:'[]'}).then(d => {
-    const n = (d.wynik || []).length;
-    liczby('umowy', [[n, odm(n, 'niezapisana umowa', 'niezapisane umowy', 'niezapisanych umów'), true]]);
-  }).catch(() => {});
-}
+// liczby „do zrobienia” – ta sama funkcja co w karcie menu (/wspolne/pasek.js: PracawrePasek.liczby)
+function liczby(obszar, lista){ DO[obszar] = lista; rysujDo(); }
 
 // --- moje zadania z HubSpot: zaległe, dziś i najbliższy tydzień; każde z linkiem do kontaktu / transakcji -----------
 const IKONY_ZADAN = {
@@ -194,10 +172,10 @@ PracawrePasek.konto().then(k => {
   DOSTEPNE = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];
   document.getElementById('brakDostepu').hidden = !!DOSTEPNE.length;
   window.addEventListener('pracawre-widok-agenta', () => location.reload());
-  const ma = obszar => PracawrePasek.aplikacje(k).some(a => a.obszar === obszar);
-  if (ma('leady')) liczbyLeadow();
-  if (ma('umowy')) liczbyUmow();
-  if (k && k.admin && !agent && k.zgloszeniaNowe) liczby('administracja', [[k.zgloszeniaNowe, odm(k.zgloszeniaNowe, 'nowe zgłoszenie', 'nowe zgłoszenia', 'nowych zgłoszeń'), true]]);
+  if (k && PracawrePasek.liczby) PracawrePasek.liczby(k, liczby);
+  // zadania z HubSpot osobno – liczby nie czekają na HubSpot
+  if (PracawrePasek.aplikacje(k).some(a => a.obszar === 'leady')) fetch('/leady/api/zadania', {credentials:'same-origin'})
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(zadania).catch(() => {});
 });
 </script>
 </body>

@@ -62,49 +62,58 @@
     "@view-transition{navigation:auto}" +
     "::view-transition-old(root),::view-transition-new(root){animation-duration:.22s}" +
     "#pracawre-pasek{flex:none;position:relative;z-index:60}" +
+    // 28.10 (decyzja użytkownika): górny pasek = tylko ☰, logo i nazwa otwartego narzędzia; wszystko inne (narzędzia z liczbami,
+    // konto, motyw, zgłoś błąd, widok agenta, administracja, wyloguj) w wysuwanej karcie z lewej na całą wysokość
     ".pp{view-transition-name:pracawre-pasek;box-sizing:border-box;display:flex;align-items:center;gap:4px;height:40px;" +
-    "padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));background:#141518;color:#d9d5cc;" +
+    "padding:0 max(12px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));background:#141518;color:#d9d5cc;" +
     "border-bottom:2px solid #c9a03c;font:600 13px/1 Lato,'Segoe UI',system-ui,-apple-system,sans-serif;letter-spacing:.01em}" +
-    ".pp *{box-sizing:border-box}" +
-    ".pp a,.pp button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;" +
+    ".pp *,.pp-sz *{box-sizing:border-box}" +
+    ".pp a,.pp button,.pp-sz a,.pp-sz button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 10px;" +
     "border-radius:8px;color:#bdb8ad;white-space:nowrap;transition:background .15s,color .15s}" +
-    ".pp a:hover,.pp button:hover{background:rgba(255,255,255,.07);color:#fff}" +
-    ".pp a:focus-visible,.pp button:focus-visible{outline:2px solid #c9a03c;outline-offset:-2px}" +
-    ".pp svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
+    ".pp a:hover,.pp button:hover,.pp-sz a:hover,.pp-sz button:hover{background:rgba(255,255,255,.07);color:#fff}" +
+    ".pp a:focus-visible,.pp button:focus-visible,.pp-sz a:focus-visible,.pp-sz button:focus-visible{outline:2px solid #c9a03c;outline-offset:-2px}" +
+    ".pp svg,.pp-sz svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
     ".pp .pp-dom{padding:0 8px 0 4px}.pp .pp-dom img{height:24px;width:auto;display:block}" +
     ".pp .pp-sep{width:1px;height:18px;background:rgba(255,255,255,.16);margin:0 6px;flex:none}" +
-    ".pp [hidden]{display:none!important}" +
-    // zakładki w grupach (Dokumenty | Sprzedaż); grupa bez widocznych zakładek znika razem z kreską
-    ".pp .pp-grp{display:flex;gap:2px}.pp .pp-grp+.pp-grp::before{content:'';width:1px;height:18px;align-self:center;background:rgba(255,255,255,.12);margin:0 6px}" +
-    ".pp .pp-lista a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
-    ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
-    // menu rozwijane: narzędzia (telefon) i konto
-    ".pp .pp-m{position:relative}" +
-    ".pp .pp-lista{position:absolute;top:36px;right:0;min-width:230px;background:#1d1f23;border:1px solid #33363c;border-radius:12px;padding:6px;" +
-    "box-shadow:0 18px 50px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:1px;z-index:70}" +
-    ".pp .pp-narz .pp-lista{left:0;right:auto}" +
-    ".pp .pp-lista a,.pp .pp-lista button{box-sizing:border-box;height:36px;padding:0 10px;width:100%}" +
-    ".pp .pp-lista .pp-grp{flex-direction:column}.pp .pp-lista .pp-grp+.pp-grp::before{width:auto;height:1px;margin:5px 4px}" +
-    ".pp .pp-lista .pp-gt{font-size:10.5px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:#8d887e;padding:10px 10px 4px}" +
-    ".pp .pp-lista hr{border:0;border-top:1px solid #33363c;margin:5px 4px}" +
-    ".pp .pp-kto{padding:8px 10px 10px;display:flex;flex-direction:column;gap:3px}.pp .pp-kto b{color:#f3efe6;font-size:14px}" +
-    ".pp .pp-kto small{color:#8d887e;font-weight:400;font-size:12px}" +
-    ".pp .pp-motywy{display:flex;gap:2px;margin:2px 4px 4px;background:#141518;border-radius:9px;padding:3px}" +
-    ".pp .pp-motywy button{flex:1;justify-content:center;height:28px;padding:0 6px;font-size:12px}" +
-    ".pp .pp-motywy button[aria-pressed=true]{background:#33363c;color:#fff}" +
-    ".pp .pp-av{width:24px;height:24px;border-radius:50%;background:#c9a03c;color:#141518;display:grid;place-items:center;font-size:11px;font-weight:900;position:relative}" +
-    ".pp .pp-av i{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e5534b;border:2px solid #141518}" +
-    ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-ch{width:12px!important;height:12px!important;opacity:.6}" +
-    ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:auto}" +
-    // 28.10 (decyzja użytkownika): narzędzia zawsze w rozwijanej liście z lewej (☰), zakładki w pasku ukryte – pulpit na ważne rzeczy
-    ".pp .pp-narz .pp-lista{min-width:300px}" +
-    ".pp .pp-lista a.pp-z{height:auto;min-height:44px;padding:7px 10px;align-items:flex-start}.pp .pp-lista a.pp-z svg{margin-top:2px}" +
-    ".pp .pp-z span{display:flex;flex-direction:column;gap:2px}.pp .pp-z small{font-weight:400;font-size:11.5px;color:#8d887e;white-space:normal;line-height:1.3}" +
+    ".pp [hidden],.pp-sz [hidden]{display:none!important}" +
+    ".pp .pp-otw{position:relative;width:34px;padding:0;justify-content:center}.pp .pp-otw svg{width:19px;height:19px}" +
+    ".pp .pp-tu{color:#f3efe6;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}" +
+    ".pp .pp-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex:none}" +
+    ".pp-kropka{position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:#e5534b;border:2px solid #141518}" +
     ".pp .pp-ag{height:24px;padding:0 9px;border-radius:999px;background:#c9a03c;color:#141518;font-size:11.5px;font-weight:900}" +
     ".pp .pp-ag:hover{background:#e0b850;color:#141518}" +
-    ".pp .pp-lista .pp-agent[aria-pressed=true]{color:#fff;background:rgba(201,160,60,.16)}" +
-    ".pp .pp-lista .pp-agent b{margin-left:auto;font-size:11px;color:#8d887e}" +
-    "@media (max-width:980px){.pp .pp-konto .pp-imie{display:none}}" +
+    ".pp .pp-av,.pp-sz .pp-av{width:26px;height:26px;border-radius:50%;background:#c9a03c;color:#141518;display:grid;place-items:center;font-size:11px;font-weight:900;flex:none}" +
+    ".pp .pp-konto{padding:0 4px}" +
+    // karta z lewej
+    ".pp-sz-tlo{position:fixed;inset:0;z-index:2147482000;background:rgba(10,10,9,.45);opacity:0;transition:opacity .2s}" +
+    ".pp-sz{position:fixed;top:0;bottom:0;left:0;z-index:2147482001;width:min(380px,92vw);display:flex;flex-direction:column;" +
+    "background:#17181b;color:#d9d5cc;border-right:1px solid #2c2e33;box-shadow:24px 0 60px rgba(0,0,0,.35);transform:translateX(-102%);" +
+    "transition:transform .22s ease;font:600 13.5px/1.25 Lato,'Segoe UI',system-ui,-apple-system,sans-serif;overflow:hidden}" +
+    ".pp-sz.otw{transform:none}.pp-sz-tlo.otw{opacity:1}" +
+    ".pp-sz .pp-sz-g{display:flex;align-items:center;gap:8px;padding:12px 12px 10px 16px;border-bottom:2px solid #c9a03c;flex:none}" +
+    ".pp-sz .pp-sz-g a{padding:0}.pp-sz .pp-sz-g img{height:28px;display:block}.pp-sz .pp-sz-x{margin-left:auto;width:34px;padding:0;justify-content:center}" +
+    ".pp-sz .pp-sz-w{flex:1;overflow:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:2px}" +
+    ".pp-sz .pp-sz-w>*{flex:none}" +
+    ".pp-sz .pp-kto{display:flex;align-items:center;gap:11px;padding:10px 8px 14px}.pp-sz .pp-kto .pp-av{width:38px;height:38px;font-size:14px}" +
+    ".pp-sz .pp-kto b{display:block;color:#f3efe6;font-size:15px}.pp-sz .pp-kto small{display:block;color:#8d887e;font-weight:400;font-size:12px;margin-top:2px}" +
+    ".pp-sz .pp-gt{font-size:10.5px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:#8d887e;padding:14px 10px 6px}" +
+    ".pp-sz a.pp-z{height:auto;min-height:46px;padding:9px 10px;align-items:flex-start;white-space:normal}" +
+    ".pp-sz .pp-z>svg{margin-top:1px;width:18px;height:18px;color:#c9a03c}" +
+    ".pp-sz .pp-z>span{display:flex;flex-direction:column;gap:3px;min-width:0}.pp-sz .pp-z b{color:#f3efe6;font-size:14px}" +
+    ".pp-sz .pp-z small{font-weight:400;font-size:12px;color:#8d887e;line-height:1.35}" +
+    ".pp-sz .pp-z[aria-current=page]{background:rgba(201,160,60,.14);box-shadow:inset 3px 0 0 #c9a03c}" +
+    ".pp-sz .pp-l{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.pp-sz .pp-l:empty{display:none}" +
+    ".pp-sz .pp-l i{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#2a2c31;color:#e6e3dc}" +
+    ".pp-sz .pp-l i.w{background:#c9a03c;color:#141518}" +
+    ".pp-sz .pp-sz-d{flex:none;border-top:1px solid #2c2e33;padding:10px;display:flex;flex-direction:column;gap:2px}" +
+    ".pp-sz .pp-sz-d>button,.pp-sz .pp-sz-d>a{height:36px;width:100%}" +
+    ".pp-sz .pp-motywy{display:flex;gap:2px;margin:0 0 6px;background:#101113;border-radius:9px;padding:3px}" +
+    ".pp-sz .pp-motywy button{flex:1;justify-content:center;height:28px;padding:0 6px;font-size:12px}" +
+    ".pp-sz .pp-motywy button[aria-pressed=true]{background:#33363c;color:#fff}" +
+    ".pp-sz .pp-agent[aria-pressed=true]{color:#fff;background:rgba(201,160,60,.16)}" +
+    ".pp-sz .pp-agent b,.pp-sz .pp-n{margin-left:auto;font-size:11px;color:#8d887e}" +
+    ".pp-sz .pp-n{background:#c9a03c;color:#141518;border-radius:999px;padding:1px 7px;font-weight:900}" +
+    "@media (prefers-reduced-motion:reduce){.pp-sz,.pp-sz-tlo{transition:none}}" +
     "@media print{#pracawre-pasek,.pw-app{display:none!important}}" +
     // pasek aplikacji pod wspólnym paskiem (Generator umów, Zarządzanie) – decyzja użytkownika 25.10: wszędzie jednakowy,
     // bez własnego logo (logo WRE jest we wspólnym pasku). Aplikacja daje tylko znaczniki: .pw-app > .pw-app-tytul,
@@ -151,16 +160,16 @@
     document.querySelectorAll(".pp-motywy [data-motyw]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.motyw === wybor())); });
   }
 
-  function link(a, znane, zOpisem) {
+  function link(a, znane) {
     var ukryj = znane ? !widoczny(a, znane) : a.zastrzezony;
-    return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (zOpisem ? ' class="pp-z"' : "") + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
-      svg(a.ikona) + "<span>" + a.nazwa + (zOpisem ? "<small>" + a.opis + "</small>" : "") + "</span></a>";
+    return '<a class="pp-z" href="' + a.href + '" data-obszar="' + a.obszar + '"' + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
+      svg(a.ikona) + "<span><b>" + a.nazwa + "</b><small>" + a.opis + '</small><span class="pp-l" data-l="' + a.obszar + '"></span></span></a>';
   }
-  function zakladki(znane, naglowki) {
+  function zakladki(znane) {
     return GRUPY.map(function (g) {
       var w = APPS.filter(function (a) { return a.grupa === g.id; });
-      return '<div class="pp-grp" data-grupa="' + g.id + '">' + (naglowki ? '<div class="pp-gt">' + g.nazwa + "</div>" : "") +
-        w.map(function (a) { return link(a, znane, naglowki); }).join("") + "</div>";
+      return '<div class="pp-grp" data-grupa="' + g.id + '"><div class="pp-gt">' + g.nazwa + "</div>" +
+        w.map(function (a) { return link(a, znane); }).join("") + "</div>";
     }).join("");
   }
 
@@ -168,60 +177,101 @@
     if (!el) return;
     styl();
     var znane = kontoZapamietane();
-    var narzedzia = APPS.filter(naStronie)[0];
+    var tu = APPS.filter(naStronie)[0] || (location.pathname.indexOf("/administracja") === 0 ? { nazwa: "Administracja" } : null);
     el.innerHTML =
       '<nav class="pp" aria-label="pracawre.com">' +
+      '<button type="button" class="pp-otw" data-sz title="Menu – narzędzia, konto, zgłoś błąd" aria-haspopup="dialog" aria-expanded="false">' +
+      svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + '<i class="pp-kropka" hidden></i></button>' +
       '<a class="pp-dom" href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
-      '<span class="pp-sep" aria-hidden="true"></span>' +
-      // narzędzia w jednym menu z lewej (na każdym ekranie) – przycisk z nazwą otwartej aplikacji
-      '<div class="pp-m pp-narz"><button type="button" aria-haspopup="true" aria-expanded="false">' +
-      svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + "<span>" + (narzedzia ? narzedzia.nazwa : "Narzędzia") + "</span>" + svg('<path d="m6 9 6 6 6-6"/>').replace("<svg", '<svg class="pp-ch"') + "</button>" +
-      '<div class="pp-lista" hidden>' + zakladki(znane, true) + "</div></div>" +
-      // konto: imię, motyw, zgłoszenie błędu, administracja, wylogowanie – w jednym miejscu
-      '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button><div class="pp-m pp-km"><button type="button" class="pp-konto" aria-haspopup="true" aria-expanded="false" title="Konto">' +
-      '<span class="pp-av">?</span><span class="pp-imie">Konto</span>' + svg('<path d="m6 9 6 6 6-6"/>').replace("<svg", '<svg class="pp-ch"') + "</button>" +
-      '<div class="pp-lista" hidden>' +
-      '<div class="pp-kto"><b>Konto</b><small></small></div><hr>' +
-      '<div class="pp-gt">Motyw</div><div class="pp-motywy">' +
+      (tu ? '<span class="pp-sep" aria-hidden="true"></span><span class="pp-tu">' + tu.nazwa + "</span>" : "") +
+      '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button>' +
+      '<button type="button" class="pp-konto" data-sz title="Konto"><span class="pp-av">?</span></button></div></nav>' +
+      // wysuwana karta (position:fixed) – poza .pp, żeby przejścia stron (view-transition) jej nie ruszały
+      '<div class="pp-sz-tlo" hidden></div>' +
+      '<aside class="pp-sz" role="dialog" aria-modal="true" aria-label="Menu" hidden>' +
+      '<div class="pp-sz-g"><a href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
+      '<button type="button" class="pp-sz-x" data-zamknij title="Zamknij (Esc)">' + svg('<path d="M6 6l12 12M18 6 6 18"/>') + "</button></div>" +
+      '<div class="pp-sz-w"><div class="pp-kto"><span class="pp-av">?</span><span class="pp-kto-t"><b>Konto</b><small></small></span></div>' +
+      '<a class="pp-z" href="/"' + (location.pathname === "/" ? ' aria-current="page"' : "") + ">" + svg('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>') +
+      "<span><b>Strona główna</b><small>Moje zadania i to, co czeka na zrobienie</small></span></a>" +
+      zakladki(znane) +
+      '<div class="pp-grp pp-biuro" hidden><div class="pp-gt">Biuro</div><a class="pp-z pp-adm" href="/administracja/"' +
+      (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
+      svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') +
+      '<span><b>Administracja</b><small>Konta, uprawnienia, zgłoszenia błędów, stan systemu</small><span class="pp-l" data-l="administracja"></span></span></a></div>' +
+      "</div>" +
+      '<div class="pp-sz-d"><div class="pp-motywy" role="group" aria-label="Motyw">' +
       ["auto", "light", "dark"].map(function (m) { return '<button type="button" data-motyw="' + m + '" aria-pressed="false">' + svg(IKONY[m]) + NAZWY_MOTYWOW[m] + "</button>"; }).join("") +
-      "</div><hr>" +
+      "</div>" +
       '<button type="button" data-zglos>' + svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
-      "<span>Zgłoś błąd</span></button>" +
+      "<span>Zgłoś błąd albo uwagę</span></button>" +
       '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
-      '<span>Widok agenta</span><b>wył.</b></button>' +
-      '<a class="pp-adm" href="/administracja/" hidden' + (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
-      svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') + '<span>Administracja</span><b class="pp-n" hidden></b></a>' +
+      "<span>Widok agenta</span><b>wył.</b></button>" +
       '<a href="/oauth2/sign_out?rd=%2F">' + svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a>" +
-      "</div></div></div></nav>";
-    el.querySelectorAll(".pp-m").forEach(menu);
+      "</div></aside>";
+    var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
+    el.querySelectorAll("[data-sz]").forEach(function (b) { b.addEventListener("click", function () { otworz(el); }); });
+    el.querySelector("[data-zamknij]").addEventListener("click", function () { zamknij(); });
+    tlo.addEventListener("click", function () { zamknij(); });
+    sz.addEventListener("click", function (e) { if (e.target.closest("a")) zamknij(true); });
     el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
-    el.querySelector("[data-zglos]").addEventListener("click", function () { zamknijMenu(); zglos(); });
-    el.querySelector("[data-agent]").addEventListener("click", function () { zamknijMenu(); ustawWidokAgenta(!widokAgenta()); });
+    el.querySelector("[data-zglos]").addEventListener("click", function () { zamknij(); zglos(); });
+    el.querySelector("[data-agent]").addEventListener("click", function () { ustawWidokAgenta(!widokAgenta()); });
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); });
   }
 
-  // menu rozwijane: klik otwiera / zamyka; klik obok, Esc albo wybór pozycji zamyka
-  function zamknijMenu(oprocz) {
-    document.querySelectorAll(".pp-m").forEach(function (m) {
-      if (m === oprocz) return;
-      m.querySelector(".pp-lista").hidden = true;
-      m.querySelector("button").setAttribute("aria-expanded", "false");
-    });
+  // karta z lewej: ☰ albo awatar otwiera; ✕, klik obok, Esc albo wybór pozycji zamyka
+  var otwarta = null, przedKarta = null;
+  function otworz(el) {
+    var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
+    otwarta = el; przedKarta = document.activeElement;
+    sz.hidden = false; tlo.hidden = false;
+    requestAnimationFrame(function () { sz.classList.add("otw"); tlo.classList.add("otw"); });
+    el.querySelectorAll("[data-sz]").forEach(function (b) { b.setAttribute("aria-expanded", "true"); });
+    sz.querySelector("[data-zamknij]").focus({ preventScroll: true });
+    konto().then(function (k) { if (k) liczby(k, function (obszar, lista) { wpiszLiczby(el, obszar, lista); }); });
   }
-  function menu(m) {
-    var przycisk = m.querySelector("button"), lista = m.querySelector(".pp-lista");
-    przycisk.addEventListener("click", function () {
-      zamknijMenu(m);
-      lista.hidden = !lista.hidden;
-      przycisk.setAttribute("aria-expanded", String(!lista.hidden));
-    });
-    lista.addEventListener("click", function (e) { if (e.target.closest("a")) zamknijMenu(); });
+  function zamknij(odRazu) {
+    var el = otwarta; if (!el) return;
+    otwarta = null;
+    var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
+    sz.classList.remove("otw"); tlo.classList.remove("otw");
+    el.querySelectorAll("[data-sz]").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+    setTimeout(function () { if (otwarta !== el) { sz.hidden = true; tlo.hidden = true; } }, odRazu ? 0 : 230);
+    if (!odRazu && przedKarta && przedKarta.focus) przedKarta.focus({ preventScroll: true });
   }
-  document.addEventListener("click", function (e) { if (!e.target.closest || !e.target.closest(".pp-m")) zamknijMenu(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") zamknijMenu(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && otwarta) zamknij(); });
+
+  // Liczby „do zrobienia” z aplikacji – w karcie przy narzędziach i na pulpicie (ta sama funkcja). naKazde(obszar, [[n, tekst, ważne]]).
+  // Błąd albo brak odpowiedzi aplikacji = bez liczb. Wyniki w pamięci na minutę (karta otwierana wiele razy).
+  var odm = function (n, jedna, kilka, wiele) { return n + " " + (n === 1 ? jedna : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? kilka : wiele); };
+  var LICZBY = {}, liczbyCzas = 0;
+  function liczby(k, naKazde) {
+    var widac = function (o) { return aplikacje(k).some(function (a) { return a.obszar === o; }); };
+    var agent = widokAgenta();
+    var dalej = function (obszar, lista) { LICZBY[obszar] = lista.filter(function (x) { return x[0] > 0; }); naKazde(obszar, LICZBY[obszar]); };
+    if (Date.now() - liczbyCzas < 60000) { Object.keys(LICZBY).forEach(function (o) { naKazde(o, LICZBY[o]); }); return; }
+    liczbyCzas = Date.now();
+    var json = function (url, opcje) { return fetch(url, Object.assign({ credentials: "same-origin" }, opcje)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); };
+    if (widac("leady")) json("/leady/api/pulpit").then(function (d) {
+      dalej("leady", [[d.do_wziecia, odm(d.do_wziecia, "lead do wzięcia", "leady do wzięcia", "leadów do wzięcia")],
+        [d.moje.nowy, odm(d.moje.nowy, "nowy u mnie", "nowe u mnie", "nowych u mnie"), true],
+        [d.moje.ponownie, d.moje.ponownie + " do ponownego telefonu", true],
+        [d.moje.zakwal, odm(d.moje.zakwal, "zakwalifikowany", "zakwalifikowane", "zakwalifikowanych")]]);
+    }).catch(function () {});
+    if (widac("umowy")) json("/umowy/api/szkiceLista", { method: "POST", headers: { "Content-Type": "application/json" }, body: "[]" }).then(function (d) {
+      var n = (d.wynik || []).length;
+      dalej("umowy", [[n, odm(n, "niezapisana umowa", "niezapisane umowy", "niezapisanych umów"), true]]);
+    }).catch(function () {});
+    if (k.admin && !agent) dalej("administracja", [[k.zgloszeniaNowe || 0, odm(k.zgloszeniaNowe || 0, "nowe zgłoszenie", "nowe zgłoszenia", "nowych zgłoszeń"), true]]);
+  }
+  function wpiszLiczby(el, obszar, lista) {
+    var m = el.querySelector('.pp-l[data-l="' + obszar + '"]');
+    if (m) m.innerHTML = lista.map(function (x) { return '<i class="' + (x[2] ? "w" : "") + '">' + esc(x[1]) + "</i>"; }).join("");
+  }
 
   // Uprawnienia (panel Administracja): bez dostępu do obszaru – podstrona znika z paska; administrator – przycisk panelu.
   // Pamięć w sessionStorage, żeby pasek nie mrugał przy przechodzeniu między stronami.
@@ -255,22 +305,19 @@
     APPS.forEach(function (a) {
       el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !widoczny(a, k); });
     });
-    el.querySelectorAll(".pp-grp").forEach(function (g) { g.hidden = !g.querySelector("a:not([hidden])"); });
-    var nazwa = k.nazwa || (k.email || "").split("@")[0];
-    el.querySelector(".pp-imie").textContent = nazwa.split(/\s+/)[0] || "Konto";
-    el.querySelector(".pp-av").innerHTML = esc(inicjaly(nazwa)) + (k.admin && k.zgloszeniaNowe ? "<i></i>" : "");
-    el.querySelector(".pp-kto").innerHTML = "<b>" + esc(nazwa) + "</b><small>" + esc(k.email || "") + "</small>";
-    var adm = el.querySelector(".pp-adm"), n = adm.querySelector(".pp-n"), ag = widokAgenta() && k.admin;
-    adm.hidden = !k.admin || ag;
+    el.querySelectorAll(".pp-grp[data-grupa]").forEach(function (g) { g.hidden = !g.querySelector("a:not([hidden])"); });
+    var nazwa = k.nazwa || (k.email || "").split("@")[0], ag = widokAgenta() && k.admin;
+    el.querySelectorAll(".pp-av").forEach(function (a) { a.textContent = inicjaly(nazwa); });
+    el.querySelector(".pp-konto").title = nazwa;
+    el.querySelector(".pp-kto-t").innerHTML = "<b>" + esc(nazwa) + "</b><small>" + esc(k.email || "") + "</small>";
+    el.querySelector(".pp-biuro").hidden = !k.admin || ag;
+    el.querySelector(".pp-adm").href = k.zgloszeniaNowe ? "/administracja/#zgloszenia" : "/administracja/";
+    el.querySelector(".pp-kropka").hidden = !(k.admin && !ag && k.zgloszeniaNowe);
     var przel = el.querySelector("[data-agent]");
     przel.hidden = !k.admin;
     przel.setAttribute("aria-pressed", String(ag));
     przel.querySelector("b").textContent = ag ? "wł." : "wył.";
     el.querySelector("[data-agent-wyl]").hidden = !ag;
-    n.textContent = k.zgloszeniaNowe || "";
-    n.hidden = !k.zgloszeniaNowe;
-    n.title = "Nowe zgłoszenia błędów";
-    adm.href = k.zgloszeniaNowe ? "/administracja/#zgloszenia" : "/administracja/";
   }
   function inicjaly(nazwa) {
     var cz = nazwa.split(/[\s.]+/).filter(Boolean);
@@ -472,7 +519,7 @@
     });
   }
 
-  window.PracawrePasek = { widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
