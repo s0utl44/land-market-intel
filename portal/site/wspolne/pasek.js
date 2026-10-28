@@ -75,9 +75,8 @@
     ".pp .pp-sep{width:1px;height:18px;background:rgba(255,255,255,.16);margin:0 6px;flex:none}" +
     ".pp [hidden]{display:none!important}" +
     // zakładki w grupach (Dokumenty | Sprzedaż); grupa bez widocznych zakładek znika razem z kreską
-    ".pp .pp-apps{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}.pp .pp-apps::-webkit-scrollbar{display:none}" +
     ".pp .pp-grp{display:flex;gap:2px}.pp .pp-grp+.pp-grp::before{content:'';width:1px;height:18px;align-self:center;background:rgba(255,255,255,.12);margin:0 6px}" +
-    ".pp .pp-apps a[aria-current=page],.pp .pp-lista a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
+    ".pp .pp-lista a[aria-current=page]{color:#fff;background:rgba(201,160,60,.16);box-shadow:inset 0 -2px 0 #c9a03c}" +
     ".pp .pp-r{margin-left:auto;display:flex;gap:2px;flex:none}" +
     // menu rozwijane: narzędzia (telefon) i konto
     ".pp .pp-m{position:relative}" +
@@ -95,14 +94,17 @@
     ".pp .pp-motywy button[aria-pressed=true]{background:#33363c;color:#fff}" +
     ".pp .pp-av{width:24px;height:24px;border-radius:50%;background:#c9a03c;color:#141518;display:grid;place-items:center;font-size:11px;font-weight:900;position:relative}" +
     ".pp .pp-av i{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e5534b;border:2px solid #141518}" +
-    ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-konto .pp-ch{width:12px;height:12px;opacity:.6}" +
+    ".pp .pp-konto{padding:0 8px 0 4px}.pp .pp-ch{width:12px!important;height:12px!important;opacity:.6}" +
     ".pp .pp-n{background:#c9a03c;color:#141518;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:auto}" +
-    ".pp .pp-narz{display:none}" +
+    // 28.10 (decyzja użytkownika): narzędzia zawsze w rozwijanej liście z lewej (☰), zakładki w pasku ukryte – pulpit na ważne rzeczy
+    ".pp .pp-narz .pp-lista{min-width:300px}" +
+    ".pp .pp-lista a.pp-z{height:auto;min-height:44px;padding:7px 10px;align-items:flex-start}.pp .pp-lista a.pp-z svg{margin-top:2px}" +
+    ".pp .pp-z span{display:flex;flex-direction:column;gap:2px}.pp .pp-z small{font-weight:400;font-size:11.5px;color:#8d887e;white-space:normal;line-height:1.3}" +
     ".pp .pp-ag{height:24px;padding:0 9px;border-radius:999px;background:#c9a03c;color:#141518;font-size:11.5px;font-weight:900}" +
     ".pp .pp-ag:hover{background:#e0b850;color:#141518}" +
     ".pp .pp-lista .pp-agent[aria-pressed=true]{color:#fff;background:rgba(201,160,60,.16)}" +
     ".pp .pp-lista .pp-agent b{margin-left:auto;font-size:11px;color:#8d887e}" +
-    "@media (max-width:980px){.pp .pp-apps{display:none}.pp .pp-narz{display:block}.pp .pp-konto .pp-imie{display:none}}" +
+    "@media (max-width:980px){.pp .pp-konto .pp-imie{display:none}}" +
     "@media print{#pracawre-pasek,.pw-app{display:none!important}}" +
     // pasek aplikacji pod wspólnym paskiem (Generator umów, Zarządzanie) – decyzja użytkownika 25.10: wszędzie jednakowy,
     // bez własnego logo (logo WRE jest we wspólnym pasku). Aplikacja daje tylko znaczniki: .pw-app > .pw-app-tytul,
@@ -149,16 +151,16 @@
     document.querySelectorAll(".pp-motywy [data-motyw]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.motyw === wybor())); });
   }
 
-  function link(a, znane) {
+  function link(a, znane, zOpisem) {
     var ukryj = znane ? !widoczny(a, znane) : a.zastrzezony;
-    return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
-      svg(a.ikona) + "<span>" + a.nazwa + "</span></a>";
+    return '<a href="' + a.href + '" data-obszar="' + a.obszar + '"' + (zOpisem ? ' class="pp-z"' : "") + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
+      svg(a.ikona) + "<span>" + a.nazwa + (zOpisem ? "<small>" + a.opis + "</small>" : "") + "</span></a>";
   }
   function zakladki(znane, naglowki) {
     return GRUPY.map(function (g) {
       var w = APPS.filter(function (a) { return a.grupa === g.id; });
       return '<div class="pp-grp" data-grupa="' + g.id + '">' + (naglowki ? '<div class="pp-gt">' + g.nazwa + "</div>" : "") +
-        w.map(function (a) { return link(a, znane); }).join("") + "</div>";
+        w.map(function (a) { return link(a, znane, naglowki); }).join("") + "</div>";
     }).join("");
   }
 
@@ -171,10 +173,9 @@
       '<nav class="pp" aria-label="pracawre.com">' +
       '<a class="pp-dom" href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
       '<span class="pp-sep" aria-hidden="true"></span>' +
-      '<div class="pp-apps">' + zakladki(znane, false) + "</div>" +
-      // telefon: zakładki w jednym menu „Narzędzia”
+      // narzędzia w jednym menu z lewej (na każdym ekranie) – przycisk z nazwą otwartej aplikacji
       '<div class="pp-m pp-narz"><button type="button" aria-haspopup="true" aria-expanded="false">' +
-      svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + "<span>" + (narzedzia ? narzedzia.nazwa : "Narzędzia") + "</span></button>" +
+      svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + "<span>" + (narzedzia ? narzedzia.nazwa : "Narzędzia") + "</span>" + svg('<path d="m6 9 6 6 6-6"/>').replace("<svg", '<svg class="pp-ch"') + "</button>" +
       '<div class="pp-lista" hidden>' + zakladki(znane, true) + "</div></div>" +
       // konto: imię, motyw, zgłoszenie błędu, administracja, wylogowanie – w jednym miejscu
       '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button><div class="pp-m pp-km"><button type="button" class="pp-konto" aria-haspopup="true" aria-expanded="false" title="Konto">' +

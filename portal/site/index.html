@@ -40,8 +40,9 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .powitanie h1 em{font-family:"Lora",Georgia,serif;font-weight:500;color:var(--zloto-c)}
 .powitanie p{margin:6px 0 0;color:var(--szary)}
 
-/* 28.10 (decyzja użytkownika: kafelki ułożone równo): grupy obok siebie w kolumnach, w grupie kafelki jeden pod drugim */
-#grupy{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:28px 20px;align-items:start}
+/* 28.10 (decyzja użytkownika): narzędzia tylko w menu ☰ w pasku – pulpit pokazuje rzeczy ważne: „Do zrobienia” (liczby
+   z aplikacji, kafelek tylko gdy jest coś do zrobienia) i „Moje zadania” z HubSpot. Miejsce na kolejne (np. faktury z ClickUp). */
+.kafle.do{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
 .grupa h2{margin:0 0 14px;font-size:.72rem;font-weight:900;letter-spacing:.28em;text-transform:uppercase;color:var(--zloto-c)}
 .kafle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 .kafel{height:100%;display:flex;gap:16px;align-items:center;padding:20px;border-radius:14px;text-decoration:none;color:inherit;
@@ -91,33 +92,28 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
     </div>
   </header>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
-  <div id="grupy"></div>
+  <section class="grupa" id="doZrobienia" hidden><h2>Do zrobienia</h2><ul class="kafle do" id="doLista"></ul></section>
+  <div class="pusto" id="brakDostepu" hidden>Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
 
 <script>
 "use strict";
-// Kafelki: aplikacje WRE, do których konto ma dostęp – grupy, nazwy, ikony i opisy z /wspolne/pasek.js (ta sama reguła
-// i kolejność co zakładki w pasku); grupa Biuro: Administracja – tylko dla administratorów.
-// Konto z pamięci sesji, więc kafelki nie migają przy powrocie na stronę.
-const ADMINISTRACJA = {obszar: 'administracja', grupa: 'biuro', href: '/administracja/', nazwa: 'Administracja',
-  opis: 'Konta, uprawnienia i zgłoszenia błędów', ikona: '<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'};
+// „Do zrobienia”: kafelek aplikacji tylko wtedy, gdy podała coś do zrobienia (liczby); nazwy i ikony z /wspolne/pasek.js.
+// Administracja (nowe zgłoszenia) – tylko dla administratorów.
+const ADMINISTRACJA = {obszar: 'administracja', href: '/administracja/#zgloszenia', nazwa: 'Administracja',
+  ikona: '<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-function rysuj(k){
-  const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // 28.10: widok agenta – bez Administracji
-  const dostepne = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];
-  const html = [...PracawrePasek.grupy, {id: 'biuro', nazwa: 'Biuro'}].map(g => {
-    const kafle = dostepne.filter(a => a.grupa === g.id);
-    if (!kafle.length) return '';
-    return `<section class="grupa"><h2>${esc(g.nazwa)}</h2><ul class="kafle">${kafle.map(a =>
-      `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
-        <span><b>${esc(a.nazwa)}</b><small>${esc(a.opis)}</small><span class="liczby" data-liczby="${a.obszar}"></span></span>
-        <span class="dalej" aria-hidden="true">→</span></a></li>`).join('')}</ul></section>`;
-  }).join('');
-  document.getElementById('grupy').innerHTML = html ||
-    '<div class="pusto">Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>';
+let DOSTEPNE = [];
+const DO = {}; // obszar → [[liczba, tekst, ważne]]
+function rysujDo(){
+  const kafle = DOSTEPNE.filter(a => (DO[a.obszar] || []).length).map(a =>
+    `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
+      <span><b>${esc(a.nazwa)}</b><span class="liczby">${DO[a.obszar].map(([n, tekst, wazne]) => `<span class="liczba${wazne ? ' wazne' : ''}">${esc(tekst)}</span>`).join('')}</span></span>
+      <span class="dalej" aria-hidden="true">→</span></a></li>`).join('');
+  document.getElementById('doLista').innerHTML = kafle;
+  document.getElementById('doZrobienia').hidden = !kafle;
 }
 
 function powitaj(k){
@@ -131,10 +127,7 @@ function powitaj(k){
 // --- liczby na kafelkach (25.10, decyzja użytkownika): co jest do zrobienia, bez wchodzenia w narzędzie ---------------
 // Każda aplikacja podaje swoje liczby; błąd albo brak odpowiedzi = kafelek bez liczb (pulpit działa dalej).
 const odm = (n, jedna, kilka, wiele) => `${n} ${n === 1 ? jedna : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? kilka : wiele}`;
-function liczby(obszar, lista){
-  const el = document.querySelector(`[data-liczby="${obszar}"]`);
-  if (el) el.innerHTML = lista.filter(([n]) => n > 0).map(([n, tekst, wazne]) => `<span class="liczba${wazne ? ' wazne' : ''}">${esc(tekst)}</span>`).join('');
-}
+function liczby(obszar, lista){ DO[obszar] = lista.filter(([n]) => n > 0); rysujDo(); }
 async function pobierz(url, opcje){
   const r = await fetch(url, {credentials:'same-origin', ...opcje});
   if (!r.ok) throw new Error(r.status);
@@ -197,16 +190,14 @@ function zadania(z){
 
 PracawrePasek.konto().then(k => {
   powitaj(k);
-  if (!PracawrePasek.aplikacje || !PracawrePasek.grupy){      // pasek z pamięci przeglądarki sprzed wdrożenia
-    document.getElementById('grupy').innerHTML = '<div class="pusto">Strona się zaktualizowała – odśwież ją (Ctrl+F5).</div>';
-    return;
-  }
-  rysuj(k);
+  const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // widok agenta – bez Administracji
+  DOSTEPNE = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];
+  document.getElementById('brakDostepu').hidden = !!DOSTEPNE.length;
   window.addEventListener('pracawre-widok-agenta', () => location.reload());
   const ma = obszar => PracawrePasek.aplikacje(k).some(a => a.obszar === obszar);
   if (ma('leady')) liczbyLeadow();
   if (ma('umowy')) liczbyUmow();
-  if (k && k.zgloszeniaNowe) liczby('administracja', [[k.zgloszeniaNowe, odm(k.zgloszeniaNowe, 'nowe zgłoszenie', 'nowe zgłoszenia', 'nowych zgłoszeń'), true]]);
+  if (k && k.admin && !agent && k.zgloszeniaNowe) liczby('administracja', [[k.zgloszeniaNowe, odm(k.zgloszeniaNowe, 'nowe zgłoszenie', 'nowe zgłoszenia', 'nowych zgłoszeń'), true]]);
 });
 </script>
 </body>
