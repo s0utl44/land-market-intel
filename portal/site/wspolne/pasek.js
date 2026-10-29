@@ -15,6 +15,7 @@
     { href: "/protokoly/", obszar: "protokoly", grupa: "dokumenty", opis: "Protokoły ze zdjęciami · weryfikacja najemcy", nazwa: "Zarządzanie", ikona: '<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>' },
     { href: "/radar/", obszar: "radar", grupa: "rynek", opis: "Działki na Dolnym Śląsku – oferty, ceny, pozwolenia", nazwa: "Radar działek", zastrzezony: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
     { href: "/leady/", obszar: "leady", grupa: "sprzedaz", opis: "Prywatne ogłoszenia mieszkań – telefony do właścicieli", nazwa: "Leady", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
+    { href: "/transakcje/", obszar: "transakcje", grupa: "sprzedaz", opis: "Lejek transakcji – Twoje sprawy, etapy i sumy", nazwa: "Transakcje", zastrzezony: true, ikona: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/>' },
     { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Tygodniowy raport pracy agentów z HubSpot", nazwa: "Odprawa", zastrzezony: true, tylkoAdmin: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
   ];
   // grupa i opis – zakładki w grupach (pasek) i kafelki na pulpicie (strona główna)
@@ -383,6 +384,7 @@
     { id: "kartoteka", nazwa: "Kartoteka", sciezka: "/kartoteka" },
     { id: "radar", nazwa: "Radar działek", sciezka: "/radar" },
     { id: "leady", nazwa: "Leady", sciezka: "/leady" },
+    { id: "transakcje", nazwa: "Transakcje", sciezka: "/transakcje" },
     { id: "odprawa", nazwa: "Odprawa", sciezka: "/odprawa" }
   ];
   var RODZAJE_ZGL = [["blad", "Błąd"], ["poprawka", "Poprawka"], ["pomysl", "Pomysł"]];
