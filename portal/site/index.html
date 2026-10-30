@@ -82,39 +82,6 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .zadania-info{margin:10px 0 0;font-size:.84rem;color:var(--szary)}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
 .stopka{margin-top:auto;font-size:.78rem;color:var(--szary)}
-/* układ strony (30.10, super administrator): sekcje w kolejności z układu, cała / pół szerokości, szeroka strona */
-.pulpit.szeroka{max-width:1400px}
-#sekcje{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 28px}
-#sekcje>.grupa{grid-column:1/-1;min-width:0}#sekcje>.grupa.pol{grid-column:auto}
-@media (max-width:800px){#sekcje>.grupa.pol{grid-column:1/-1}}
-.staty{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
-.stat{background:var(--karta);border:1px solid var(--linia);border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05);text-decoration:none;color:inherit;display:block}
-a.stat:hover{border-color:var(--zloto)}
-.stat b{display:block;font-size:1.55rem;font-weight:900;letter-spacing:-.01em}
-.stat span{display:block;margin-top:4px;font-size:.84rem;color:var(--szary)}
-.stat.zl b{color:var(--zloto-c)}
-/* tryb układania */
-.ukBtn{position:fixed;right:18px;bottom:18px;z-index:40;border:0;cursor:pointer;border-radius:999px;padding:11px 18px;font:900 14px Lato,sans-serif;
-  background:#1f1d1a;color:#f3efe6;box-shadow:0 8px 28px rgba(0,0,0,.25)}
-.ukBtn:hover{background:#9b7a26}
-.edPasek{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-radius:14px;background:#1f1d1a;color:#f3efe6;
-  box-shadow:0 8px 28px rgba(0,0,0,.2);font-size:14px}
-.edPasek b{margin-right:auto}
-.edPasek button,.edPasek select{font:700 13px Lato,sans-serif;border-radius:999px;border:1px solid #3a3c40;background:#2a2b2e;color:#f3efe6;padding:7px 13px;cursor:pointer}
-.edPasek button.pri{background:#c9a03c;border-color:#c9a03c;color:#1f1d1a}
-.edPasek .sg{display:inline-flex;gap:2px;background:#141518;border-radius:999px;padding:3px}.edPasek .sg button{border:0;background:none;padding:5px 11px}
-.edPasek .sg button[aria-pressed=true]{background:#3a3c40}
-.edBl{color:#f08b82;width:100%;font-size:13px}
-html.edycja #sekcje>.grupa{display:block!important;outline:2px dashed var(--linia);outline-offset:10px;border-radius:6px}
-html.edycja #sekcje>.grupa.nad{outline-color:var(--zloto)}
-html.edycja #sekcje>.grupa.ukryta{opacity:.45}
-.edSek{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:8px;border-radius:12px;background:var(--hover);border:1px solid var(--linia);font-size:13px}
-.edSek .uch{cursor:grab;color:var(--szary);font-size:16px;letter-spacing:-2px;padding:0 4px;user-select:none}
-.edSek input[type=text]{flex:1 1 160px;min-width:0;font:900 14px Lato,sans-serif;border:1px solid var(--linia);border-radius:8px;padding:6px 9px;background:var(--karta);color:var(--tekst)}
-.edSek select,.edSek button{font:700 12.5px Lato,sans-serif;border:1px solid var(--linia);border-radius:8px;padding:6px 8px;background:var(--karta);color:var(--tekst);cursor:pointer}
-.edSek .ch{display:flex;flex-wrap:wrap;gap:4px 12px;width:100%;padding:4px 4px 0}
-.edSek .ch label{display:flex;gap:5px;align-items:center;cursor:pointer}
-.edPusto{padding:18px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);font-size:.9rem;text-align:center}
 @media (max-width:640px){.powitanie{border-left:0;padding-left:0}}
 </style>
 </head>
@@ -128,183 +95,14 @@ html.edycja #sekcje>.grupa.ukryta{opacity:.45}
       <p id="dzis"></p>
     </div>
   </header>
-  <div id="edytor"></div>
-  <div id="sekcje">
-    <section class="grupa" id="naDzis" data-sek="zadania" hidden><h2><span class="nzw">Moje zadania</span> <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
-    <section class="grupa" id="doZrobienia" data-sek="do" hidden><h2 class="nzw">Do zrobienia</h2><ul class="kafle do" id="doLista"></ul></section>
-    <section class="grupa" id="statystyki" data-sek="statystyki" hidden><h2 class="nzw">Statystyki</h2><ul class="staty" id="staty"></ul></section>
-  </div>
+  <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
+  <section class="grupa" id="doZrobienia" hidden><h2>Do zrobienia</h2><ul class="kafle do" id="doLista"></ul></section>
   <div class="pusto" id="brakDostepu" hidden>Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
 
 <script>
 "use strict";
-// --- układ strony głównej (30.10, decyzja użytkownika: super administrator – obszar „uklad” – układa pulpit: kolejność sekcji,
-// nazwy, kto widzi, szerokość, statystyki; zapis w /administracja/api/uklad razem z układem menu) -----------------------------
-const SEKCJE = {
-  zadania: {nazwa: 'Moje zadania', opis: 'zadania z HubSpot – zaległe, dziś, 7 dni', widok: 'wszyscy', szer: 'cala'},
-  do: {nazwa: 'Do zrobienia', opis: 'liczby z narzędzi', widok: 'wszyscy', szer: 'cala'},
-  statystyki: {nazwa: 'Statystyki', opis: 'liczby z Transakcji i Zimnych', widok: 'admin', szer: 'cala'},
-};
-const STATY = {
-  tr_otwarte: 'Otwarte transakcje', tr_wyn: 'Wynagrodzenie w toku', tr_wartosc: 'Wartość nieruchomości w toku', tr_sukces: 'Sukces – ostatnie 90 dni',
-  zimne_wolne: 'Zimne – ogłoszenia do wzięcia', zimne_moje: 'Zimne – moje na dziś',
-};
-const STATY_DOM = ['tr_otwarte', 'tr_wyn', 'tr_sukces', 'zimne_wolne'];
-const WIDOK = {wszyscy: 'Widzą wszyscy', admin: 'Tylko administratorzy', ukryta: 'Ukryta'};
-let KONTO = null, UK = {}, ED = null;
-function pulpitUkladu(u){
-  const p = (u || {}).pulpit || {}, zap = p.sekcje || [];
-  const sek = zap.filter(x => SEKCJE[x.id]).map(x => ({...SEKCJE[x.id], ...x}));
-  Object.keys(SEKCJE).forEach(id => { if (!sek.some(x => x.id === id)) sek.push({id, ...SEKCJE[id]}); });
-  sek.forEach(x => { if (x.id === 'statystyki' && !Array.isArray(x.kafle)) x.kafle = STATY_DOM.slice(); });
-  return {szerokosc: p.szerokosc || 'waska', sekcje: sek};
-}
-const admin = () => !!(KONTO && KONTO.admin && !(PracawrePasek.widokAgenta && PracawrePasek.widokAgenta()));
-function zastosujUklad(){
-  const p = ED || pulpitUkladu(UK);
-  document.querySelector('.pulpit').classList.toggle('szeroka', p.szerokosc === 'szeroka');
-  const box = document.getElementById('sekcje');
-  p.sekcje.forEach(x => {
-    const el = box.querySelector(`[data-sek="${x.id}"]`); if (!el) return;
-    box.appendChild(el);
-    el.classList.toggle('pol', x.szer === 'pol');
-    const widac = x.widok === 'wszyscy' || (x.widok === 'admin' && admin());
-    el.classList.toggle('ukryta', !widac);
-    el.dataset.widac = widac ? '1' : '';
-    el.querySelector('.nzw').textContent = x.nazwa || SEKCJE[x.id].nazwa;
-    el.hidden = !(widac && MA[el.id]);
-  });
-  if (!ED) statystyki();
-}
-// sekcja pokazuje się, gdy ma treść i układ ją dopuszcza
-const MA = {};       // sekcja ma treść
-function pokaz(id, jest){ MA[id] = !!jest; const el = document.getElementById(id); el.hidden = !ED && !(jest && el.dataset.widac); }
-
-// --- statystyki: Transakcje (agent – swoje, administrator – wszystkie) i Zimne ------------------------------------------
-const zl = v => Math.round(v || 0).toLocaleString('pl-PL') + ' zł';
-let STAT_DANE = null, statP = null;
-function statystyki(){
-  const x = (ED || pulpitUkladu(UK)).sekcje.find(s => s.id === 'statystyki');
-  const el = document.getElementById('statystyki');
-  if (!x || !el.dataset.widac || !KONTO) return pokaz('statystyki', false);
-  const ma = o => PracawrePasek.aplikacje(KONTO).some(a => a.obszar === o);
-  if (!statP) statP = Promise.all([
-    ma('transakcje') ? fetch('/transakcje/api/tablica?lejek=default', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : null).catch(() => null) : null,
-    ma('leady') ? fetch('/leady/api/pulpit', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : null).catch(() => null) : null,
-  ]).then(([tr, zi]) => {
-    const w = {};
-    if (tr && tr.etapy) {
-      const otw = tr.etapy.filter(e => !e.zamkniety);
-      w.tr_otwarte = [otw.reduce((s, e) => s + e.liczba, 0), '/transakcje/'];
-      w.tr_wyn = [zl(otw.reduce((s, e) => s + e.suma, 0)), '/transakcje/', 1];
-      w.tr_wartosc = [zl(otw.reduce((s, e) => s + (e.suma_wartosci || 0), 0)), '/transakcje/'];
-      w.tr_sukces = [zl(tr.etapy.filter(e => e.wygrany).reduce((s, e) => s + e.suma, 0)), '/transakcje/', 1];
-    }
-    if (zi) { w.zimne_wolne = [zi.do_wziecia, '/leady/']; w.zimne_moje = [(zi.moje || {}).nowy + (zi.moje || {}).ponownie, '/leady/']; }
-    return STAT_DANE = w;
-  });
-  statP.then(w => {
-    const kafle = (x.kafle || []).filter(k => w[k]);
-    document.getElementById('staty').innerHTML = kafle.map(k => `<li><a class="stat${w[k][2] ? ' zl' : ''}" href="${w[k][1]}"><b>${esc(w[k][0])}</b><span>${esc(STATY[k])}</span></a></li>`).join('')
-      || (ED ? '<li class="edPusto">Brak danych do pokazania – zaznacz kafelki albo sprawdź dostęp do Transakcji / Zimnych.</li>' : '');
-    pokaz('statystyki', kafle.length);
-  });
-}
-
-// --- edytor układu strony ----------------------------------------------------------------------------------------------
-function rysujEd(){
-  const p = ED, box = document.getElementById('sekcje');
-  document.documentElement.classList.add('edycja');
-  document.getElementById('edytor').innerHTML = `<div class="edPasek"><b>✎ Układ strony głównej</b>
-    <span class="sg" role="group" aria-label="Szerokość strony">${[['waska', 'Wąska'], ['szeroka', 'Szeroka']].map(([v, n]) => `<button data-szer="${v}" aria-pressed="${p.szerokosc === v}">${n}</button>`).join('')}</span>
-    <button data-menu>Ułóż menu boczne</button><select data-wersje aria-label="Poprzednie wersje"><option value="">Wersje…</option></select>
-    <button data-dom>Domyślny</button><button data-anuluj>Anuluj</button><button class="pri" data-zapisz>Zapisz</button><div class="edBl" hidden></div></div>`;
-  p.sekcje.forEach((x, i) => {
-    const el = box.querySelector(`[data-sek="${x.id}"]`);
-    el.querySelector('.edSek')?.remove();
-    el.insertAdjacentHTML('afterbegin', `<div class="edSek" data-i="${i}"><span class="uch" title="Przeciągnij">⋮⋮</span>
-      <button data-m="${i}|-1" title="Wyżej">↑</button><button data-m="${i}|1" title="Niżej">↓</button>
-      <input type="text" data-nazwa="${i}" value="${esc(x.nazwa)}" aria-label="Nazwa sekcji" title="${esc(SEKCJE[x.id].opis)}">
-      <select data-widok="${i}" aria-label="Kto widzi">${Object.entries(WIDOK).map(([v, n]) => `<option value="${v}"${x.widok === v ? ' selected' : ''}>${n}</option>`).join('')}</select>
-      <select data-sz="${i}" aria-label="Szerokość sekcji"><option value="cala"${x.szer !== 'pol' ? ' selected' : ''}>Cała szerokość</option><option value="pol"${x.szer === 'pol' ? ' selected' : ''}>Pół szerokości</option></select>
-      ${x.id === 'statystyki' ? `<div class="ch">${Object.entries(STATY).map(([k, n]) => `<label><input type="checkbox" data-kafel="${k}"${x.kafle.includes(k) ? ' checked' : ''}>${esc(n)}</label>`).join('')}</div>` : ''}</div>`);
-  });
-  zastosujUklad();
-  p.sekcje.forEach(x => { const el = box.querySelector(`[data-sek="${x.id}"]`); el.hidden = false; el.classList.toggle('ukryta', x.widok === 'ukryta' || (x.widok === 'admin' && !admin()));
-    if (!el.querySelector('li, .edPusto')) el.querySelector('ul').insertAdjacentHTML('beforeend', '<li class="edPusto">Tu pojawi się treść, gdy będzie co pokazać.</li>'); });
-  statystyki();
-  fetch('/administracja/api/uklad/wersje', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : []).then(l => {
-    const s = document.querySelector('[data-wersje]'); if (!s) return;
-    s.innerHTML = '<option value="">Wersje…</option>' + l.map(w => `<option value="${w.nr}">v${w.nr} · ${esc(new Date(w.kiedy).toLocaleString('pl-PL', {dateStyle: 'short', timeStyle: 'short'}))} · ${esc(w.kto.split('@')[0])}</option>`).join('');
-  });
-}
-function wyjdzEd(){ ED = null; document.documentElement.classList.remove('edycja'); document.getElementById('edytor').innerHTML = '';
-  document.querySelectorAll('.edSek, .edPusto').forEach(x => x.remove()); statP = null; zastosujUklad(); rysujDo(); przyciskUkladu(); }
-function blad(t){ const b = document.querySelector('.edBl'); b.textContent = t; b.hidden = false; }
-async function zapiszUklad(dokument){
-  const r = await fetch('/administracja/api/uklad', {method: 'PUT', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({uklad: dokument, nr: PracawrePasek.ukladNr()})});
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.detail || 'Błąd ' + r.status);
-  PracawrePasek.ukladZapisz({uklad: dokument, nr: j.nr}); UK = dokument;
-}
-document.getElementById('edytor').addEventListener('click', async e => {
-  const b = e.target.closest('button'); if (!b || !ED) return;
-  if (b.dataset.szer) { ED.szerokosc = b.dataset.szer; return rysujEd(); }
-  if (b.hasAttribute('data-menu')) return PracawrePasek.edytujMenu();
-  if (b.hasAttribute('data-anuluj')) return wyjdzEd();
-  if (b.hasAttribute('data-dom')) { if (confirm('Przywrócić domyślny układ strony głównej?')) { ED = pulpitUkladu({}); rysujEd(); } return; }
-  if (b.hasAttribute('data-zapisz')) {
-    const dok = JSON.parse(JSON.stringify(UK || {}));
-    dok.pulpit = {szerokosc: ED.szerokosc, sekcje: ED.sekcje.map(x => ({id: x.id, nazwa: x.nazwa.trim() || SEKCJE[x.id].nazwa, widok: x.widok, szer: x.szer, ...(x.kafle ? {kafle: x.kafle} : {})}))};
-    try { await zapiszUklad(dok); wyjdzEd(); } catch (err) { blad(err.message); }
-  }
-});
-document.getElementById('edytor').addEventListener('change', async e => {
-  const s = e.target.closest('[data-wersje]'); if (!s || !s.value) return;
-  if (!confirm(`Przywrócić wersję v${s.value} (strona główna i menu)?`)) { s.value = ''; return; }
-  const r = await fetch('/administracja/api/uklad/przywroc/' + s.value, {method: 'POST', credentials: 'same-origin'});
-  if (!r.ok) return blad('Nie udało się przywrócić.');
-  const d = await PracawrePasek.uklad(true); UK = d.uklad || {}; ED = pulpitUkladu(UK); rysujEd();
-});
-const box = document.getElementById('sekcje');
-box.addEventListener('input', e => {
-  if (!ED) return; const t = e.target;
-  if (t.dataset.nazwa != null) { ED.sekcje[+t.dataset.nazwa].nazwa = t.value; t.closest('.grupa').querySelector('.nzw').textContent = t.value; }
-});
-box.addEventListener('change', e => {
-  if (!ED) return; const t = e.target;
-  if (t.dataset.widok != null) { ED.sekcje[+t.dataset.widok].widok = t.value; rysujEd(); }
-  if (t.dataset.sz != null) { ED.sekcje[+t.dataset.sz].szer = t.value; rysujEd(); }
-  if (t.dataset.kafel) { const x = ED.sekcje.find(s => s.id === 'statystyki'); x.kafle = Object.keys(STATY).filter(k => document.querySelector(`[data-kafel="${k}"]`).checked); statystyki(); }
-});
-box.addEventListener('click', e => {
-  const b = e.target.closest('[data-m]'); if (!b || !ED) return;
-  const [i, k] = b.dataset.m.split('|').map(Number), c = i + k;
-  if (ED.sekcje[c]) { const x = ED.sekcje.splice(i, 1)[0]; ED.sekcje.splice(c, 0, x); rysujEd(); }
-});
-let ciag = null;
-box.addEventListener('pointerdown', e => { const u = e.target.closest('.edSek .uch'); if (u) u.closest('.grupa').draggable = true; });
-box.addEventListener('dragstart', e => { const g = e.target.closest('.grupa[draggable=true]'); if (!g) return; ciag = g.dataset.sek; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ciag); });
-box.addEventListener('dragend', () => { box.querySelectorAll('.grupa').forEach(g => { g.draggable = false; g.classList.remove('nad'); }); ciag = null; });
-box.addEventListener('dragover', e => { const g = e.target.closest('.grupa'); if (!ciag || !g) return; e.preventDefault(); box.querySelectorAll('.nad').forEach(x => x.classList.remove('nad')); g.classList.add('nad'); });
-box.addEventListener('drop', e => {
-  const g = e.target.closest('.grupa'); if (!ciag || !g || !ED) return; e.preventDefault();
-  const z = ED.sekcje.findIndex(x => x.id === ciag), c = ED.sekcje.findIndex(x => x.id === g.dataset.sek);
-  if (z !== c) { const x = ED.sekcje.splice(z, 1)[0]; ED.sekcje.splice(c, 0, x); }
-  ciag = null; rysujEd();
-});
-function przyciskUkladu(){
-  document.querySelector('.ukBtn')?.remove();
-  if (!PracawrePasek.mozeUklad || !PracawrePasek.mozeUklad(KONTO)) return;
-  const b = document.createElement('button'); b.className = 'ukBtn'; b.textContent = '✎ Ułóż stronę';
-  b.title = 'Układ strony głównej i menu (super administrator)';
-  b.onclick = async () => { const d = await PracawrePasek.uklad(true); UK = d.uklad || {}; ED = pulpitUkladu(UK); b.remove(); rysujEd(); window.scrollTo(0, 0); };
-  document.body.appendChild(b);
-}
-window.addEventListener('pracawre-uklad', e => { UK = (e.detail || {}).uklad || {}; if (!ED) { statP = null; zastosujUklad(); rysujDo(); } });
 // „Do zrobienia”: kafelek aplikacji tylko wtedy, gdy podała coś do zrobienia (liczby); nazwy i ikony z /wspolne/pasek.js.
 // Administracja (nowe zgłoszenia) – tylko dla administratorów.
 const ADMINISTRACJA = {obszar: 'administracja', href: '/administracja/#zgloszenia', nazwa: 'Administracja',
@@ -318,8 +116,8 @@ function rysujDo(){
     `<li><a class="kafel" href="${a.href}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${a.ikona}</svg></span>
       <span><b>${esc(a.nazwa)}</b><span class="liczby">${DO[a.obszar].map(([n, tekst, wazne]) => `<span class="liczba${wazne ? ' wazne' : ''}">${esc(tekst)}</span>`).join('')}</span></span>
       <span class="dalej" aria-hidden="true">→</span></a></li>`).join('');
-  document.getElementById('doLista').innerHTML = kafle || (ED ? '<li class="edPusto">Tu pojawią się liczby z narzędzi.</li>' : '');
-  pokaz('doZrobienia', kafle);
+  document.getElementById('doLista').innerHTML = kafle;
+  document.getElementById('doZrobienia').hidden = !kafle;
 }
 
 function powitaj(k){
@@ -352,8 +150,8 @@ function kiedy(termin){
 }
 const linkHubSpot = u => /^https:\/\/app\.hubspot\.com\//.test(u || '') ? u : '';
 function zadania(z){
-  const info = document.getElementById('zadaniaInfo');
-  pokaz('naDzis', true);
+  const sekcja = document.getElementById('naDzis'), info = document.getElementById('zadaniaInfo');
+  sekcja.hidden = false;
   const granica = poczatekDnia(new Date()) + 8 * DZIEN;       // do końca 7. dnia od dziś
   const blisko = z.lista.filter(x => !x.termin || new Date(x.termin).getTime() < granica);
   const pozniej = z.lista.length - blisko.length;
@@ -383,9 +181,7 @@ document.getElementById('zadania').addEventListener('click', async e => {
   } catch (err) { b.disabled = false; alert('Nie udało się odhaczyć: ' + (err.message || err)); }
 });
 
-Promise.all([PracawrePasek.konto(), PracawrePasek.uklad()]).then(([k, u]) => {
-  KONTO = k; UK = (u || {}).uklad || {};
-  zastosujUklad(); przyciskUkladu();
+PracawrePasek.konto().then(k => {
   powitaj(k);
   const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // widok agenta – bez Administracji
   DOSTEPNE = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];

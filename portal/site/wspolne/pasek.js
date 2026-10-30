@@ -146,74 +146,11 @@
   // grupy zakładek – te same na pulpicie (strona główna) i w pasku (decyzja użytkownika 25.10)
   var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }, { id: "rynek", nazwa: "Rynek" }];
 
-  // --- Układ witryny (30.10, decyzja użytkownika: super administrator – obszar „uklad” w Kartotece – układa menu i stronę
-  // główną: kolejność, grupy, nazwy). Dokument z /administracja/api/uklad, w sessionStorage jak konto (bez mrugania).
-  // Brak układu = domyślne APPS i GRUPY; narzędzie, którego nie ma w układzie (nowe), trafia do swojej grupy domyślnej.
-  var UKLAD = null, UKLAD_NR = 0, ukladP = null;
-  function ukladZapamietany() {
-    try { var u = JSON.parse(sessionStorage.getItem("pracawre-uklad") || "null"); if (u) { UKLAD = u.uklad || {}; UKLAD_NR = u.nr || 0; } return u; } catch (e) { return null; }
-  }
-  function ukladZapisz(d) {
-    UKLAD = d.uklad || {}; UKLAD_NR = d.nr || 0;
-    try { sessionStorage.setItem("pracawre-uklad", JSON.stringify({ uklad: UKLAD, nr: UKLAD_NR })); } catch (e) {}
-  }
-  function uklad(swiezy) {
-    if (ukladP && !swiezy) return ukladP;
-    var zap = ukladZapamietany();
-    var p = fetch("/administracja/api/uklad", { credentials: "same-origin", cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        if (!d) return { uklad: UKLAD || {}, nr: UKLAD_NR };
-        var zmiana = JSON.stringify(d.uklad) !== JSON.stringify(UKLAD);
-        ukladZapisz(d);
-        if (zmiana) { przerysujMenu(); try { window.dispatchEvent(new CustomEvent("pracawre-uklad", { detail: d })); } catch (e) {} }
-        return d;
-      }).catch(function () { return { uklad: UKLAD || {}, nr: UKLAD_NR }; });
-    ukladP = zap && !swiezy ? Promise.resolve(zap) : p;
-    return ukladP;
-  }
-  // narzędzia z nazwami i opisami z układu
-  function appsUkladu() {
-    var nazwy = ((UKLAD || {}).menu || {}).aplikacje || {};
-    return APPS.map(function (a) {
-      var z = nazwy[a.obszar] || {}, o = {};
-      for (var k in a) o[k] = a[k];
-      if (z.nazwa) o.nazwa = String(z.nazwa); if (z.opis != null) o.opis = String(z.opis);
-      return o;
-    });
-  }
-  // grupy menu: [{id, nazwa, apps: [narzędzie]}] – w kolejności z układu
-  function menu() {
-    var apps = appsUkladu(), m = (UKLAD || {}).menu || {};
-    var grupy = (m.grupy && m.grupy.length ? m.grupy : GRUPY.map(function (g) {
-      return { id: g.id, nazwa: g.nazwa, aplikacje: APPS.filter(function (a) { return a.grupa === g.id; }).map(function (a) { return a.obszar; }) };
-    })).map(function (g) { return { id: String(g.id), nazwa: String(g.nazwa || ""), aplikacje: (g.aplikacje || []).slice() }; });
-    var uzyte = {};
-    grupy.forEach(function (g) { g.aplikacje = g.aplikacje.filter(function (o) { if (uzyte[o]) return false; uzyte[o] = 1; return true; }); });
-    apps.forEach(function (a) {
-      if (uzyte[a.obszar]) return;
-      var g = grupy.filter(function (x) { return x.id === a.grupa; })[0] || grupy[grupy.length - 1];
-      if (!g) { g = { id: a.grupa, nazwa: a.grupa, aplikacje: [] }; grupy.push(g); }
-      g.aplikacje.push(a.obszar);
-    });
-    return grupy.map(function (g) {
-      return { id: g.id, nazwa: g.nazwa, apps: g.aplikacje.map(function (o) { return apps.filter(function (a) { return a.obszar === o; })[0]; }).filter(Boolean) };
-    });
-  }
-  function przerysujMenu() {
-    document.querySelectorAll("#pracawre-pasek").forEach(function (el) {
-      var w = el.querySelector(".pp-grupy"); if (!w || el.querySelector(".pp-ed")) return;
-      w.innerHTML = zakladki(kontoZapamietane());
-      var k = kontoZapamietane(); if (k) uprawnieniaWPasku(el, k);
-      var tu = appsUkladu().filter(naStronie)[0], t = el.querySelector(".pp-tu"); if (tu && t) t.textContent = tu.nazwa;
-    });
-  }
-
-  function styl(id, css) {
-    if (document.getElementById(id || "pracawre-pasek-styl")) return;
+  function styl() {
+    if (document.getElementById("pracawre-pasek-styl")) return;
     var s = document.createElement("style");
-    s.id = id || "pracawre-pasek-styl";
-    s.textContent = css || CSS;
+    s.id = "pracawre-pasek-styl";
+    s.textContent = CSS;
     (document.head || html).appendChild(s);
   }
 
@@ -227,28 +164,27 @@
   function link(a, znane) {
     var ukryj = znane ? !widoczny(a, znane) : a.zastrzezony;
     return '<a class="pp-z" href="' + a.href + '" data-obszar="' + a.obszar + '"' + (naStronie(a) ? ' aria-current="page"' : "") + (ukryj ? " hidden" : "") + ">" +
-      svg(a.ikona) + "<span><b>" + esc(a.nazwa) + "</b><small>" + esc(a.opis) + '</small><span class="pp-l" data-l="' + a.obszar + '"></span></span></a>';
+      svg(a.ikona) + "<span><b>" + a.nazwa + "</b><small>" + a.opis + '</small><span class="pp-l" data-l="' + a.obszar + '"></span></span></a>';
   }
   function zakladki(znane) {
-    return menu().map(function (g) {
-      return '<div class="pp-grp" data-grupa="' + esc(g.id) + '"><div class="pp-gt">' + esc(g.nazwa) + "</div>" +
-        g.apps.map(function (a) { return link(a, znane); }).join("") + "</div>";
+    return GRUPY.map(function (g) {
+      var w = APPS.filter(function (a) { return a.grupa === g.id; });
+      return '<div class="pp-grp" data-grupa="' + g.id + '"><div class="pp-gt">' + g.nazwa + "</div>" +
+        w.map(function (a) { return link(a, znane); }).join("") + "</div>";
     }).join("");
   }
 
   function wypelnij(el) {
     if (!el) return;
     styl();
-    styl("pracawre-uklad-styl", CSS_ED);
     var znane = kontoZapamietane();
-    ukladZapamietany();
-    var tu = appsUkladu().filter(naStronie)[0] || (location.pathname.indexOf("/administracja") === 0 ? { nazwa: "Administracja" } : null);
+    var tu = APPS.filter(naStronie)[0] || (location.pathname.indexOf("/administracja") === 0 ? { nazwa: "Administracja" } : null);
     el.innerHTML =
       '<nav class="pp" aria-label="pracawre.com">' +
       '<button type="button" class="pp-otw" data-sz title="Menu – narzędzia, konto, zgłoś błąd" aria-haspopup="dialog" aria-expanded="false">' +
       svg('<path d="M4 6h16M4 12h16M4 18h16"/>') + '<i class="pp-kropka" hidden></i></button>' +
       '<a class="pp-dom" href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
-      (tu ? '<span class="pp-sep" aria-hidden="true"></span><span class="pp-tu">' + esc(tu.nazwa) + "</span>" : "") +
+      (tu ? '<span class="pp-sep" aria-hidden="true"></span><span class="pp-tu">' + tu.nazwa + "</span>" : "") +
       '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button>' +
       '<button type="button" class="pp-konto" data-sz title="Konto"><span class="pp-av">?</span></button></div></nav>' +
       // wysuwana karta (position:fixed) – poza .pp, żeby przejścia stron (view-transition) jej nie ruszały
@@ -259,7 +195,7 @@
       '<div class="pp-sz-w"><div class="pp-kto"><span class="pp-av">?</span><span class="pp-kto-t"><b>Konto</b><small></small></span></div>' +
       '<a class="pp-z" href="/"' + (location.pathname === "/" ? ' aria-current="page"' : "") + ">" + svg('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>') +
       "<span><b>Strona główna</b><small>Moje zadania i to, co czeka na zrobienie</small></span></a>" +
-      '<div class="pp-grupy">' + zakladki(znane) + "</div>" +
+      zakladki(znane) +
       '<div class="pp-grp pp-biuro" hidden><div class="pp-gt">Biuro</div><a class="pp-z pp-adm" href="/administracja/"' +
       (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
       svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') +
@@ -272,23 +208,20 @@
       "<span>Zgłoś błąd albo uwagę</span></button>" +
       '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
       "<span>Widok agenta</span><b>wył.</b></button>" +
-      '<button type="button" data-ukl-menu hidden>' + svg('<path d="M4 6h10M4 12h16M4 18h7"/><path d="m17 3 4 4-8 8h-4v-4z"/>') + "<span>Ułóż menu</span></button>" +
       '<a href="/oauth2/sign_out?rd=%2F">' + svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a>" +
       "</div></aside>";
     var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
     el.querySelectorAll("[data-sz]").forEach(function (b) { b.addEventListener("click", function () { otworz(el); }); });
     el.querySelector("[data-zamknij]").addEventListener("click", function () { zamknij(); });
     tlo.addEventListener("click", function () { zamknij(); });
-    sz.addEventListener("click", function (e) { if (e.target.closest("a") && !ED) zamknij(true); });
+    sz.addEventListener("click", function (e) { if (e.target.closest("a")) zamknij(true); });
     el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
     el.querySelector("[data-zglos]").addEventListener("click", function () { zamknij(); zglos(); });
     el.querySelector("[data-agent]").addEventListener("click", function () { ustawWidokAgenta(!widokAgenta()); });
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
-    el.querySelector("[data-ukl-menu]").addEventListener("click", function () { edytujMenu(el); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); });
-    uklad();
   }
 
   // karta z lewej: ☰ albo awatar otwiera; ✕, klik obok, Esc albo wybór pozycji zamyka
@@ -305,7 +238,6 @@
   function zamknij(odRazu) {
     var el = otwarta; if (!el) return;
     otwarta = null;
-    if (ED && !odRazu) { ED = null; setTimeout(function () { if (!otwarta) wypelnij(el); }, 240); }   // edycja menu bez zapisu
     var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
     sz.classList.remove("otw"); tlo.classList.remove("otw");
     el.querySelectorAll("[data-sz]").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
@@ -353,13 +285,10 @@
     if (a.tylkoAdmin && k.admin && widokAgenta()) return false;   // widok agenta: bez zakładek tylko dla administratorów
     return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
   }
-  function mozeUklad(k) { return !!k && (k.obszary || {}).uklad === "admin" && !widokAgenta(); }
   function naStronie(a) { return location.pathname.indexOf(a.href) === 0 || location.pathname + "/" === a.href; }
   // aplikacje, do których konto ma dostęp (kafelki strony głównej); k = null – tylko te bez zastrzeżeń
   function aplikacje(k) {
-    var kol = [];
-    menu().forEach(function (g) { kol = kol.concat(g.apps); });
-    return kol.filter(function (a) { return k ? widoczny(a, k) : !a.zastrzezony; });
+    return APPS.filter(function (a) { return k ? widoczny(a, k) : !a.zastrzezony; });
   }
   function konto() {
     if (kontoP) return kontoP;
@@ -378,7 +307,6 @@
       el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !widoczny(a, k); });
     });
     el.querySelectorAll(".pp-grp[data-grupa]").forEach(function (g) { g.hidden = !g.querySelector("a:not([hidden])"); });
-    el.querySelector("[data-ukl-menu]").hidden = !mozeUklad(k);
     var nazwa = k.nazwa || (k.email || "").split("@")[0], ag = widokAgenta() && k.admin;
     el.querySelectorAll(".pp-av").forEach(function (a) { a.textContent = inicjaly(nazwa); });
     el.querySelector(".pp-konto").title = nazwa;
@@ -407,170 +335,6 @@
     }
     wypelnij(el);
   }
-
-  // --- edycja menu w karcie z lewej (30.10, super administrator): przeciąganie za ⋮⋮ (albo strzałki), nazwy i opisy
-  // w polach, nowa grupa, pusta grupa do usunięcia; Zapisz → /administracja/api/uklad (cały dokument, nr wersji)
-  var CSS_ED =
-    ".pp-ed{display:flex;flex-direction:column;gap:10px;padding:4px 2px}" +
-    ".pp-ed .pp-ed-i{font-weight:400;font-size:12.5px;color:#8d887e;line-height:1.4;margin:2px 4px 4px}" +
-    ".pp-ed .pp-eg{border:1px solid #2c2e33;border-radius:12px;padding:8px;background:#1b1c20}" +
-    ".pp-ed .pp-eg.nad,.pp-ed .pp-eal.nad{outline:2px dashed #c9a03c;outline-offset:2px}" +
-    ".pp-ed .pp-egh,.pp-ed .pp-ea{display:flex;align-items:center;gap:6px}" +
-    ".pp-ed .pp-eal{display:flex;flex-direction:column;gap:6px;margin-top:8px;min-height:30px}" +
-    ".pp-ed .pp-ea{background:#232429;border-radius:9px;padding:6px}" +
-    ".pp-ed .pp-ea svg{color:#c9a03c;width:16px;height:16px}" +
-    ".pp-ed .pp-ea>span:not(.uch){flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}" +
-    ".pp-ed input{all:unset;box-sizing:border-box;width:100%;min-width:0;padding:4px 7px;border-radius:7px;border:1px solid transparent;color:#f3efe6;font-weight:700;font-size:13.5px}" +
-    ".pp-ed input.op{font-weight:400;font-size:12px;color:#a8a399}" +
-    ".pp-ed .pp-egh input{font-size:11px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#c9a03c}" +
-    ".pp-ed input:hover{border-color:#3a3c42}.pp-ed input:focus{border-color:#c9a03c;background:#141518}" +
-    ".pp-ed .uch{cursor:grab;color:#6f6a61;padding:4px 2px;font-size:14px;letter-spacing:-2px;user-select:none;flex:none}" +
-    ".pp-ed .uch:hover{color:#c9a03c}" +
-    ".pp-ed button.m{width:24px;height:24px;padding:0;justify-content:center;font-size:12px;flex:none;color:#8d887e}" +
-    ".pp-ed .ciag{opacity:.4}" +
-    ".pp-sz .pp-sz-d .pp-ed-st{display:flex;gap:6px;flex-wrap:wrap}" +
-    ".pp-sz .pp-sz-d .pp-ed-st button{height:34px;flex:1;justify-content:center;border:1px solid #33363c}" +
-    ".pp-sz .pp-sz-d .pp-ed-st button.pri{background:#c9a03c;color:#141518;border-color:#c9a03c}" +
-    ".pp-sz .pp-sz-d .pp-ed-bl{color:#f08b82;font-size:12.5px;padding:4px}";
-  var ED = null;      // {grupy:[{id, nazwa, aplikacje:[obszar]}], aplikacje:{obszar:{nazwa, opis}}}
-  function edytujMenu(el) {
-    var k = kontoZapamietane();
-    if (!mozeUklad(k)) return;
-    uklad(true).then(function () {
-      var m = menu(), nazwy = {};
-      appsUkladu().forEach(function (a) { nazwy[a.obszar] = { nazwa: a.nazwa, opis: a.opis }; });
-      ED = { grupy: m.map(function (g) { return { id: g.id, nazwa: g.nazwa, aplikacje: g.apps.map(function (a) { return a.obszar; }) }; }), aplikacje: nazwy };
-      if (otwarta !== el) otworz(el);
-      rysujEd(el);
-    });
-  }
-  function rysujEd(el) {
-    var w = el.querySelector(".pp-sz-w"), d = el.querySelector(".pp-sz-d");
-    var apps = {}; APPS.forEach(function (a) { apps[a.obszar] = a; });
-    w.innerHTML = '<div class="pp-ed"><div class="pp-ed-i">Układ menu dla wszystkich. Przeciągnij za ⋮⋮ (albo strzałki) – kolejność grup i narzędzi, ' +
-      'narzędzie do innej grupy. Kliknij nazwę albo opis, żeby zmienić. Każdy widzi tylko narzędzia, do których ma dostęp.</div>' +
-      ED.grupy.map(function (g, gi) {
-        return '<div class="pp-eg" data-g="' + gi + '"><div class="pp-egh"><span class="uch" title="Przeciągnij grupę">⋮⋮</span>' +
-          '<input data-gn="' + gi + '" value="' + esc(g.nazwa) + '" aria-label="Nazwa grupy" placeholder="Nazwa grupy">' +
-          '<button type="button" class="m" data-gm="' + gi + '|-1" title="Wyżej">↑</button><button type="button" class="m" data-gm="' + gi + '|1" title="Niżej">↓</button>' +
-          (g.aplikacje.length ? "" : '<button type="button" class="m" data-gu="' + gi + '" title="Usuń pustą grupę">✕</button>') + "</div>" +
-          '<div class="pp-eal" data-gl="' + gi + '">' + g.aplikacje.map(function (o) {
-            var a = apps[o], n = ED.aplikacje[o] || {};
-            return '<div class="pp-ea" data-a="' + o + '"><span class="uch" title="Przeciągnij narzędzie">⋮⋮</span>' + svg(a.ikona) +
-              '<span><input data-an="' + o + '" value="' + esc(n.nazwa) + '" aria-label="Nazwa narzędzia"><input class="op" data-ao="' + o + '" value="' + esc(n.opis) + '" aria-label="Opis narzędzia" placeholder="opis"></span>' +
-              '<button type="button" class="m" data-am="' + o + '|-1" title="Wyżej">↑</button><button type="button" class="m" data-am="' + o + '|1" title="Niżej">↓</button></div>';
-          }).join("") + "</div></div>";
-      }).join("") + '<button type="button" data-gnowa style="height:34px;justify-content:center;border:1px dashed #3a3c42">+ Nowa grupa</button></div>';
-    d.hidden = false;
-    var st = d.querySelector(".pp-ed-st");
-    if (!st) {
-      d.insertAdjacentHTML("afterbegin", '<div class="pp-ed-wr"><div class="pp-ed-bl" hidden></div><div class="pp-ed-st"><button type="button" class="pri" data-ezap>Zapisz menu</button>' +
-        '<button type="button" data-eanul>Anuluj</button><button type="button" data-edom title="Układ menu jak na początku (domyślny)">Domyślne</button></div></div>');
-      [].forEach.call(d.children, function (c) { if (!c.classList.contains("pp-ed-wr")) c.hidden = true; });
-    }
-  }
-  function koniecEd(el, otwarte) {
-    ED = null;
-    zamknij(true);
-    wypelnij(el);                                   // karta i grupy od nowa, z bieżącym układem
-    if (otwarte) otworz(el);
-  }
-  function przesunApp(o, kier) {
-    var gi = ED.grupy.findIndex(function (g) { return g.aplikacje.indexOf(o) >= 0; }), g = ED.grupy[gi], i = g.aplikacje.indexOf(o);
-    g.aplikacje.splice(i, 1);
-    if (i + kier >= 0 && i + kier <= g.aplikacje.length) g.aplikacje.splice(i + kier, 0, o);
-    else if (ED.grupy[gi + kier]) { var c = ED.grupy[gi + kier].aplikacje; if (kier < 0) c.push(o); else c.unshift(o); }
-    else g.aplikacje.splice(i, 0, o);
-  }
-  function zapiszMenu(el, domyslne) {
-    var bl = el.querySelector(".pp-ed-bl");
-    var nowy = JSON.parse(JSON.stringify(UKLAD || {}));
-    if (domyslne) delete nowy.menu;
-    else {
-      var bazowe = {}; APPS.forEach(function (a) { bazowe[a.obszar] = a; });
-      var nazwy = {};
-      Object.keys(ED.aplikacje).forEach(function (o) {
-        var n = ED.aplikacje[o], z = {};
-        if (n.nazwa && n.nazwa.trim() && n.nazwa.trim() !== bazowe[o].nazwa) z.nazwa = n.nazwa.trim();
-        if (n.opis != null && n.opis.trim() !== bazowe[o].opis) z.opis = n.opis.trim();
-        if (z.nazwa || z.opis != null) nazwy[o] = z;
-      });
-      if (ED.grupy.some(function (g) { return !g.nazwa.trim(); })) { bl.textContent = "Każda grupa musi mieć nazwę."; bl.hidden = false; return; }
-      nowy.menu = { grupy: ED.grupy.map(function (g) { return { id: g.id, nazwa: g.nazwa.trim(), aplikacje: g.aplikacje }; }), aplikacje: nazwy };
-    }
-    fetch("/administracja/api/uklad", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uklad: nowy, nr: UKLAD_NR }) })
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Błąd " + r.status); return j; }); })
-      .then(function (j) {
-        ukladZapisz({ uklad: nowy, nr: j.nr }); ukladP = null;
-        koniecEd(el, true);
-        try { window.dispatchEvent(new CustomEvent("pracawre-uklad", { detail: { uklad: nowy, nr: j.nr } })); } catch (e) {}
-      })
-      .catch(function (e) { bl.textContent = e.message; bl.hidden = false; });
-  }
-  // zdarzenia edytora – raz na dokument (karta może być przerysowana)
-  var ciagniety = null;
-  document.addEventListener("input", function (e) {
-    if (!ED || !e.target.closest(".pp-ed")) return;
-    var t = e.target;
-    if (t.dataset.gn != null) ED.grupy[+t.dataset.gn].nazwa = t.value;
-    if (t.dataset.an) ED.aplikacje[t.dataset.an].nazwa = t.value;
-    if (t.dataset.ao) ED.aplikacje[t.dataset.ao].opis = t.value;
-  });
-  document.addEventListener("click", function (e) {
-    var el = e.target.closest && e.target.closest("#pracawre-pasek");
-    if (!el || !ED) return;
-    var b = e.target.closest("button"); if (!b) return;
-    if (b.hasAttribute("data-ezap")) return zapiszMenu(el);
-    if (b.hasAttribute("data-edom")) { if (confirm("Przywrócić domyślny układ menu (kolejność, grupy i nazwy)?")) zapiszMenu(el, true); return; }
-    if (b.hasAttribute("data-eanul")) return koniecEd(el, true);
-    if (b.hasAttribute("data-gnowa")) { ED.grupy.push({ id: "g" + Date.now().toString(36), nazwa: "Nowa grupa", aplikacje: [] }); rysujEd(el); var i = el.querySelectorAll("[data-gn]"); i[i.length - 1].select(); return; }
-    if (b.dataset.gu != null) { ED.grupy.splice(+b.dataset.gu, 1); return rysujEd(el); }
-    if (b.dataset.gm) { var p = b.dataset.gm.split("|"), gi = +p[0], c = gi + +p[1]; if (ED.grupy[c]) { var g = ED.grupy.splice(gi, 1)[0]; ED.grupy.splice(c, 0, g); } return rysujEd(el); }
-    if (b.dataset.am) { var q = b.dataset.am.split("|"); przesunApp(q[0], +q[1]); return rysujEd(el); }
-  }, true);
-  // przeciąganie – tylko za uchwyt ⋮⋮ (pola tekstowe dalej da się zaznaczać)
-  document.addEventListener("pointerdown", function (e) {
-    var u = e.target.closest && e.target.closest(".pp-ed .uch");
-    if (u) u.parentNode.closest("[data-a], [data-g]").draggable = true;
-  });
-  document.addEventListener("dragstart", function (e) {
-    var x = e.target.closest && e.target.closest(".pp-ed [draggable=true]"); if (!x) return;
-    ciagniety = x.dataset.a ? { a: x.dataset.a } : { g: +x.dataset.g };
-    e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", "uklad"); } catch (er) {}
-    x.classList.add("ciag"); e.stopPropagation();
-  });
-  document.addEventListener("dragend", function () {
-    document.querySelectorAll(".pp-ed [draggable]").forEach(function (x) { x.draggable = false; x.classList.remove("ciag"); });
-    document.querySelectorAll(".pp-ed .nad").forEach(function (x) { x.classList.remove("nad"); });
-    ciagniety = null;
-  });
-  document.addEventListener("dragover", function (e) {
-    if (!ciagniety || !ED) return;
-    var cel = ciagniety.a ? e.target.closest(".pp-eal") : e.target.closest(".pp-eg");
-    if (!cel) return;
-    e.preventDefault();
-    document.querySelectorAll(".pp-ed .nad").forEach(function (x) { x.classList.remove("nad"); });
-    cel.classList.add("nad");
-  });
-  document.addEventListener("drop", function (e) {
-    if (!ciagniety || !ED) return;
-    var el = e.target.closest("#pracawre-pasek"); if (!el) return;
-    e.preventDefault();
-    if (ciagniety.a) {
-      var lista = e.target.closest(".pp-eal"); if (!lista) return;
-      var gi = +lista.dataset.gl, przed = e.target.closest("[data-a]"), o = ciagniety.a;
-      ED.grupy.forEach(function (g) { var i = g.aplikacje.indexOf(o); if (i >= 0) g.aplikacje.splice(i, 1); });
-      var docel = ED.grupy[gi].aplikacje, i2 = przed && przed.dataset.a !== o ? docel.indexOf(przed.dataset.a) : -1;
-      if (i2 >= 0 && e.clientY > przed.getBoundingClientRect().top + przed.offsetHeight / 2) i2++;
-      if (i2 >= 0) docel.splice(i2, 0, o); else docel.push(o);
-    } else {
-      var na = e.target.closest(".pp-eg"); if (!na) return;
-      var z = ciagniety.g, c = +na.dataset.g;
-      if (z !== c) { var g = ED.grupy.splice(z, 1)[0]; ED.grupy.splice(c, 0, g); }
-    }
-    ciagniety = null;
-    rysujEd(el);
-  });
 
   // Kartoteka (wspólna baza osób i mieszkań) – panel na całe okno w ramce, otwierany z Generatora i Protokołów
   // (bez linku w pasku – decyzja użytkownika). parametry: {osoba: id} albo {mieszkanie: id}; poZamknieciu – np. odświeżenie.
@@ -757,8 +521,7 @@
     });
   }
 
-  window.PracawrePasek = { uklad: uklad, ukladZapisz: ukladZapisz, ukladNr: function () { return UKLAD_NR; }, mozeUklad: mozeUklad,
-    edytujMenu: function () { var el = document.getElementById("pracawre-pasek"); if (el) edytujMenu(el); }, liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
