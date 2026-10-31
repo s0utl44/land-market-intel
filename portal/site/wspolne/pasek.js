@@ -222,7 +222,7 @@
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
-    konto().then(function (k) { uprawnieniaWPasku(el, k); });
+    konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); });
   }
 
   // karta z lewej: ☰ albo awatar otwiera; ✕, klik obok, Esc albo wybór pozycji zamyka
@@ -335,6 +335,79 @@
       document.body.insertBefore(el, document.body.firstChild);
     }
     wypelnij(el);
+  }
+
+  // --- „Czy spotkania się odbyły?” (31.10, decyzja użytkownika – rozmowa z Dawidem): po wejściu na dowolną stronę lista
+  // MOICH spotkań, których termin minął, bez oznaczonego wyniku (od chwili wdrożenia – nie wstecz). Przy każdym Tak / Nie;
+  // bez oznaczenia wszystkich nie da się przejść dalej („Zapisz i przejdź do swoich spraw”). Dotyczy agentów zimnych telefonów
+  // (dostęp do Zimnych i Transakcji). Dane: /transakcje/api/spotkania/… (Tak → odbyte, Nie → odwołane; zapis w HubSpot).
+  var CSS_SP =
+    "#pp-sp{position:fixed;inset:0;z-index:2147483002;background:rgba(15,14,12,.6);display:grid;place-items:center;padding:16px;" +
+    "font:15px/1.45 Lato,'Segoe UI',system-ui,sans-serif;--k:#fff;--t:#1f1d1a;--m:#6b665d;--l:#e2ddd2;--p:#faf8f4;--z:#c9a03c;--zd:#9b7a26}" +
+    "html[data-theme=dark] #pp-sp{--k:#212326;--t:#e8e5de;--m:#a39e94;--l:#33363a;--p:#1c1e21;--zd:#d9b55a}" +
+    "#pp-sp *{box-sizing:border-box}" +
+    "#pp-sp .spO{background:var(--k);color:var(--t);width:min(620px,100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.35);padding:22px 24px}" +
+    "#pp-sp h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-sp .op{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
+    "#pp-sp .w{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--l)}" +
+    "#pp-sp .w .tx{flex:1;min-width:0}#pp-sp .w b{display:block;font-size:14.5px}#pp-sp .w small{color:var(--m);font-size:12.5px}" +
+    "#pp-sp .sg{display:inline-flex;background:var(--p);border:1px solid var(--l);border-radius:999px;padding:3px;gap:2px;flex:none}" +
+    "#pp-sp .sg button{all:unset;cursor:pointer;padding:6px 16px;border-radius:999px;font-weight:800;font-size:13.5px}" +
+    "#pp-sp .sg button[data-v=tak][aria-pressed=true]{background:#2e7d32;color:#fff}#pp-sp .sg button[data-v=nie][aria-pressed=true]{background:#b3261e;color:#fff}" +
+    "#pp-sp .st{display:flex;align-items:center;gap:10px;margin-top:16px}#pp-sp .st .in{margin-right:auto;font-size:12.5px;color:var(--m)}" +
+    "#pp-sp .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:40px;padding:0 18px;border-radius:999px;font-weight:800;background:var(--t);color:var(--k);white-space:nowrap;flex:none}" +
+    "#pp-sp .b[disabled]{opacity:.35;pointer-events:none}#pp-sp .bl{color:#b3261e;font-size:13px;margin-top:8px}" +
+    "@media (max-width:560px){#pp-sp .w{flex-wrap:wrap}}";
+  var spotkaniaSpr = false;
+  function oknoSpotkan(k) {
+    if (spotkaniaSpr || !k || document.getElementById("pp-sp")) return;
+    var o = k.obszary || {}, ma = function (x) { return o[x] === "dostep" || o[x] === "admin"; };
+    if (!ma("leady") || !ma("transakcje")) return;
+    try { if (Date.now() - Number(sessionStorage.getItem("pracawre-spotkania") || 0) < 180000) return; } catch (e) {}
+    spotkaniaSpr = true;
+    fetch("/transakcje/api/spotkania/do-oznaczenia", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : { lista: [] }; })
+      .then(function (d) {
+        var lista = d.lista || [];
+        if (!lista.length) { try { sessionStorage.setItem("pracawre-spotkania", String(Date.now())); } catch (e) {} return; }
+        pokazSpotkania(lista);
+      }).catch(function () {});
+  }
+  function pokazSpotkania(lista) {
+    if (!document.getElementById("pp-sp-styl")) { var st = document.createElement("style"); st.id = "pp-sp-styl"; st.textContent = CSS_SP; document.head.appendChild(st); }
+    var wyb = {};
+    var t = document.createElement("div"); t.id = "pp-sp";
+    var kiedy = function (v) { var d = new Date(v); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); };
+    t.innerHTML = '<div class="spO" role="dialog" aria-modal="true" aria-labelledby="pp-sp-t"><h2 id="pp-sp-t">Czy spotkania się odbyły?</h2>' +
+      '<p class="op">Zaznacz przy każdym spotkaniu Tak albo Nie – to zajmie chwilę, a potem przejdziesz do swoich spraw.</p>' +
+      lista.map(function (x) {
+        return '<div class="w" data-id="' + esc(x.id) + '"><span class="tx"><b>' + esc(x.tytul || "Spotkanie") + "</b><small>" + esc(kiedy(x.start)) +
+          (x.nazwa ? " · " + esc(x.nazwa) : "") + '</small></span><span class="sg" role="group" aria-label="Czy się odbyło">' +
+          '<button type="button" data-v="tak" aria-pressed="false">Tak</button><button type="button" data-v="nie" aria-pressed="false">Nie</button></span></div>';
+      }).join("") +
+      '<div class="bl" hidden></div><div class="st"><span class="in">Tak = odbyło się · Nie = odwołane</span>' +
+      '<button type="button" class="b" data-zapisz disabled>Zapisz i przejdź do swoich spraw</button></div></div>';
+    document.body.appendChild(t);
+    var zap = t.querySelector("[data-zapisz]"), bl = t.querySelector(".bl");
+    t.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-v]");
+      if (b) {
+        var w = b.closest("[data-id]"); wyb[w.dataset.id] = b.dataset.v;
+        w.querySelectorAll("[data-v]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        zap.disabled = lista.some(function (x) { return !wyb[x.id]; });
+        return;
+      }
+      if (!e.target.closest("[data-zapisz]") || zap.disabled) return;
+      zap.disabled = true; zap.textContent = "Zapisywanie…"; bl.hidden = true;
+      fetch("/transakcje/api/spotkania/wyniki", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wyniki: lista.map(function (x) { return { id: x.id, odbylo: wyb[x.id] }; }) }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Błąd " + r.status); return j; }); })
+        .then(function () {
+          try { sessionStorage.setItem("pracawre-spotkania", String(Date.now())); } catch (er) {}
+          t.remove();
+          try { window.dispatchEvent(new CustomEvent("pracawre-spotkania")); } catch (er) {}
+        })
+        .catch(function (err) { bl.textContent = err.message || "Nie udało się zapisać – spróbuj jeszcze raz."; bl.hidden = false; zap.disabled = false; zap.textContent = "Zapisz i przejdź do swoich spraw"; });
+    });
   }
 
   // Kartoteka (wspólna baza osób i mieszkań) – panel na całe okno w ramce, otwierany z Generatora i Protokołów
