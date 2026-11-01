@@ -84,6 +84,9 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
    zimne w tym tygodniu, prośby o fakturę. Bez ponaglania o umowy pośrednictwa. */
 .zadanie a.tyt{color:inherit;text-decoration:none}.zadanie a.tyt:hover b{text-decoration:underline}
 .zadanie.co .kiedy{color:var(--zloto-c)}
+.odb{display:flex;gap:6px;align-items:center;flex:none}.odb .b{all:unset;cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid var(--linia);font-weight:900;font-size:.82rem}
+.odb .b:hover{background:var(--zloto);color:#1f1d1a;border-color:var(--zloto)}.odb .b[disabled]{opacity:.4;pointer-events:none}
+a.dalejCo{text-decoration:none;font-weight:900}
 .sprawy{background:var(--karta);border:1px solid var(--linia);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;
   box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
 .wsk{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
@@ -114,12 +117,13 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
   </header>
   <section class="grupa" id="spotkaniaS" hidden><h2>Spotkania</h2><ul class="zadania" id="spotkania"></ul></section>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
-  <section class="grupa" id="sprawyS" hidden><h2>Moje sprawy</h2><div class="sprawy" id="sprawy"></div></section>
+  <section class="grupa" id="sprawyS" hidden><h2>Moje transakcje</h2><div class="sprawy" id="sprawy"></div></section>
   <div class="dwa">
     <section class="grupa" id="zimneS" hidden><h2>Zimne w tym tygodniu</h2><div class="sprawy" id="zimne"></div></section>
     <section class="grupa" id="fakturyS" hidden><h2>Prośby o fakturę</h2><ul class="zadania" id="faktury"></ul></section>
   </div>
-  <section class="grupa" id="doZrobienia" hidden><h2>Do zrobienia</h2><ul class="kafle do" id="doLista"></ul></section>
+  <!-- 1.11 (decyzja użytkownika): „Do zrobienia” usunięte z pulpitu (liczby zostają w menu ☰) -->
+  <section class="grupa" id="doZrobienia" hidden><ul class="kafle do" id="doLista"></ul></section>
   <div class="pusto" id="brakDostepu" hidden>Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
@@ -140,7 +144,7 @@ function rysujDo(){
       <span><b>${esc(a.nazwa)}</b><span class="liczby">${DO[a.obszar].map(([n, tekst, wazne]) => `<span class="liczba${wazne ? ' wazne' : ''}">${esc(tekst)}</span>`).join('')}</span></span>
       <span class="dalej" aria-hidden="true">→</span></a></li>`).join('');
   document.getElementById('doLista').innerHTML = kafle;
-  document.getElementById('doZrobienia').hidden = !kafle;
+  document.getElementById('doZrobienia').hidden = true;
 }
 
 function powitaj(k){
@@ -171,7 +175,6 @@ function kiedy(termin){
   if (dni < 0) return 'zaległe · ' + (dni === -1 ? 'wczoraj' : t.toLocaleDateString('pl-PL', {day:'numeric', month:'short'}));
   return t.toLocaleDateString('pl-PL', {weekday:'short', day:'numeric', month:'short'});
 }
-const linkHubSpot = u => /^https:\/\/app\.hubspot\.com\//.test(u || '') ? u : '';
 function zadania(z){
   const sekcja = document.getElementById('naDzis'), info = document.getElementById('zadaniaInfo');
   sekcja.hidden = false;
@@ -180,9 +183,12 @@ function zadania(z){
   const pozniej = z.lista.length - blisko.length;
   document.getElementById('zadania').innerHTML = blisko.map(x => {
     const zalegle = x.termin && poczatekDnia(new Date(x.termin)) < poczatekDnia(new Date());
+    // 1.11 (decyzja użytkownika): linki prowadzą do naszych stron – transakcja → Transakcje, kontakt → lead w Zimnych (nie do HubSpot)
     const gdzie = x.gdzie.map(g => {
-      const nazwa = esc(g.nazwa || (g.typ === 'kontakt' ? 'kontakt' : 'transakcja')), link = linkHubSpot(g.link);
-      return link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${nazwa}</a>` : `<span>${nazwa}</span>`;
+      const nazwa = esc(g.nazwa || (g.typ === 'kontakt' ? 'kontakt' : 'transakcja'));
+      const link = g.typ === 'transakcja' && g.id ? '/transakcje/#t=' + encodeURIComponent(g.id)
+        : g.typ === 'kontakt' && x.lead ? `/leady/#lead/${encodeURIComponent(x.lead.portal)}/${encodeURIComponent(x.lead.id)}` : '';
+      return link ? `<a href="${esc(link)}">${nazwa}</a>` : `<span>${nazwa}</span>`;
     }).join('');
     return `<li class="zadanie${zalegle ? ' zalegle' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IKONY_ZADAN[x.typ] || IKONY_ZADAN.TODO}</svg></span>
       <span class="tx"><b>${esc(x.tytul)}${x.pilne ? '<span class="pilne">pilne</span>' : ''}</b>${gdzie ? `<span class="gdzie">${gdzie}</span>` : ''}</span>
@@ -216,11 +222,12 @@ function pulpitTransakcji(p){
   document.getElementById('spotkaniaS').hidden = !sp.length;
   document.getElementById('spotkania').innerHTML = sp.map(x => `<li class="zadanie${x.co ? ' co' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IK_SPOTK}</svg></span>
     <span class="tx"><a class="tyt" href="${linkT(x.transakcja)}"><b>${esc(x.tytul || 'Spotkanie')}</b></a><span class="gdzie"><a href="${linkT(x.transakcja)}">${esc(x.nazwa)}</a></span></span>
-    <span class="kiedy">${x.co ? (x.co_wyszlo ? 'co wyszło?' : 'odbyło się?') : esc(kiedy(x.start))}</span></li>`).join('');
+    ${x.co && !x.co_wyszlo ? `<span class="odb"><span class="kiedy">odbyło się?</span><button class="b" data-sp="${esc(x.id)}" data-odb="tak">Tak</button><button class="b" data-sp="${esc(x.id)}" data-odb="nie">Nie</button></span>`
+      : x.co_wyszlo ? `<a class="kiedy dalejCo" href="${linkT(x.transakcja)}">co wyszło? →</a>` : `<span class="kiedy">${esc(kiedy(x.start))}</span>`}</li>`).join('');
   document.getElementById('sprawyS').hidden = !p.otwarte && !p.sukces.n;
-  document.getElementById('sprawy').innerHTML = `<div class="wsk"><div><b>${p.otwarte}</b><span>otwarte sprawy</span></div>
+  document.getElementById('sprawy').innerHTML = `<div class="wsk"><div><b>${p.otwarte}</b><span>otwarte transakcje</span></div>
       <div><b>${esc(zl(p.w_toku))}</b><span>wynagrodzenie w toku (netto)</span></div>
-      <div><b>${p.sukces.n ? esc(zl(p.sukces.kwota)) : '—'}</b><span>sukces w tym miesiącu${p.sukces.n ? ' · ' + odm(p.sukces.n, 'sprawa', 'sprawy', 'spraw') : ''}</span></div></div>
+      <div><b>${p.sukces.n ? esc(zl(p.sukces.kwota)) : '—'}</b><span>sukces w tym miesiącu${p.sukces.n ? ' · ' + odm(p.sukces.n, 'transakcja', 'transakcje', 'transakcji') : ''}</span></div></div>
     ${p.lejek.length ? `<div class="etapy">${p.lejek.map(e => `<a href="/transakcje/" style="--ek:${KOLORY_ETAPOW[e.klucz] || '#c9a03c'}">${esc(e.nazwa)} <i>${e.n}</i></a>`).join('')}</div>` : ''}
     <a class="dalej" href="/transakcje/">Otwórz Transakcje →</a>`;
   document.getElementById('fakturyS').hidden = !(p.faktury || []).length;
@@ -235,6 +242,20 @@ function pulpitZimnych(p){
   document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.zimne ?? t.skuteczne ?? 0}</b><span>zimne telefony (odebrane)</span></div>
       <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>`;
 }
+
+// 1.11: „odbyło się?” wprost z pulpitu → Transakcje (Tak = odbyte, potem „co wyszło?” w transakcji; Nie = odwołane)
+let OST_PULPIT = null;
+document.getElementById('spotkania').addEventListener('click', async e => {
+  const b = e.target.closest('[data-odb]'); if (!b) return;
+  b.closest('.odb').querySelectorAll('button').forEach(x => x.disabled = true);
+  try {
+    const r = await fetch('/transakcje/api/spotkania/wyniki', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({wyniki: [{id: b.dataset.sp, odbylo: b.dataset.odb}]})});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+    try { sessionStorage.removeItem('pracawre-spotkania'); } catch (er) {}
+    fetch('/transakcje/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitTransakcji).catch(() => {});
+  } catch (err) { b.closest('.odb').querySelectorAll('button').forEach(x => x.disabled = false); alert('Nie udało się zapisać: ' + (err.message || err)); }
+});
 
 PracawrePasek.konto().then(k => {
   powitaj(k);
