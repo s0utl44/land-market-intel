@@ -80,6 +80,22 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
   font:900 14px/1 Lato,sans-serif;cursor:pointer}.zadanie .ok:hover{background:var(--zloto);color:#1f1d1a;border-color:var(--zloto)}
 .zadanie .ok[disabled]{opacity:.4;pointer-events:none}
 .zadania-info{margin:10px 0 0;font-size:.84rem;color:var(--szary)}
+/* 1.11 (etap 6, decyzje użytkownika): pulpit agenta – spotkania dziś i jutro, moje sprawy (lejek w kolorach etapów jak w Transakcjach),
+   zimne w tym tygodniu, prośby o fakturę. Bez ponaglania o umowy pośrednictwa. */
+.zadanie a.tyt{color:inherit;text-decoration:none}.zadanie a.tyt:hover b{text-decoration:underline}
+.zadanie.co .kiedy{color:var(--zloto-c)}
+.sprawy{background:var(--karta);border:1px solid var(--linia);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
+.wsk{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
+.wsk div{display:flex;flex-direction:column;gap:2px}.wsk b{font-size:1.45rem;font-weight:900;font-variant-numeric:tabular-nums}
+.wsk span{font-size:.8rem;color:var(--szary)}
+.etapy{display:flex;flex-wrap:wrap;gap:6px}
+.etapy a{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-size:.84rem;font-weight:700;text-decoration:none;
+  background:color-mix(in srgb,var(--ek) 16%,var(--karta));color:color-mix(in srgb,var(--ek) 75%,var(--tekst))}
+.etapy a::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ek)}
+.etapy a i{font-style:normal;font-weight:900}
+.sprawy .dalej{font-size:.86rem;font-weight:700;color:var(--zloto-c);text-decoration:none;align-self:flex-start}
+.dwa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:28px}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
 .stopka{margin-top:auto;font-size:.78rem;color:var(--szary)}
 @media (max-width:640px){.powitanie{border-left:0;padding-left:0}}
@@ -95,7 +111,13 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
       <p id="dzis"></p>
     </div>
   </header>
+  <section class="grupa" id="spotkaniaS" hidden><h2>Spotkania</h2><ul class="zadania" id="spotkania"></ul></section>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
+  <section class="grupa" id="sprawyS" hidden><h2>Moje sprawy</h2><div class="sprawy" id="sprawy"></div></section>
+  <div class="dwa">
+    <section class="grupa" id="zimneS" hidden><h2>Zimne w tym tygodniu</h2><div class="sprawy" id="zimne"></div></section>
+    <section class="grupa" id="fakturyS" hidden><h2>Prośby o fakturę</h2><ul class="zadania" id="faktury"></ul></section>
+  </div>
   <section class="grupa" id="doZrobienia" hidden><h2>Do zrobienia</h2><ul class="kafle do" id="doLista"></ul></section>
   <div class="pusto" id="brakDostepu" hidden>Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
@@ -181,6 +203,37 @@ document.getElementById('zadania').addEventListener('click', async e => {
   } catch (err) { b.disabled = false; alert('Nie udało się odhaczyć: ' + (err.message || err)); }
 });
 
+// --- pulpit agenta (1.11): Transakcje /transakcje/api/pulpit i Zimne /leady/api/pulpit (tydzien) ---------------------------
+const KOLORY_ETAPOW = {nowy: "#7a8496", proba_kontaktu: "#7a8496", spotkanie: "#3b7dd8", umowa_otwarta: "#8a63d2", agencyjna: "#8a63d2",
+  wylacznosc: "#c99a06", oferta_pracujaca: "#e07a2e", oferta_realna: "#d0582a", przedwstepna: "#1f9a8a", faktura: "#2e9b57", oplacono: "#1e7a43"};
+const zl = n => Math.round(n || 0).toLocaleString('pl-PL') + ' zł';
+const IK_SPOTK = '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>';
+const linkT = id => '/transakcje/#t=' + encodeURIComponent(id);
+function pulpitTransakcji(p){
+  if (!p || p.brak) return;
+  const sp = [...(p.spotkania || []).map(x => ({...x, co: false})), ...(p.rozliczyc || []).map(x => ({...x, co: true}))];
+  document.getElementById('spotkaniaS').hidden = !sp.length;
+  document.getElementById('spotkania').innerHTML = sp.map(x => `<li class="zadanie${x.co ? ' co' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IK_SPOTK}</svg></span>
+    <span class="tx"><a class="tyt" href="${linkT(x.transakcja)}"><b>${esc(x.tytul || 'Spotkanie')}</b></a><span class="gdzie"><a href="${linkT(x.transakcja)}">${esc(x.nazwa)}</a></span></span>
+    <span class="kiedy">${x.co ? (x.co_wyszlo ? 'co wyszło?' : 'odbyło się?') : esc(kiedy(x.start))}</span></li>`).join('');
+  document.getElementById('sprawyS').hidden = !p.otwarte && !p.sukces.n;
+  document.getElementById('sprawy').innerHTML = `<div class="wsk"><div><b>${p.otwarte}</b><span>otwarte sprawy</span></div>
+      <div><b>${esc(zl(p.w_toku))}</b><span>wynagrodzenie w toku (netto)</span></div>
+      <div><b>${p.sukces.n ? esc(zl(p.sukces.kwota)) : '—'}</b><span>sukces w tym miesiącu${p.sukces.n ? ' · ' + odm(p.sukces.n, 'sprawa', 'sprawy', 'spraw') : ''}</span></div></div>
+    ${p.lejek.length ? `<div class="etapy">${p.lejek.map(e => `<a href="/transakcje/" style="--ek:${KOLORY_ETAPOW[e.klucz] || '#c9a03c'}">${esc(e.nazwa)} <i>${e.n}</i></a>`).join('')}</div>` : ''}
+    <a class="dalej" href="/transakcje/">Otwórz Transakcje →</a>`;
+  document.getElementById('fakturyS').hidden = !(p.faktury || []).length;
+  document.getElementById('faktury').innerHTML = (p.faktury || []).map(f => `<li class="zadanie"><span class="tx"><a class="tyt" href="${linkT(f.transakcja)}"><b>${esc(f.nazwa)}</b></a>
+    <span class="gdzie"><span>${esc(f.etap || '')}</span></span></span><span class="kiedy">${f.kiedy ? esc(new Date(f.kiedy).toLocaleDateString('pl-PL', {day:'numeric', month:'short'})) : ''}</span></li>`).join('');
+}
+function pulpitZimnych(p){
+  const t = p && p.tydzien; if (!t) return;
+  document.getElementById('zimneS').hidden = false;
+  document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.wziete}</b><span>wzięte leady</span></div>
+      <div><b>${t.telefony}</b><span>telefony</span></div><div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>
+    <a class="dalej" href="/leady/">Otwórz Zimne →</a>`;
+}
+
 PracawrePasek.konto().then(k => {
   powitaj(k);
   const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // widok agenta – bez Administracji
@@ -189,6 +242,9 @@ PracawrePasek.konto().then(k => {
   window.addEventListener('pracawre-widok-agenta', () => location.reload());
   if (k && PracawrePasek.liczby) PracawrePasek.liczby(k, liczby);
   // zadania z HubSpot osobno – liczby nie czekają na HubSpot
+  const ma = o => PracawrePasek.aplikacje(k).some(a => a.obszar === o);
+  if (ma('transakcje')) fetch('/transakcje/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitTransakcji).catch(() => {});
+  if (ma('leady')) fetch('/leady/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitZimnych).catch(() => {});
   if (PracawrePasek.aplikacje(k).some(a => a.obszar === 'leady')) fetch('/leady/api/zadania', {credentials:'same-origin'})
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(zadania).catch(() => {});
 });
