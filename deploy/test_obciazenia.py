@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test obciążenia pracawre.com: 10, 20 i 30 osób naraz w Leadach, Generatorze umów, Kartotece i Radarze.
+"""Test obciążenia pracawre.com: 10, 20 i 30 osób naraz w Zimnych, Transakcjach, Generatorze umów, Kartotece i Radarze.
 
 Uruchomienie na serwerze (tylko Python ze standardową biblioteką):
     python3 /opt/lmi/deploy/test_obciazenia.py
@@ -34,6 +34,14 @@ KLIKNIECIA = [
     ("Leady: lista", "GET", "http://127.0.0.1:8101/api/leady", None),
     ("Leady: liczby na pulpicie", "GET", "http://127.0.0.1:8101/api/pulpit", None),
     ("Leady: dane konta", "GET", "http://127.0.0.1:8101/api/ja", None),
+    ("Zimne: rejony (tryb Dzwonię)", "GET", "http://127.0.0.1:8101/api/dzwonie/rejony?rodzaj=sp", None),
+    ("Zimne: licznik dnia", "GET", "http://127.0.0.1:8101/api/dzwonie/stan", None),
+    ("Zimne: cele", "GET", "http://127.0.0.1:8101/api/cele/moje", None),
+    ("Zimne: zadania (pulpit)", "GET", "http://127.0.0.1:8101/api/zadania", None),
+    ("Transakcje: tablica", "GET", "http://127.0.0.1:8102/api/tablica?lejek=default", None),
+    ("Transakcje: tablica", "GET", "http://127.0.0.1:8102/api/tablica?lejek=default", None),
+    ("Transakcje: pulpit", "GET", "http://127.0.0.1:8102/api/pulpit", None),
+    ("Transakcje: spotkania do oznaczenia", "GET", "http://127.0.0.1:8102/api/spotkania/do-oznaczenia", None),
     ("Umowy: Otwórz… (lista umów)", "POST", "http://127.0.0.1:8090/api/listaKompletow", []),
     ("Umowy: strona", "GET", "http://127.0.0.1:8090/", None),
     ("Kartoteka: szukaj osoby", "GET", "http://127.0.0.1:8098/api/szukaj?typ=osoby&q=a&limit=50", None),
@@ -75,14 +83,14 @@ def runda(ile: int) -> None:
     for w in watki:
         w.join()
     print(f"\n=== {ile} osób naraz przez {TRWANIE} s ===")
-    print(f"{'kliknięcie':34}{'ile':>6}{'mediana':>10}{'95%':>9}{'najgorzej':>11}  błędy")
+    print(f"{'kliknięcie':38}{'ile':>6}{'mediana':>10}{'95%':>9}{'najgorzej':>11}  błędy")
     for nazwa in dict.fromkeys(k[0] for k in KLIKNIECIA):
         c = sorted(wyniki[nazwa])
         if not c:
-            print(f"{nazwa:34}{0:>6}{'–':>10}{'–':>9}{'–':>11}  {len(bledy[nazwa])} {sorted(set(bledy[nazwa]))}")
+            print(f"{nazwa:38}{0:>6}{'–':>10}{'–':>9}{'–':>11}  {len(bledy[nazwa])} {sorted(set(bledy[nazwa]))}")
             continue
         p95 = c[min(len(c) - 1, int(len(c) * 0.95))]
-        print(f"{nazwa:34}{len(c):>6}{statistics.median(c):>9.2f}s{p95:>8.2f}s{c[-1]:>10.2f}s  "
+        print(f"{nazwa:38}{len(c):>6}{statistics.median(c):>9.2f}s{p95:>8.2f}s{c[-1]:>10.2f}s  "
               + (f"{len(bledy[nazwa])} {sorted(set(bledy[nazwa]))}" if bledy[nazwa] else "–"))
 
 
