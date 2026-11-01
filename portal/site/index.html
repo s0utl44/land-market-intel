@@ -229,8 +229,9 @@ function pulpitTransakcji(p){
 function pulpitZimnych(p){
   const t = p && p.tydzien; if (!t) return;
   document.getElementById('zimneS').hidden = false;
-  document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.wziete}</b><span>wzięte leady</span></div>
-      <div><b>${t.telefony}</b><span>telefony</span></div><div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>
+  // 1.11 (decyzja użytkownika): tylko skuteczne zimne telefony (dodzwonił się) i umówione spotkania – jak najprościej
+  document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.skuteczne ?? 0}</b><span>skuteczne zimne telefony</span></div>
+      <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>
     <a class="dalej" href="/leady/">Otwórz Zimne →</a>`;
 }
 
