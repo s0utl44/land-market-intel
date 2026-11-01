@@ -642,7 +642,89 @@
     });
   }
 
-  window.PracawrePasek = { liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, aplikacje: aplikacje, grupy: GRUPY };
+
+  // --- pływający przycisk „Zacznij dzwonić” (1.11, decyzje użytkownika): JEDYNE miejsce startu trybu „Dzwonię” – pulpit i Zimne.
+  // Lew WRE „oddycha”, złote fale, cel dnia z paskiem (/leady/api/cele/moje – obowiązuje cel dyrektora); przesuwany myszą / palcem
+  // (próg 6 px, miejsce w localStorage pracawre-dzwon-miejsce); bez rysowanej obwódki; na telefonie samo kółko. naKlik – w Zimnych
+  // start trybu na tej samej stronie (bez przeładowania); html.pw-dzwonie (tryb otwarty) ukrywa przycisk.
+  var CSS_DZ =
+    "#dzwonPrz{position:fixed;z-index:900;right:22px;bottom:22px;display:flex;align-items:center;gap:14px;padding:9px 22px 9px 9px;border-radius:999px;" +
+    "  background:#1f1d1a;color:#fff;text-decoration:none;box-shadow:0 12px 30px rgba(31,29,26,.35),0 0 0 1px rgba(201,160,60,.5);" +
+    "  touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .2s,background .2s}" +
+    "#dzwonPrz:hover{transform:scale(1.04);background:#2a2316}" +
+    "#dzwonPrz.ciagnij{cursor:grabbing;transition:none;transform:scale(1.04)}" +
+    ':root[data-theme="dark"] #dzwonPrz{background:#0f1012;box-shadow:0 12px 30px rgba(0,0,0,.6),0 0 0 1px rgba(217,181,90,.55)}' +
+    '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #dzwonPrz{background:#0f1012;box-shadow:0 12px 30px rgba(0,0,0,.6),0 0 0 1px rgba(217,181,90,.55)}}' +
+    "#dzwonPrz .lew{position:relative;flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;" +
+    "  background:radial-gradient(circle at 50% 40%,#2a2722,#141311);box-shadow:inset 0 0 0 2px #c9a03c}" +
+    "#dzwonPrz .lew img{width:36px;pointer-events:none;animation:dzOddech 2.4s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(217,181,90,.35))}" +
+    '#dzwonPrz .lew::before,#dzwonPrz .lew::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #d9b55a;opacity:0;' +
+    "  animation:dzFala 2.4s cubic-bezier(.2,.6,.3,1) infinite}" +
+    "#dzwonPrz .lew::after{animation-delay:1.2s}" +
+    "@keyframes dzOddech{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}" +
+    "@keyframes dzFala{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.75);opacity:0}}" +
+    "#dzwonPrz .tx{display:flex;flex-direction:column;line-height:1.15;min-width:0}" +
+    "#dzwonPrz .tx b{font-size:1.15rem;font-weight:900;letter-spacing:.01em;transition:letter-spacing .2s}" +
+    "#dzwonPrz:hover .tx b{letter-spacing:.04em}" +
+    "#dzwonPrz .tx small{font-size:.78rem;color:#d9b55a;font-weight:700;margin-top:3px;white-space:nowrap}" +
+    "#dzwonPrz .pas{display:block;height:4px;border-radius:9px;background:rgba(255,255,255,.12);margin-top:5px;overflow:hidden;width:150px}" +
+    "#dzwonPrz .pas i{display:block;height:100%;width:0;background:linear-gradient(90deg,#bd9302,#e8c86a);transition:width .6s}" +
+    "@media (max-width:640px){#dzwonPrz{padding:6px;gap:0}#dzwonPrz .tx{display:none}}" +
+    "@media (prefers-reduced-motion:reduce){#dzwonPrz .lew img,#dzwonPrz .lew::before,#dzwonPrz .lew::after{animation:none}}" +
+    "@media print{#dzwonPrz{display:none}}html.pw-dzwonie #dzwonPrz{display:none}";
+  function przyciskDzwonienia(opcje) {
+    opcje = opcje || {};
+    var b = document.getElementById("dzwonPrz");
+    if (!b) {
+      if (!document.getElementById("pp-dz-styl")) { var st = document.createElement("style"); st.id = "pp-dz-styl"; st.textContent = CSS_DZ; document.head.appendChild(st); }
+      b = document.createElement("a");
+      b.id = "dzwonPrz"; b.href = "/leady/#dzwonie"; b.setAttribute("aria-label", "Zacznij dzwonić");
+      b.title = "Zacznij dzwonić – przytrzymaj i przeciągnij, żeby przesunąć";
+      b.innerHTML = '<span class="lew"><img src="/wspolne/lew-wre.png" alt=""></span><span class="tx"><b>Zacznij dzwonić</b><small id="dzwonCel"></small>' +
+        '<span class="pas" id="dzwonPas" hidden><i></i></span></span>';
+      document.body.appendChild(b);
+      var KL = "pracawre-dzwon-miejsce";
+      var ustaw = function (x, y) {
+        var w = b.offsetWidth, h = b.offsetHeight;
+        x = Math.min(Math.max(8, x), innerWidth - w - 8); y = Math.min(Math.max(50, y), innerHeight - h - 8);
+        b.style.left = x + "px"; b.style.top = y + "px"; b.style.right = "auto"; b.style.bottom = "auto";
+      };
+      var zMiejsca = function () { try { var m = JSON.parse(localStorage.getItem(KL) || "null"); if (m) ustaw(m.x * innerWidth, m.y * innerHeight); } catch (e) {} };
+      b._zMiejsca = zMiejsca;
+      zMiejsca(); addEventListener("resize", zMiejsca);
+      var start = null, przesunal = false;
+      b.addEventListener("pointerdown", function (e) { if (e.button) return; var r = b.getBoundingClientRect();
+        start = { x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top }; przesunal = false; b.setPointerCapture(e.pointerId); });
+      b.addEventListener("pointermove", function (e) {
+        if (!start) return;
+        if (!przesunal && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+        przesunal = true; b.classList.add("ciagnij"); ustaw(e.clientX - start.dx, e.clientY - start.dy);
+      });
+      var koniec = function () {
+        if (!start) return; start = null; b.classList.remove("ciagnij");
+        if (przesunal) { var r = b.getBoundingClientRect(); try { localStorage.setItem(KL, JSON.stringify({ x: r.left / innerWidth, y: r.top / innerHeight })); } catch (e) {} }
+      };
+      b.addEventListener("pointerup", koniec); b.addEventListener("pointercancel", koniec);
+      b.addEventListener("click", function (e) {
+        if (przesunal) { e.preventDefault(); przesunal = false; return; }
+        if (b._naKlik) { e.preventDefault(); b._naKlik(); }
+      });
+      b.addEventListener("dragstart", function (e) { e.preventDefault(); });
+    }
+    b._naKlik = opcje.naKlik || null;
+    fetch("/leady/api/cele/moje", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (m) {
+      if (!m) return;
+      var z = m.dzien.zrobione, c = m.dzien.obowiazuje || {};
+      var cz = [c.odebrane ? z.zimne + " z " + c.odebrane + " rozmów" : z.zimne + " rozmów dziś", c.spotkania ? z.spotkania + " z " + c.spotkania + " spotkań" : ""];
+      document.getElementById("dzwonCel").textContent = (c.odebrane || c.spotkania ? "Cel dnia: " : "") + cz.filter(Boolean).join(" · ");
+      var p = document.getElementById("dzwonPas");
+      if (c.odebrane) { p.hidden = false; p.firstElementChild.style.width = Math.min(100, Math.round(z.zimne / c.odebrane * 100)) + "%"; }
+      b._zMiejsca();
+    }).catch(function () {});
+    return b;
+  }
+
+  window.PracawrePasek = { liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());

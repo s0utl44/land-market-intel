@@ -100,33 +100,6 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .stopka{margin-top:auto;font-size:.78rem;color:var(--szary)}
 @media (max-width:640px){.powitanie{border-left:0;padding-left:0}}
 
-/* 1.11 (decyzje użytkownika): pływający przycisk „Zacznij dzwonić” z lwem WRE – lew „oddycha”, złote fale jak przy dzwonieniu,
-   cel dnia z paskiem; przesuwany po ekranie (miejsce pamiętane w tej przeglądarce), bez rysowanej obwódki po najechaniu;
-   na telefonie samo kółko z lwem. Tylko osoby z dostępem do Zimnych. */
-#dzwonPrz{position:fixed;z-index:900;right:22px;bottom:22px;display:flex;align-items:center;gap:14px;padding:9px 22px 9px 9px;border-radius:999px;
-  background:#1f1d1a;color:#fff;text-decoration:none;box-shadow:0 12px 30px rgba(31,29,26,.35),0 0 0 1px rgba(201,160,60,.5);
-  touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .2s,background .2s}
-#dzwonPrz:hover{transform:scale(1.04);background:#2a2316}
-#dzwonPrz.ciagnij{cursor:grabbing;transition:none;transform:scale(1.04)}
-:root[data-theme="dark"] #dzwonPrz{background:#0f1012;box-shadow:0 12px 30px rgba(0,0,0,.6),0 0 0 1px rgba(217,181,90,.55)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #dzwonPrz{background:#0f1012;box-shadow:0 12px 30px rgba(0,0,0,.6),0 0 0 1px rgba(217,181,90,.55)}}
-#dzwonPrz .lew{position:relative;flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;
-  background:radial-gradient(circle at 50% 40%,#2a2722,#141311);box-shadow:inset 0 0 0 2px var(--zloto)}
-#dzwonPrz .lew img{width:36px;pointer-events:none;animation:dzOddech 2.4s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(217,181,90,.35))}
-#dzwonPrz .lew::before,#dzwonPrz .lew::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #d9b55a;opacity:0;
-  animation:dzFala 2.4s cubic-bezier(.2,.6,.3,1) infinite}
-#dzwonPrz .lew::after{animation-delay:1.2s}
-@keyframes dzOddech{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
-@keyframes dzFala{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.75);opacity:0}}
-#dzwonPrz .tx{display:flex;flex-direction:column;line-height:1.15;min-width:0}
-#dzwonPrz .tx b{font-size:1.15rem;font-weight:900;letter-spacing:.01em;transition:letter-spacing .2s}
-#dzwonPrz:hover .tx b{letter-spacing:.04em}
-#dzwonPrz .tx small{font-size:.78rem;color:#d9b55a;font-weight:700;margin-top:3px;white-space:nowrap}
-#dzwonPrz .pas{display:block;height:4px;border-radius:9px;background:rgba(255,255,255,.12);margin-top:5px;overflow:hidden;width:150px}
-#dzwonPrz .pas i{display:block;height:100%;width:0;background:linear-gradient(90deg,#bd9302,#e8c86a);transition:width .6s}
-@media (max-width:640px){#dzwonPrz{padding:6px;gap:0}#dzwonPrz .tx{display:none}}
-@media (prefers-reduced-motion:reduce){#dzwonPrz .lew img,#dzwonPrz .lew::before,#dzwonPrz .lew::after{animation:none}}
-@media print{#dzwonPrz{display:none}}
 </style>
 </head>
 <body>
@@ -150,9 +123,6 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
   <div class="pusto" id="brakDostepu" hidden>Nie masz jeszcze dostępu do żadnego narzędzia – napisz do administratora.</div>
   <p class="stopka">WRE Nieruchomości · ul. Łaciarska 4b, Wrocław</p>
 </main>
-<a id="dzwonPrz" href="/leady/#dzwonie" hidden aria-label="Zacznij dzwonić" title="Zacznij dzwonić – przytrzymaj i przeciągnij, żeby przesunąć">
-  <span class="lew"><img src="/wspolne/lew-wre.png" alt=""></span>
-  <span class="tx"><b>Zacznij dzwonić</b><small id="dzwonCel"></small><span class="pas" id="dzwonPas" hidden><i></i></span></span></a>
 
 <script>
 "use strict";
@@ -263,46 +233,7 @@ function pulpitZimnych(p){
   // 1.11 (decyzja użytkownika): jak w Odprawie – odebrane zimne telefony (dodzwonił się) i umówione spotkania, wszystkie moje
   // telefony z HubSpot od poniedziałku (nie tylko zapisane w Zimnych)
   document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.zimne ?? t.skuteczne ?? 0}</b><span>zimne telefony (odebrane)</span></div>
-      <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>
-    <a class="dalej" href="/leady/#dzwonie" style="font-size:1rem">▶ Zacznij dzwonić</a>`;
-}
-
-// --- przycisk „Zacznij dzwonić” (1.11): cel dnia z Zimnych (/leady/api/cele/moje – obowiązuje cel dyrektora, inaczej własny),
-// przesuwanie myszą / palcem (próg 6 px – zwykłe kliknięcie dalej otwiera tryb), miejsce w localStorage pracawre-dzwon-miejsce
-function przyciskDzwonienia(){
-  const b = document.getElementById('dzwonPrz'), KLUCZ = 'pracawre-dzwon-miejsce';
-  b.hidden = false;
-  const ustaw = (x, y) => {
-    const w = b.offsetWidth, h = b.offsetHeight;
-    x = Math.min(Math.max(8, x), innerWidth - w - 8); y = Math.min(Math.max(50, y), innerHeight - h - 8);
-    Object.assign(b.style, {left: x + 'px', top: y + 'px', right: 'auto', bottom: 'auto'});
-    return [x, y];
-  };
-  const zMiejsca = () => { try { const m = JSON.parse(localStorage.getItem(KLUCZ) || 'null'); if (m) ustaw(m.x * innerWidth, m.y * innerHeight); } catch (e) {} };
-  zMiejsca(); addEventListener('resize', zMiejsca);
-  let start = null, przesunal = false;
-  b.addEventListener('pointerdown', e => { if (e.button) return; const r = b.getBoundingClientRect();
-    start = {x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top}; przesunal = false; b.setPointerCapture(e.pointerId); });
-  b.addEventListener('pointermove', e => {
-    if (!start) return;
-    if (!przesunal && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
-    przesunal = true; b.classList.add('ciagnij'); ustaw(e.clientX - start.dx, e.clientY - start.dy);
-  });
-  const koniec = () => {
-    if (!start) return; start = null; b.classList.remove('ciagnij');
-    if (przesunal) { const r = b.getBoundingClientRect(); try { localStorage.setItem(KLUCZ, JSON.stringify({x: r.left / innerWidth, y: r.top / innerHeight})); } catch (e) {} }
-  };
-  b.addEventListener('pointerup', koniec); b.addEventListener('pointercancel', koniec);
-  b.addEventListener('click', e => { if (przesunal) { e.preventDefault(); przesunal = false; } });
-  b.addEventListener('dragstart', e => e.preventDefault());
-  fetch('/leady/api/cele/moje', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : null).then(m => {
-    if (!m) return;
-    const d = m.dzien, z = d.zrobione, c = d.obowiazuje || {};
-    const czesci = [c.odebrane ? `${z.zimne} z ${c.odebrane} rozmów` : `${z.zimne} rozmów dziś`, c.spotkania ? `${z.spotkania} z ${c.spotkania} spotkań` : ''];
-    document.getElementById('dzwonCel').textContent = (c.odebrane || c.spotkania ? 'Cel dnia: ' : '') + czesci.filter(Boolean).join(' · ');
-    if (c.odebrane) { const p = document.getElementById('dzwonPas'); p.hidden = false; p.firstElementChild.style.width = Math.min(100, Math.round(z.zimne / c.odebrane * 100)) + '%'; }
-    zMiejsca();
-  }).catch(() => {});
+      <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>`;
 }
 
 PracawrePasek.konto().then(k => {
@@ -316,7 +247,7 @@ PracawrePasek.konto().then(k => {
   const ma = o => PracawrePasek.aplikacje(k).some(a => a.obszar === o);
   if (ma('transakcje')) fetch('/transakcje/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitTransakcji).catch(() => {});
   if (ma('leady')) fetch('/leady/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitZimnych).catch(() => {});
-  if (ma('leady')) przyciskDzwonienia();
+  if (ma('leady') && PracawrePasek.przyciskDzwonienia) PracawrePasek.przyciskDzwonienia();   // 1.11: jedyne „Zacznij dzwonić” – pływający lew
   if (PracawrePasek.aplikacje(k).some(a => a.obszar === 'leady')) fetch('/leady/api/zadania', {credentials:'same-origin'})
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(zadania).catch(() => {});
 });
