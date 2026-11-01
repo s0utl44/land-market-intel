@@ -205,6 +205,7 @@
       '<div class="pp-sz-d"><div class="pp-motywy" role="group" aria-label="Motyw">' +
       ["auto", "light", "dark"].map(function (m) { return '<button type="button" data-motyw="' + m + '" aria-pressed="false">' + svg(IKONY[m]) + NAZWY_MOTYWOW[m] + "</button>"; }).join("") +
       "</div>" +
+      '<button type="button" data-profil>' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') + "<span>Mój profil</span></button>" +
       '<button type="button" data-zglos>' + svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
       "<span>Zgłoś błąd albo uwagę</span></button>" +
       '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
@@ -218,6 +219,7 @@
     sz.addEventListener("click", function (e) { if (e.target.closest("a")) zamknij(true); });
     el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
     el.querySelector("[data-zglos]").addEventListener("click", function () { zamknij(); zglos(); });
+    el.querySelector("[data-profil]").addEventListener("click", function () { zamknij(); profil(); });
     el.querySelector("[data-agent]").addEventListener("click", function () { ustawWidokAgenta(!widokAgenta()); });
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
@@ -492,6 +494,51 @@
     "#pp-zgl .mz{padding:9px 0;border-bottom:1px solid var(--l);font-size:13.5px}#pp-zgl .mz:last-child{border:0}" +
     "#pp-zgl .mz small{display:block;color:var(--m)}#pp-zgl .sz{font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;background:rgba(201,160,60,.16);color:var(--zd);margin-left:6px}";
 
+  // --- Mój profil (1.11, decyzja użytkownika): każdy wpisuje link do SWOJEGO profilu agenta na Otodomie – Transakcje pokazują
+  // z niego ogłoszenia do podpięcia przy transakcji („Nasze ogłoszenia”). Zapis: Kartoteka PUT /administracja/api/ja/profil.
+  var PROF_CSS = "#pp-prof{position:fixed;inset:0;z-index:2147483001;background:rgba(15,14,12,.55);display:grid;place-items:center;padding:16px;" +
+    "--k:#fff;--t:#1f1d1a;--m:#6b665d;--l:#e2ddd2;--z:#c9a03c;font:15px/1.45 Lato,system-ui,sans-serif}" +
+    "html[data-theme=dark] #pp-prof{--k:#212326;--t:#e8e5de;--m:#a39e94;--l:#33363a}" +
+    "#pp-prof *{box-sizing:border-box}#pp-prof .pk{background:var(--k);color:var(--t);width:min(520px,100%);border-radius:18px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
+    "#pp-prof h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-prof p{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
+    "#pp-prof label{display:block;font-size:12.5px;font-weight:700;color:var(--m)}" +
+    "#pp-prof input{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:0 12px;font:inherit;outline:none}" +
+    "#pp-prof input:focus{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
+    "#pp-prof .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
+    "#pp-prof .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-prof .st{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}" +
+    "#pp-prof .bl{color:#b3261e;font-size:13px;margin-top:8px}";
+  function profil() {
+    if (document.getElementById("pp-prof")) return;
+    if (!document.getElementById("pp-prof-styl")) {
+      var st = document.createElement("style"); st.id = "pp-prof-styl"; st.textContent = PROF_CSS; document.head.appendChild(st);
+    }
+    var o = document.createElement("div"); o.id = "pp-prof";
+    o.innerHTML = '<div class="pk" role="dialog" aria-modal="true" aria-labelledby="pp-prof-t"><h2 id="pp-prof-t">Mój profil</h2>' +
+      "<p>Link do Twojego profilu agenta na Otodomie – Twoje ogłoszenia pokażą się przy transakcjach do podpięcia jednym kliknięciem.</p>" +
+      '<label>Profil na Otodomie<input id="pp-prof-o" inputmode="url" placeholder="https://www.otodom.pl/pl/profil/agenci-nieruchomosci/…"></label>' +
+      '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div></div>';
+    document.body.appendChild(o);
+    var inp = o.querySelector("#pp-prof-o"), bl = o.querySelector(".bl");
+    konto().then(function (k) { if (k && k.profil && k.profil.otodom && !inp.value) inp.value = k.profil.otodom; });
+    function zamk() { o.remove(); document.removeEventListener("keydown", esc_); }
+    function esc_(e) { if (e.key === "Escape") zamk(); }
+    document.addEventListener("keydown", esc_);
+    o.addEventListener("click", function (e) { if (e.target === o || e.target.closest("[data-x]")) zamk(); });
+    o.querySelector("[data-z]").addEventListener("click", function () {
+      bl.hidden = true;
+      fetch("/administracja/api/ja/profil", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otodom: inp.value.trim() }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Nie udało się zapisać."); return j; }); })
+        .then(function (k) {
+          try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {}
+          kontoP = Promise.resolve(k); zamk();
+          window.dispatchEvent(new CustomEvent("pracawre-profil", { detail: k }));
+        })
+        .catch(function (e) { bl.textContent = e.message; bl.hidden = false; });
+    });
+    setTimeout(function () { inp.focus(); }, 0);
+  }
+
   function zglos() {
     if (document.getElementById("pp-zgl")) return;
     if (!document.getElementById("pp-zgl-styl")) {
@@ -595,7 +642,7 @@
     });
   }
 
-  window.PracawrePasek = { liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { liczby: liczby, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
