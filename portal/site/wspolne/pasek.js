@@ -703,7 +703,20 @@
     "@media (max-width:640px){#dzwonPrz{padding:6px;gap:0}#dzwonPrz .tx{display:none}}" +
     "@media (prefers-reduced-motion:reduce){#dzwonPrz .lew img,#dzwonPrz .lew::before,#dzwonPrz .lew::after{animation:none}}" +
     "@media print{#dzwonPrz{display:none}}html.pw-dzwonie #dzwonPrz{display:none}";
+  // 1.11 (decyzja użytkownika): „Zacznij dzwonić” TYLKO u agentów (rola agent); administrator widzi go w „Widoku agenta”,
+  // dyrektor i zarządzanie – nie
+  var dzOpcje = null;
   function przyciskDzwonienia(opcje) {
+    if (!dzOpcje) window.addEventListener("pracawre-widok-agenta", function () { przyciskDzwonienia(dzOpcje); });
+    dzOpcje = opcje || {};
+    konto().then(function (k) {
+      if (!k) return;
+      var agent = k.rola === "agent" || (k.admin && widokAgenta());
+      if (agent) przyciskDzwonieniaPokaz(opcje);
+      else { var b = document.getElementById("dzwonPrz"); if (b) b.remove(); }
+    });
+  }
+  function przyciskDzwonieniaPokaz(opcje) {
     opcje = opcje || {};
     var b = document.getElementById("dzwonPrz");
     if (!b) {
