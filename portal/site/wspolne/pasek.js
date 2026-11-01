@@ -142,7 +142,37 @@
     ".pw-app-link svg,.pw-app-btn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
     ".pw-app-link:focus-visible,.pw-app-btn:focus-visible{outline:2px solid #c9a03c;outline-offset:2px}" +
     "@media (max-width:1250px){.pw-app-link svg,.pw-app-btn:not(.pri):not(.ikona) svg{display:none}.pw-app-link,.pw-app-btn{padding:0 11px}.pw-app-btn.ikona{padding:0}}" +
-    "@media (max-width:900px){.pw-app{overflow-x:auto}.pw-app-tytul{display:none}}";
+    "@media (max-width:900px){.pw-app{overflow-x:auto}.pw-app-tytul{display:none}}" +
+    // edycja tekstu w całej witrynie (1.11, decyzja użytkownika – wzór „Edit message”): ramka edycji .pw-ed z pigułkami
+    // „✕ Anuluj” / „✓ Zapisz” (.pw-ed-p, data-pw-anuluj / data-pw-zapisz – Esc i Ctrl+Enter), dymek z tekstem .pw-dym
+    // (.pw-dym-b treść, .pw-dym-a ikonki Kopiuj / Edytuj pod spodem po najechaniu). Kolory ze zmiennych aplikacji (z zapasem).
+    ".pw-ed{box-sizing:border-box;border-radius:16px;background:var(--card2,#faf8f4);border:1px solid var(--line2,#ece8df);padding:12px 14px;" +
+    "transform-origin:top right;animation:pwEdIn .2s cubic-bezier(.23,1,.32,1)}" +
+    ".pw-ed textarea{field-sizing:content;resize:none}" +
+    ".pw-ed textarea.pw-ed-tx{display:block;width:100%;box-sizing:border-box;min-height:72px;border:0;outline:0;background:transparent;font:inherit;" +
+    "font-size:14.5px;line-height:1.5;color:var(--ink,#1f1d1a);padding:2px}" +
+    ".pw-ed-t{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--line,#e2ddd2);background:transparent;font:inherit;font-weight:800;" +
+    "color:var(--ink,#1f1d1a);padding:4px 2px;margin-bottom:6px;outline:0}" +
+    ".pw-ed-p{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;flex-wrap:wrap}" +
+    ".pw-ed-p .pw-ed-skr{margin-right:auto;color:var(--faint,#9a958b);font-size:11.5px}" +
+    ".pw-ed-anul,.pw-ed-zap,.pw-ed-usun{all:unset;box-sizing:border-box;cursor:pointer;height:30px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13px;" +
+    "display:inline-flex;align-items:center;gap:5px;white-space:nowrap}" +
+    ".pw-ed-anul,.pw-ed-usun{color:var(--muted,#6b665d)}.pw-ed-anul:hover,.pw-ed-usun:hover{background:var(--hover,#f7f3e8)}.pw-ed-usun:hover{color:#c62828}" +
+    ".pw-ed-zap{color:#1a1a1a;background:linear-gradient(to bottom,color-mix(in srgb,var(--gold,#c9a03c) 70%,#fff),var(--gold,#c9a03c));" +
+    "box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(0,0,0,.18)}.pw-ed-zap:hover{filter:brightness(1.08)}" +
+    ".pw-ed-zap[disabled],.pw-ed-zap:disabled{opacity:.5;pointer-events:none}" +
+    ".pw-ed-anul:focus-visible,.pw-ed-zap:focus-visible,.pw-ed-usun:focus-visible{outline:2px solid var(--gold,#c9a03c);outline-offset:2px}" +
+    ".pw-dym{display:flex;flex-direction:column;align-items:flex-start;gap:2px}" +
+    ".pw-dym-b{max-width:100%;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:16px;padding:9px 13px;font-size:14.5px;line-height:1.5;" +
+    "background:linear-gradient(to bottom,color-mix(in srgb,var(--gold-bg,rgba(201,160,60,.13)) 70%,var(--card,#fff)),var(--gold-bg,rgba(201,160,60,.13)));" +
+    "color:var(--ink,#1f1d1a);animation:pwEdIn .2s cubic-bezier(.23,1,.32,1)}" +
+    ".pw-dym-b.pusty{background:none;padding:2px 0;color:var(--faint,#9a958b);font-style:italic;cursor:pointer}" +
+    ".pw-dym-a{display:flex;gap:2px;opacity:0;transition:opacity .15s}.pw-dym:hover .pw-dym-a,.pw-dym:focus-within .pw-dym-a{opacity:1}" +
+    "@media (hover:none){.pw-dym-a{opacity:1}}" +
+    ".pw-dym-a button{all:unset;cursor:pointer;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--muted,#6b665d);font-size:13px}" +
+    ".pw-dym-a button:hover{background:var(--hover,#f7f3e8);color:var(--ink,#1f1d1a)}.pw-dym-a button:focus-visible{outline:2px solid var(--gold,#c9a03c)}" +
+    "@keyframes pwEdIn{from{opacity:0;transform:scale(.98) translateY(3px)}to{opacity:1;transform:none}}" +
+    "@media (prefers-reduced-motion:reduce){.pw-ed,.pw-dym-b{animation:none}}";
 
   // grupy zakładek – te same na pulpicie (strona główna) i w pasku (decyzja użytkownika 25.10)
   var GRUPY = [{ id: "dokumenty", nazwa: "Dokumenty" }, { id: "sprzedaz", nazwa: "Sprzedaż" }, { id: "rynek", nazwa: "Rynek" }];
@@ -481,8 +511,8 @@
     "#pp-zgl .cz button[aria-pressed=true]{background:rgba(201,160,60,.16);border-color:var(--z);color:var(--zd)}" +
     "#pp-zgl .sg{display:inline-flex;background:var(--p);border:1px solid var(--l);border-radius:999px;padding:3px;gap:2px}" +
     "#pp-zgl .sg button{border:0;padding:6px 14px}#pp-zgl .sg button[aria-pressed=true]{background:var(--t);color:var(--k)}" +
-    "#pp-zgl textarea{width:100%;min-height:120px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:10px 12px;font:inherit;resize:vertical;outline:none}" +
-    "#pp-zgl textarea:focus{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
+    "#pp-zgl .pw-ed{background:var(--k);border-color:var(--l)}#pp-zgl .pw-ed:focus-within{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
+    "#pp-zgl textarea.pw-ed-tx{min-height:110px;color:var(--t)}" +
     "#pp-zgl .zr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}" +
     "#pp-zgl .zr img{max-height:70px;max-width:140px;border-radius:8px;border:1px solid var(--l)}" +
     "#pp-zgl .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 16px;white-space:nowrap;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
@@ -560,13 +590,14 @@
         dostepne.map(function (o) { return '<button type="button" data-o="' + o.id + '" aria-pressed="' + (stan.obszary.indexOf(o.id) >= 0) + '"' + (o.opis ? ' title="' + o.opis + '"' : "") + ">" + o.nazwa + "</button>"; }).join("") +
         '</div><div class="et">Rodzaj</div><div class="sg">' +
         RODZAJE_ZGL.map(function (r) { return '<button type="button" data-r="' + r[0] + '" aria-pressed="' + (stan.rodzaj === r[0]) + '">' + r[1] + "</button>"; }).join("") +
-        '</div><div class="et">Opis</div><textarea placeholder="Krok po kroku: co zostało zrobione, co się stało i co powinno się stać.">' + esc(opis) + "</textarea>" +
+        '</div><div class="et">Opis</div><div class="pw-ed"><textarea class="pw-ed-tx" aria-label="Opis" placeholder="Krok po kroku: co zostało zrobione, co się stało i co powinno się stać.">' + esc(opis) + "</textarea>" +
+        '<div class="pw-ed-p" style="margin-top:4px"><span class="pw-ed-skr">Ctrl+Enter – wyślij · Esc – zamknij</span></div></div>' +
         '<div class="et">Zrzut ekranu (opcjonalnie – możesz też wkleić Ctrl+V)</div><div class="zr">' +
         (stan.zrzut ? '<img alt="zrzut ekranu" src="' + stan.zrzut + '"><button type="button" class="b" data-bez>Usuń zrzut</button>'
           : '<label class="b">Dodaj obraz<input type="file" accept="image/png,image/jpeg,image/webp" hidden></label>') +
         '</div><div class="bl" hidden></div>' +
-        '<div class="st"><span class="in">Dołączymy adres tej strony i rodzaj przeglądarki.</span><button type="button" class="b" data-x>Anuluj</button>' +
-        '<button type="button" class="b p" data-wyslij>Wyślij zgłoszenie</button></div>' +
+        '<div class="st"><span class="in">Dołączymy adres tej strony i rodzaj przeglądarki.</span><button type="button" class="pw-ed-anul" data-x data-pw-anuluj>✕ Anuluj</button>' +
+        '<button type="button" class="pw-ed-zap" data-wyslij data-pw-zapisz>✓ Wyślij zgłoszenie</button></div>' +
         '<details><summary>Twoje zgłoszenia</summary><div class="mzl">Wczytywanie…</div></details></div>';
       var t2 = tlo.querySelector("textarea"); t2.focus(); t2.setSelectionRange(t2.value.length, t2.value.length);
       var plik = tlo.querySelector("input[type=file]");
@@ -723,6 +754,18 @@
     }).catch(function () {});
     return b;
   }
+
+  // Esc / Ctrl+Enter w ramce edycji .pw-ed – w każdej aplikacji tak samo (przed jej własnymi skrótami: Esc nie zamyka karty)
+  document.addEventListener("keydown", function (e) {
+    var ed = e.target && e.target.closest && e.target.closest(".pw-ed");
+    if (!ed || e.isComposing) return;
+    var sel = e.key === "Escape" ? "[data-pw-anuluj]" : e.key === "Enter" && (e.ctrlKey || e.metaKey) ? "[data-pw-zapisz]" : null;
+    if (!sel) return;
+    var okno = ed.closest("[role=dialog]");                     // ramka w oknie – przyciski w stopce okna
+    var cel = ed.querySelector(sel) || (okno && okno.querySelector(sel));
+    if (!cel) return;
+    e.preventDefault(); e.stopPropagation(); cel.click();
+  }, true);
 
   window.PracawrePasek = { liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
