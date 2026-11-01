@@ -786,5 +786,11 @@
   html.classList.toggle("pw-agent", widokAgenta());
   styl();
   zastosuj();
+  // 1.11 (decyzja użytkownika): karta przeglądarki na każdej stronie WRE = „WRE Nieruchomości” z lwem (bez Radaru działek –
+  // osobny projekt); strony mają to w <title> i <link rel=icon>, tu zapas dla stron bez ikonki
+  if (location.pathname.indexOf("/radar") !== 0 && !document.querySelector('link[rel~="icon"]')) {
+    var ik = document.createElement("link"); ik.rel = "icon"; ik.type = "image/png"; ik.href = "/wspolne/lew-wre.png";
+    document.head.appendChild(ik);
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sam); else sam();
 })();
