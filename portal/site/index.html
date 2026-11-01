@@ -233,7 +233,7 @@ function pulpitZimnych(p){
   // telefony z HubSpot od poniedziałku (nie tylko zapisane w Zimnych)
   document.getElementById('zimne').innerHTML = `<div class="wsk"><div><b>${t.zimne ?? t.skuteczne ?? 0}</b><span>zimne telefony (odebrane)</span></div>
       <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>
-    <a class="dalej" href="/leady/">Otwórz Zimne →</a>`;
+    <a class="dalej" href="/leady/#dzwonie" style="font-size:1rem">▶ Zacznij dzwonić</a>`;
 }
 
 PracawrePasek.konto().then(k => {
