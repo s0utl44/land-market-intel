@@ -711,8 +711,7 @@
     dzOpcje = opcje || {};
     konto().then(function (k) {
       if (!k) return;
-      // 2.11: także konto z zaznaczonym „Także agent nieruchomości” (np. administrator, który sam dzwoni)
-      var agent = k.rola === "agent" || k.agent || (k.admin && widokAgenta());
+      var agent = k.rola === "agent" || (k.admin && widokAgenta());
       if (agent) przyciskDzwonieniaPokaz(opcje);
       else { var b = document.getElementById("dzwonPrz"); if (b) b.remove(); }
     });
