@@ -97,6 +97,10 @@ a.dalejCo{text-decoration:none;font-weight:900}
   background:color-mix(in srgb,var(--ek) 16%,var(--karta));color:color-mix(in srgb,var(--ek) 75%,var(--tekst))}
 .etapy a::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ek)}
 .etapy a i{font-style:normal;font-weight:900}
+.cel{display:flex;flex-direction:column;gap:6px}.celN{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.celN span{color:var(--tekst-2,inherit);font-size:.92rem}.celN b{font-size:1.05rem;white-space:nowrap}.celN small{font-weight:600;opacity:.6}
+.celP{height:8px;border-radius:9px;background:var(--hover);overflow:hidden}.celP i{display:block;height:100%;background:var(--zloto);transition:width .6s}
+.celP.ok i{background:#2e9b57}
 .sprawy .dalej{font-size:.86rem;font-weight:700;color:var(--zloto-c);text-decoration:none;align-self:flex-start}
 .dwa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:28px}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
@@ -117,6 +121,7 @@ a.dalejCo{text-decoration:none;font-weight:900}
   </header>
   <section class="grupa" id="spotkaniaS" hidden><h2>Spotkania</h2><ul class="zadania" id="spotkania"></ul></section>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
+  <section class="grupa" id="celeS" hidden><h2 id="celeT">Moje cele</h2><div class="sprawy" id="cele"></div></section>
   <section class="grupa" id="sprawyS" hidden><h2>Moje transakcje</h2><div class="sprawy" id="sprawy"></div></section>
   <div class="dwa">
     <section class="grupa" id="zimneS" hidden><h2>Zimne w tym tygodniu</h2><div class="sprawy" id="zimne"></div></section>
@@ -234,6 +239,17 @@ function pulpitTransakcji(p){
   document.getElementById('faktury').innerHTML = (p.faktury || []).map(f => `<li class="zadanie"><span class="tx"><a class="tyt" href="${linkT(f.transakcja)}"><b>${esc(f.nazwa)}</b></a>
     <span class="gdzie"><span>${esc(f.etap || '')}</span></span></span><span class="kiedy">${f.kiedy ? esc(new Date(f.kiedy).toLocaleDateString('pl-PL', {day:'numeric', month:'short'})) : ''}</span></li>`).join('');
 }
+// 2.11 (decyzja użytkownika): cele miesiąca ustalone z dyrektorem (Odprawa → Cele agentów) – tylko moje, każdy z paskiem
+const MIES = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
+function pulpitCelow(p){
+  if (!p || !p.rodzaje || !p.rodzaje.length) return;
+  document.getElementById('celeS').hidden = false;
+  document.getElementById('celeT').textContent = 'Moje cele – ' + MIES[+p.miesiac.slice(5) - 1];
+  const ile = (v, j) => v == null ? '?' : j === 'zł' ? zl(v) : Math.round(v).toLocaleString('pl-PL');
+  document.getElementById('cele').innerHTML = p.rodzaje.map(r => { const c = p.cele[r.klucz], proc = c.zrobione == null ? 0 : Math.min(100, Math.round(c.zrobione / c.cel * 100));
+    return `<div class="cel"><div class="celN"><span>${esc(r.nazwa)}</span><b>${esc(ile(c.zrobione, r.jednostka))} <small>/ ${esc(ile(c.cel, r.jednostka))}</small></b></div>
+      <div class="celP${proc >= 100 ? ' ok' : ''}"><i style="width:${proc}%"></i></div></div>`; }).join('');
+}
 function pulpitZimnych(p){
   const t = p && p.tydzien; if (!t) return;
   document.getElementById('zimneS').hidden = false;
@@ -266,6 +282,7 @@ PracawrePasek.konto().then(k => {
   if (k && PracawrePasek.liczby) PracawrePasek.liczby(k, liczby);
   // zadania z HubSpot osobno – liczby nie czekają na HubSpot
   const ma = o => PracawrePasek.aplikacje(k).some(a => a.obszar === o);
+  if (ma('transakcje')) fetch('/transakcje/api/cele/moje', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitCelow).catch(() => {});
   if (ma('transakcje')) fetch('/transakcje/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitTransakcji).catch(() => {});
   if (ma('leady')) fetch('/leady/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitZimnych).catch(() => {});
   if (ma('leady') && PracawrePasek.przyciskDzwonienia) PracawrePasek.przyciskDzwonienia();   // 1.11: jedyne „Zacznij dzwonić” – pływający lew
