@@ -101,6 +101,10 @@ a.dalejCo{text-decoration:none;font-weight:900}
 .celN span{color:var(--tekst-2,inherit);font-size:.92rem}.celN b{font-size:1.05rem;white-space:nowrap}.celN small{font-weight:600;opacity:.6}
 .celP{height:8px;border-radius:9px;background:var(--hover);overflow:hidden}.celP i{display:block;height:100%;background:var(--zloto);transition:width .6s}
 .celP.ok i{background:#2e9b57}
+.pods .pzL{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.pods .pzL div{background:var(--tlo,rgba(0,0,0,.03));border-radius:10px;padding:8px 12px}
+.pods .pzL span{display:block;font-size:.75rem;opacity:.7}.pods .pzL b{font-size:1rem}
+.pods h3{margin:4px 0 2px;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--zloto-c)}
+.pods ul{margin:0;padding-left:18px}.pods li{margin:3px 0}.pods p{margin:0;white-space:pre-wrap}.pods .kiedyP{font-size:.8rem;opacity:.65}
 .sprawy .dalej{font-size:.86rem;font-weight:700;color:var(--zloto-c);text-decoration:none;align-self:flex-start}
 .dwa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:28px}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
@@ -121,6 +125,7 @@ a.dalejCo{text-decoration:none;font-weight:900}
   </header>
   <section class="grupa" id="spotkaniaS" hidden><h2>Spotkania</h2><ul class="zadania" id="spotkania"></ul></section>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
+  <section class="grupa" id="podsS" hidden><h2 id="podsT">Podsumowanie od dyrektora</h2><div class="sprawy pods" id="pods"></div></section>
   <section class="grupa" id="celeS" hidden><h2 id="celeT">Moje cele</h2><div class="sprawy" id="cele"></div></section>
   <section class="grupa" id="sprawyS" hidden><h2>Moje transakcje</h2><div class="sprawy" id="sprawy"></div></section>
   <div class="dwa">
@@ -250,6 +255,22 @@ function pulpitCelow(p){
     return `<div class="cel"><div class="celN"><span>${esc(r.nazwa)}</span><b>${esc(ile(c.zrobione, r.jednostka))} <small>/ ${esc(ile(c.cel, r.jednostka))}</small></b></div>
       <div class="celP${proc >= 100 ? ' ok' : ''}"><i style="width:${proc}%"></i></div></div>`; }).join('');
 }
+// 5.11 (etap 2 odprawy, decyzja użytkownika): podsumowanie odprawy od dyrektora – na pulpicie agenta (mail później)
+function pulpitPodsumowania(l){
+  const s = l && l[0]; if (!s) return;
+  const d = s.dane || {}, blok = (t, x) => x ? `<div><h3>${t}</h3>${x}</div>` : '';
+  const lista = (a, f) => a && a.length ? `<ul>${a.map(f).join('')}</ul>` : '';
+  document.getElementById('podsS').hidden = false;
+  document.getElementById('podsT').textContent = 'Podsumowanie od dyrektora – ' + (s.etykieta || s.okres);
+  document.getElementById('pods').innerHTML = !d.liczby ? `<p>${esc(d.tekst || '')}</p>` :
+    `<span class="kiedyP">${esc(new Date(s.kiedy).toLocaleDateString('pl-PL'))}</span>` +
+    blok('Wyniki', `<div class="pzL">${d.liczby.map(([n, v]) => `<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div>`) +
+    blok('Ustalenia', lista(d.ustalenia, ([n, t]) => `<li><b>${esc(n)}:</b> ${esc(t)}</li>`)) +
+    blok('Zadania (są w HubSpot)', lista(d.zadania, ([n, t]) => `<li><b>${esc(n)}</b> – ${esc(t)}</li>`)) +
+    blok('Do wyjaśnienia', lista(d.straty, ([n, t]) => `<li><b>${esc(n)}</b> – ${esc(t)}</li>`)) +
+    blok('Cele' + (d.celeMies ? ' – ' + d.celeMies : ''), lista(d.cele, ([n, v]) => `<li>${esc(n)}: <b>${esc(v)}</b></li>`)) +
+    blok('Dodatkowo', d.dodatkowo ? `<p>${esc(d.dodatkowo)}</p>` : '');
+}
 function pulpitZimnych(p){
   const t = p && p.tydzien; if (!t) return;
   document.getElementById('zimneS').hidden = false;
@@ -282,6 +303,7 @@ PracawrePasek.konto().then(k => {
   if (k && PracawrePasek.liczby) PracawrePasek.liczby(k, liczby);
   // zadania z HubSpot osobno – liczby nie czekają na HubSpot
   const ma = o => PracawrePasek.aplikacje(k).some(a => a.obszar === o);
+  if (ma('transakcje')) fetch('/transakcje/api/podsumowania/moje', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitPodsumowania).catch(() => {});
   if (ma('transakcje')) fetch('/transakcje/api/cele/moje', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitCelow).catch(() => {});
   if (ma('transakcje')) fetch('/transakcje/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitTransakcji).catch(() => {});
   if (ma('leady')) fetch('/leady/api/pulpit', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(pulpitZimnych).catch(() => {});
