@@ -529,7 +529,11 @@
   var PROF_CSS = "#pp-prof{position:fixed;inset:0;z-index:2147483001;background:rgba(15,14,12,.55);display:grid;place-items:center;padding:16px;" +
     "--k:#fff;--t:#1f1d1a;--m:#6b665d;--l:#e2ddd2;--z:#c9a03c;font:15px/1.45 Lato,system-ui,sans-serif}" +
     "html[data-theme=dark] #pp-prof{--k:#212326;--t:#e8e5de;--m:#a39e94;--l:#33363a}" +
-    "#pp-prof *{box-sizing:border-box}#pp-prof .pk{background:var(--k);color:var(--t);width:min(520px,100%);border-radius:18px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
+    "#pp-prof *{box-sizing:border-box}#pp-prof .pk{background:var(--k);color:var(--t);width:min(620px,100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:18px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
+    "#pp-prof .ph{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .ph h3{margin:0 0 8px;font-size:15px;font-weight:900}" +
+    "#pp-prof details{border:1px solid var(--l);border-radius:12px;padding:8px 12px;margin-bottom:8px}#pp-prof summary{cursor:pointer;font-weight:700}" +
+    "#pp-prof summary small{color:var(--m);font-weight:400}#pp-prof .pt h4{margin:10px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--z)}" +
+    "#pp-prof .pt ul{margin:0;padding-left:18px;font-size:13.5px}#pp-prof .pt li{margin:2px 0}#pp-prof .pt p{margin:0;color:var(--t);white-space:pre-wrap}" +
     "#pp-prof h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-prof p{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
     "#pp-prof label{display:block;font-size:12.5px;font-weight:700;color:var(--m)}" +
     "#pp-prof input{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:0 12px;font:inherit;outline:none}" +
@@ -537,6 +541,20 @@
     "#pp-prof .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
     "#pp-prof .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-prof .st{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}" +
     "#pp-prof .bl{color:#b3261e;font-size:13px;margin-top:8px}";
+  function escHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  // podsumowanie odprawy (struktura z Odprawy) – pulpit i „Mój profil”
+  function podsumowanieHtml(d) {
+    if (!d.liczby) return "<p>" + escHtml(d.tekst || "") + "</p>";
+    function blok(t, x) { return x ? "<h4>" + t + "</h4>" + x : ""; }
+    function lista(a, f) { return a && a.length ? "<ul>" + a.map(f).join("") + "</ul>" : ""; }
+    var para = function (p) { return "<li><b>" + escHtml(p[0]) + "</b> – " + escHtml(p[1]) + "</li>"; };
+    return blok("Wyniki", lista(d.liczby, function (p) { return "<li>" + escHtml(p[0]) + ": <b>" + escHtml(p[1]) + "</b></li>"; })) +
+      blok("Ustalenia", lista(d.ustalenia, para)) + blok("Zadania (są w HubSpot)", lista(d.zadania, para)) +
+      blok("Stracone transakcje", lista(d.straty, para)) +
+      blok("Cele" + (d.celeMies ? " – " + escHtml(d.celeMies) : ""), lista(d.cele, function (p) { return "<li>" + escHtml(p[0]) + ": <b>" + escHtml(p[1]) + "</b></li>"; })) +
+      blok("Dodatkowo", d.dodatkowo ? "<p>" + escHtml(d.dodatkowo) + "</p>" : "");
+  }
+
   function profil() {
     if (document.getElementById("pp-prof")) return;
     if (!document.getElementById("pp-prof-styl")) {
@@ -546,8 +564,19 @@
     o.innerHTML = '<div class="pk" role="dialog" aria-modal="true" aria-labelledby="pp-prof-t"><h2 id="pp-prof-t">Mój profil</h2>' +
       "<p>Link do Twojego profilu agenta na Otodomie – Twoje ogłoszenia pokażą się przy transakcjach do podpięcia jednym kliknięciem.</p>" +
       '<label>Profil na Otodomie<input id="pp-prof-o" inputmode="url" placeholder="https://www.otodom.pl/pl/profil/agenci-nieruchomosci/…"></label>' +
-      '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div></div>';
+      '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div>' +
+      '<div class="ph" hidden><h3>Podsumowania od dyrektora</h3><div class="pl"></div></div></div>';
     document.body.appendChild(o);
+    // 5.11 (decyzja użytkownika): historia podsumowań odpraw – także schowanych z pulpitu
+    fetch("/transakcje/api/podsumowania/moje?wszystkie=1", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (l) {
+        if (!l || !l.length) return;
+        var h = o.querySelector(".ph"); h.hidden = false;
+        h.querySelector(".pl").innerHTML = l.map(function (s, i) {
+          return "<details" + (i ? "" : " open") + "><summary>" + escHtml(s.etykieta || s.okres) + " <small>" + escHtml(new Date(s.kiedy).toLocaleDateString("pl-PL")) +
+            "</small></summary><div class=\"pt\">" + podsumowanieHtml(s.dane || {}) + "</div></details>";
+        }).join("");
+      }).catch(function () {});
     var inp = o.querySelector("#pp-prof-o"), bl = o.querySelector(".bl");
     konto().then(function (k) { if (k && k.profil && k.profil.otodom && !inp.value) inp.value = k.profil.otodom; });
     function zamk() { o.remove(); document.removeEventListener("keydown", esc_); }

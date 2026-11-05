@@ -105,6 +105,8 @@ a.dalejCo{text-decoration:none;font-weight:900}
 .pods .pzL span{display:block;font-size:.75rem;opacity:.7}.pods .pzL b{font-size:1rem}
 .pods h3{margin:4px 0 2px;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--zloto-c)}
 .pods ul{margin:0;padding-left:18px}.pods li{margin:3px 0}.pods p{margin:0;white-space:pre-wrap}.pods .kiedyP{font-size:.8rem;opacity:.65}
+.podsP{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}.podsP small{opacity:.65}
+.podsB{all:unset;cursor:pointer;padding:8px 16px;border-radius:999px;border:1px solid var(--linia);font-weight:700;font-size:.85rem}.podsB:hover{border-color:var(--zloto-c)}
 .sprawy .dalej{font-size:.86rem;font-weight:700;color:var(--zloto-c);text-decoration:none;align-self:flex-start}
 .dwa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:28px}
 .pusto{padding:28px;border:1px dashed var(--linia);border-radius:14px;color:var(--szary);text-align:center}
@@ -125,7 +127,8 @@ a.dalejCo{text-decoration:none;font-weight:900}
   </header>
   <section class="grupa" id="spotkaniaS" hidden><h2>Spotkania</h2><ul class="zadania" id="spotkania"></ul></section>
   <section class="grupa" id="naDzis" hidden><h2>Moje zadania <span id="zadaniaN"></span></h2><ul class="zadania" id="zadania"></ul><p class="zadania-info" id="zadaniaInfo" hidden></p></section>
-  <section class="grupa" id="podsS" hidden><h2 id="podsT">Podsumowanie od dyrektora</h2><div class="sprawy pods" id="pods"></div></section>
+  <section class="grupa" id="podsS" hidden><h2 id="podsT">Podsumowanie od dyrektora</h2><div class="sprawy pods" id="pods"></div>
+    <div class="podsP"><button type="button" class="podsB" id="podsSchowaj">Przeczytane – schowaj do profilu</button><small>Historia: menu konta → Mój profil</small></div></section>
   <section class="grupa" id="celeS" hidden><h2 id="celeT">Moje cele</h2><div class="sprawy" id="cele"></div></section>
   <section class="grupa" id="sprawyS" hidden><h2>Moje transakcje</h2><div class="sprawy" id="sprawy"></div></section>
   <div class="dwa">
@@ -259,6 +262,11 @@ function pulpitCelow(p){
 function pulpitPodsumowania(l){
   const s = l && l[0]; if (!s) return;
   const d = s.dane || {}, blok = (t, x) => x ? `<div><h3>${t}</h3>${x}</div>` : '';
+  document.getElementById('podsSchowaj').onclick = async e => {
+    e.target.disabled = true;
+    const r = await fetch('/transakcje/api/podsumowania/moje/' + encodeURIComponent(s.okres) + '/schowaj', {method: 'POST', credentials: 'same-origin'}).catch(() => null);
+    if (r && r.ok) document.getElementById('podsS').hidden = true; else e.target.disabled = false;
+  };
   const lista = (a, f) => a && a.length ? `<ul>${a.map(f).join('')}</ul>` : '';
   document.getElementById('podsS').hidden = false;
   document.getElementById('podsT').textContent = 'Podsumowanie od dyrektora – ' + (s.etykieta || s.okres);
@@ -267,7 +275,7 @@ function pulpitPodsumowania(l){
     blok('Wyniki', `<div class="pzL">${d.liczby.map(([n, v]) => `<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}</div>`) +
     blok('Ustalenia', lista(d.ustalenia, ([n, t]) => `<li><b>${esc(n)}:</b> ${esc(t)}</li>`)) +
     blok('Zadania (są w HubSpot)', lista(d.zadania, ([n, t]) => `<li><b>${esc(n)}</b> – ${esc(t)}</li>`)) +
-    blok('Do wyjaśnienia', lista(d.straty, ([n, t]) => `<li><b>${esc(n)}</b> – ${esc(t)}</li>`)) +
+    blok('Stracone transakcje', lista(d.straty, ([n, t]) => `<li><b>${esc(n)}</b> – ${esc(t)}</li>`)) +
     blok('Cele' + (d.celeMies ? ' – ' + d.celeMies : ''), lista(d.cele, ([n, v]) => `<li>${esc(n)}: <b>${esc(v)}</b></li>`)) +
     blok('Dodatkowo', d.dodatkowo ? `<p>${esc(d.dodatkowo)}</p>` : '');
 }
