@@ -248,3 +248,8 @@ Hermes może co rano sprawdzać `systemctl is-failed lmi-daily` i dać znać, gd
 ```bash
 cd /opt/lmi && git pull && docker compose build app web && docker compose up -d web
 ```
+
+## Zimne – działki (5.11)
+Po porannym przebiegu (`lmi-daily`, `lmi-daily-retry`) `ExecStartPost` zapisuje prywatne aktywne działki z województwa do
+`/opt/leady-dane/dzialki-radar.json` (`lmi zimne-dzialki`, src/lmi/zimne.py – bez danych osobowych). Zimne (Leady) wczytują plik same.
+Po zmianie plików usług: `cp deploy/lmi-daily*.service /etc/systemd/system/ && systemctl daemon-reload`.

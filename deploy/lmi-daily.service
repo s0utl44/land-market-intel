@@ -8,5 +8,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/opt/lmi
 ExecStart=/usr/bin/docker compose run --rm -T app daily
+# 5.11: prywatne działki do Zimnych (plik w katalogu danych Leadów; błąd eksportu nie psuje przebiegu – „-”)
+ExecStartPost=-/usr/bin/docker compose run --rm -T -v /opt/leady-dane:/eksport app zimne-dzialki --plik /eksport/dzialki-radar.json
 # pierwsze pełne pobranie trwa kilka godzin
 TimeoutStartSec=12h

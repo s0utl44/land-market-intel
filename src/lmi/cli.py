@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("check-adresowo", help="szybki test scrapera Adresowo bez bazy")
     s.add_argument("--region", default="dolnoslaskie")
 
+    s = sub.add_parser("zimne-dzialki", help="eksport prywatnych działek do Zimnych (plik JSON w katalogu danych Leadów)")
+    s.add_argument("--plik", default="/eksport/dzialki-radar.json")
     s = sub.add_parser("demo", help="pełny pipeline na danych syntetycznych")
     s.add_argument("--out-dir", default="data/synthetic")
     s.add_argument("--regions", type=int, default=0, help="liczba losowych gmin zamiast 3 domyślnych")
@@ -101,6 +103,12 @@ def main(argv: list[str] | None = None) -> int:
         for e in r.errors[:50]:
             print("  " + e)
         return 0 if r.ok else 1
+
+    if args.cmd == "zimne-dzialki":
+        from .zimne import eksport
+
+        print(f"Prywatnych działek: {eksport(args.plik)}")
+        return 0
 
     if args.cmd == "check-gratka":
         from .scrapers import gratka

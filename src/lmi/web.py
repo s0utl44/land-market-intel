@@ -555,16 +555,7 @@ def municipality_offers(
         where.append("age_days >= %(min_age)s")
         params["min_age"] = min_age_days
     if seller:
-        # jak merge_features: właściciel potwierdzony przez Adresowo/Gratkę albo "prywatny" bez biura na innym portalu
-        has = ("(features_raw @> jsonb_build_array(jsonb_build_object('seller', {v}::text)) "
-               "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', {v}::text)))")
-        agency = f"({has.format(v=chr(39) + 'biuro' + chr(39))} OR {has.format(v=chr(39) + 'deweloper' + chr(39))})"
-        owner = " OR ".join(f"features_raw @> jsonb_build_array(jsonb_build_object('src', '{src}', 'seller', 'prywatny'))"
-                            for src in OWNER_CONFIRMED)
-        if seller == "prywatny":
-            where.append(f"(({owner}) OR ({has.format(v='%(seller)s')} AND NOT {agency}))")
-        else:
-            where.append(f"({has.format(v='%(seller)s')} AND NOT ({owner}))")
+        where.append(seller_where(seller))
         params["seller"] = seller
     for i, m in enumerate((media or "").split("+") if media else []):
         where.append(f"features_raw @> jsonb_build_array(jsonb_build_object('media', jsonb_build_array(%(m{i})s::text)))")
@@ -727,6 +718,19 @@ def _offers(scope: str, where: list[str], params: dict, sort: str) -> list[dict]
     for r in rows:
         r["features"] = merge_features(r.pop("features_raw") or [])
     return rows
+
+
+def seller_where(seller: str) -> str:
+    """warunek SQL na sprzedającego (parametr %(seller)s) – jak merge_features: właściciel potwierdzony przez Adresowo/Gratkę
+    albo "prywatny" bez biura na innym portalu. Używa też eksport do Zimnych (zimne.py)."""
+    has = ("(features_raw @> jsonb_build_array(jsonb_build_object('seller', {v}::text)) "
+           "OR features_raw @> jsonb_build_array(jsonb_build_object('list_seller', {v}::text)))")
+    agency = f"({has.format(v=chr(39) + 'biuro' + chr(39))} OR {has.format(v=chr(39) + 'deweloper' + chr(39))})"
+    owner = " OR ".join(f"features_raw @> jsonb_build_array(jsonb_build_object('src', '{src}', 'seller', 'prywatny'))"
+                        for src in OWNER_CONFIRMED)
+    if seller == "prywatny":
+        return f"(({owner}) OR ({has.format(v='%(seller)s')} AND NOT {agency}))"
+    return f"({has.format(v='%(seller)s')} AND NOT ({owner}))"
 
 
 # portale, na których "prywatny" to jawne oznaczenie właściciela (Adresowo: "Oferta bezpośrednio od właściciela",
