@@ -86,7 +86,6 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;backg
 .zadanie.co .kiedy{color:var(--zloto-c)}
 .odb{display:flex;gap:6px;align-items:center;flex:none}.odb .b{all:unset;cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid var(--linia);font-weight:900;font-size:.82rem}
 .odb .b:hover{background:var(--zloto);color:#1f1d1a;border-color:var(--zloto)}.odb .b[disabled]{opacity:.4;pointer-events:none}
-a.dalejCo{text-decoration:none;font-weight:900}
 .sprawy{background:var(--karta);border:1px solid var(--linia);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;
   box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.05)}
 .wsk{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
@@ -235,8 +234,8 @@ function pulpitTransakcji(p){
   document.getElementById('spotkaniaS').hidden = !sp.length;
   document.getElementById('spotkania').innerHTML = sp.map(x => `<li class="zadanie${x.co ? ' co' : ''}"><span class="ik" aria-hidden="true"><svg viewBox="0 0 24 24">${IK_SPOTK}</svg></span>
     <span class="tx"><a class="tyt" href="${linkT(x.transakcja)}"><b>${esc(x.tytul || 'Spotkanie')}</b></a><span class="gdzie"><a href="${linkT(x.transakcja)}">${esc(x.nazwa)}</a></span></span>
-    ${x.co && !x.co_wyszlo ? `<span class="odb"><span class="kiedy">odbyło się?</span><button class="b" data-sp="${esc(x.id)}" data-odb="tak">Tak</button><button class="b" data-sp="${esc(x.id)}" data-odb="nie">Nie</button></span>`
-      : x.co_wyszlo ? `<a class="kiedy dalejCo" href="${linkT(x.transakcja)}">co wyszło? →</a>` : `<span class="kiedy">${esc(kiedy(x.start))}</span>`}</li>`).join('');
+    ${x.co ? `<span class="odb"><span class="kiedy">odbyło się?</span><button class="b" data-sp="${esc(x.id)}" data-odb="tak">Tak</button><button class="b" data-sp="${esc(x.id)}" data-odb="nie">Nie</button></span>`
+      : `<span class="kiedy">${esc(kiedy(x.start))}</span>`}</li>`).join('');
   document.getElementById('sprawyS').hidden = !p.otwarte && !p.sukces.n;
   document.getElementById('sprawy').innerHTML = `<div class="wsk"><div><b>${p.otwarte}</b><span>otwarte transakcje</span></div>
       <div><b>${esc(zl(p.w_toku))}</b><span>wynagrodzenie w toku (netto)</span></div>
@@ -288,7 +287,7 @@ function pulpitZimnych(p){
       <div><b>${t.spotkania}</b><span>umówione spotkania</span></div></div>`;
 }
 
-// 1.11: „odbyło się?” wprost z pulpitu → Transakcje (Tak = odbyte, potem „co wyszło?” w transakcji; Nie = odwołane)
+// 1.11: „odbyło się?” wprost z pulpitu → Transakcje (Tak = odbyte, Nie = odwołane; 5.11: bez „co wyszło?”)
 let OST_PULPIT = null;
 document.getElementById('spotkania').addEventListener('click', async e => {
   const b = e.target.closest('[data-odb]'); if (!b) return;
