@@ -740,7 +740,7 @@
     dzOpcje = opcje || {};
     konto().then(function (k) {
       if (!k) return;
-      var agent = k.rola === "agent" || (k.admin && widokAgenta());
+      var agent = k.rola === "agent" || k.rola === "administracja" || (k.admin && widokAgenta());   // 6.11: administracja dzwoni do leadów z marketingu
       if (agent) przyciskDzwonieniaPokaz(opcje);
       else { var b = document.getElementById("dzwonPrz"); if (b) b.remove(); }
     });
