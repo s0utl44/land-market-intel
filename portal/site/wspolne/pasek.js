@@ -461,7 +461,7 @@
     for (var k in parametry || {}) q += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(parametry[k]);
     var tlo = document.createElement("div");
     tlo.id = "pracawre-kartoteka";
-    tlo.innerHTML = '<iframe title="Kartoteka" src="/kartoteka/?' + q + '"></iframe>';
+    tlo.innerHTML = '<iframe title="Kontakty" src="/kartoteka/?' + q + '"></iframe>';
     var poprzedni = document.activeElement, przewijanie = document.documentElement.style.overflow;
     function zamknij() {
       tlo.remove(); window.removeEventListener("message", wiad); document.removeEventListener("keydown", klaw);
@@ -487,7 +487,7 @@
     { id: "ogolne", nazwa: "Ogólne", opis: "strona główna, logowanie, pasek" },
     { id: "umowy", nazwa: "Generator umów", sciezka: "/umowy" },
     { id: "protokoly", nazwa: "Zarządzanie", sciezka: "/protokoly" },
-    { id: "kartoteka", nazwa: "Kartoteka", sciezka: "/kartoteka" },
+    { id: "kartoteka", nazwa: "Kontakty", sciezka: "/kartoteka" },
     { id: "radar", nazwa: "Radar działek", sciezka: "/radar" },
     { id: "leady", nazwa: "Zimne", sciezka: "/leady" },
     { id: "transakcje", nazwa: "Transakcje", sciezka: "/transakcje" },
