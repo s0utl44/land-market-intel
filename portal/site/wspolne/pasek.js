@@ -316,6 +316,7 @@
   function widoczny(a, k) {
     var p = (k.obszary || {})[a.obszar];
     if (a.tylkoAdmin && k.admin && widokAgenta()) return false;   // widok agenta: bez zakładek tylko dla administratorów
+    if (a.obszar === "leady" && k.zimne && !k.zimne.length && !k.admin) return false;   // 7.11: dyrektor – dane tak, zimne nie
     return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
   }
   function naStronie(a) { return location.pathname.indexOf(a.href) === 0 || location.pathname + "/" === a.href; }
