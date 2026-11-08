@@ -559,6 +559,39 @@
       blok("Dodatkowo", d.dodatkowo ? "<p>" + escHtml(d.dodatkowo) + "</p>" : "");
   }
 
+  // 8.11 (decyzja użytkownika: „datę ustawiać scrollem, żeby przyspieszyć”): w CAŁEJ witrynie kółko myszy nad polem daty / godziny
+  // zmienia wartość – dzień ±1 (Shift ±7), godzina ±15 min albo krok pola (Shift ±1 godz.); kółko w górę = później. Wyłączenie: data-bez-kolka.
+  var kolkoSuma = 0;
+  function dwa(n) { return (n < 10 ? "0" : "") + n; }
+  function dzienTxt(d) { return d.getFullYear() + "-" + dwa(d.getMonth() + 1) + "-" + dwa(d.getDate()); }
+  document.addEventListener("wheel", function (e) {
+    var el = e.target, t = el && el.tagName === "INPUT" ? el.type : "";
+    if ((t !== "date" && t !== "time" && t !== "datetime-local") || el.disabled || el.readOnly || el.hasAttribute("data-bez-kolka")) return;
+    e.preventDefault();
+    kolkoSuma += e.deltaY;
+    if (Math.abs(kolkoSuma) < 40) return;                      // gładzik: drobne ruchy sumujemy, mysz: jeden ząbek = jeden krok
+    var kier = kolkoSuma < 0 ? 1 : -1; kolkoSuma = 0;
+    var krokMin = Math.max(1, Math.round((+el.step || 900) / 60)), teraz = new Date();
+    if (t === "date") {
+      var p = (el.value || dzienTxt(teraz)).split("-"), d = new Date(+p[0], +p[1] - 1, +p[2]);
+      d.setDate(d.getDate() + kier * (e.shiftKey ? 7 : 1)); el.value = dzienTxt(d);
+    } else if (t === "time") {
+      var g = (el.value || dwa(teraz.getHours()) + ":00").split(":"), m = +g[0] * 60 + +g[1], k = e.shiftKey ? 60 : krokMin;
+      m = Math.min(24 * 60 - k, Math.max(0, Math.round(m / k) * k + kier * k)); el.value = dwa(Math.floor(m / 60)) + ":" + dwa(m % 60);
+    } else {
+      var v = el.value || dzienTxt(teraz) + "T" + dwa(teraz.getHours()) + ":00", dt = new Date(v.slice(0, 16));
+      if (isNaN(dt)) return;
+      dt.setMinutes(Math.round(dt.getMinutes() / 15) * 15 + kier * (e.shiftKey ? 24 * 60 : 15));
+      el.value = dzienTxt(dt) + "T" + dwa(dt.getHours()) + ":" + dwa(dt.getMinutes());
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, { passive: false });
+  document.addEventListener("mouseover", function (e) {             // podpowiedź przy pierwszym najechaniu
+    var el = e.target, t = el && el.tagName === "INPUT" ? el.type : "";
+    if ((t === "date" || t === "time" || t === "datetime-local") && !el.title && !el.hasAttribute("data-bez-kolka"))
+      el.title = t === "date" ? "Kółko myszy: ±1 dzień (Shift: ±1 tydzień)" : "Kółko myszy: ±15 min (Shift: " + (t === "time" ? "±1 godz.)" : "±1 dzień)");
+  });
+
   // 7.11: Google agenta – każda aplikacja woła przez pasek (zawsze konto zalogowanej osoby; Kontakty /administracja/api/google)
   var googleP = null;
   function jsonLubBlad(r) {
