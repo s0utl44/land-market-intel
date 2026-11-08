@@ -277,7 +277,10 @@
     setTimeout(function () { if (otwarta !== el) { sz.hidden = true; tlo.hidden = true; } }, odRazu ? 0 : 230);
     if (!odRazu && przedKarta && przedKarta.focus) przedKarta.focus({ preventScroll: true });
   }
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && otwarta) zamknij(); });
+  // 8.11 (decyzja użytkownika: Escape zamyka TYLKO to, co jest na wierzchu): okienka paska łapią Escape pierwsze (faza przechwytywania
+  // na window) i zatrzymują go – karta transakcji / leada pod spodem zostaje. Aplikacje sprawdzają e.defaultPrevented.
+  function tylkoTo(e, fn) { if (e.key !== "Escape" || e.defaultPrevented) return false; e.preventDefault(); e.stopPropagation(); fn(); return true; }
+  window.addEventListener("keydown", function (e) { if (otwarta) tylkoTo(e, zamknij); }, true);
 
   // Liczby „do zrobienia” z aplikacji – w karcie przy narzędziach i na pulpicie (ta sama funkcja). naKazde(obszar, [[n, tekst, ważne]]).
   // Błąd albo brak odpowiedzi aplikacji = bez liczb. Wyniki w pamięci na minutę (karta otwierana wiele razy).
@@ -409,6 +412,11 @@
     if (!document.getElementById("pp-sp-styl")) { var st = document.createElement("style"); st.id = "pp-sp-styl"; st.textContent = CSS_SP; document.head.appendChild(st); }
     var wyb = {};
     var t = document.createElement("div"); t.id = "pp-sp";
+    // 8.11: okno „Czy spotkania się odbyły?” nie zamyka się Escape'em (najpierw odpowiedź), ale nie przepuszcza go do karty pod spodem
+    window.addEventListener("keydown", function blokuj(e) {
+      if (!document.body.contains(t)) return window.removeEventListener("keydown", blokuj, true);
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); }
+    }, true);
     var kiedy = function (v) { var d = new Date(v); return isNaN(d) ? "" : d.toLocaleString("pl-PL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); };
     t.innerHTML = '<div class="spO" role="dialog" aria-modal="true" aria-labelledby="pp-sp-t"><h2 id="pp-sp-t">Czy spotkania się odbyły?</h2>' +
       '<p class="op">Zaznacz przy każdym spotkaniu Tak albo Nie – to zajmie chwilę, a potem przejdziesz do swoich spraw.</p>' +
@@ -465,7 +473,7 @@
     tlo.innerHTML = '<iframe title="Kontakty" src="/kartoteka/?' + q + '"></iframe>';
     var poprzedni = document.activeElement, przewijanie = document.documentElement.style.overflow;
     function zamknij() {
-      tlo.remove(); window.removeEventListener("message", wiad); document.removeEventListener("keydown", klaw);
+      tlo.remove(); window.removeEventListener("message", wiad); window.removeEventListener("keydown", klaw, true);
       document.documentElement.style.overflow = przewijanie;
       if (poprzedni && poprzedni.focus) poprzedni.focus();
       if (poZamknieciu) poZamknieciu();
@@ -475,9 +483,9 @@
       if (e.data.typ === "kartoteka-zamknij") zamknij();
       if (e.data.typ === "kartoteka-wybor" && poWyborze) { zamknij(); poWyborze({ tabela: e.data.tabela, id: e.data.id }); }
     }
-    function klaw(e) { if (e.key === "Escape") zamknij(); }
+    function klaw(e) { tylkoTo(e, zamknij); }
     tlo.addEventListener("click", function (e) { if (e.target === tlo) zamknij(); });
-    window.addEventListener("message", wiad); document.addEventListener("keydown", klaw);
+    window.addEventListener("message", wiad); window.addEventListener("keydown", klaw, true);
     document.documentElement.style.overflow = "hidden";
     document.body.appendChild(tlo);
     tlo.querySelector("iframe").focus();
@@ -690,9 +698,9 @@
       }).catch(function () {});
     var inp = o.querySelector("#pp-prof-o"), bl = o.querySelector(".bl");
     konto().then(function (k) { if (k && k.profil && k.profil.otodom && !inp.value) inp.value = k.profil.otodom; });
-    function zamk() { o.remove(); document.removeEventListener("keydown", esc_); }
-    function esc_(e) { if (e.key === "Escape") zamk(); }
-    document.addEventListener("keydown", esc_);
+    function zamk() { o.remove(); window.removeEventListener("keydown", esc_, true); }
+    function esc_(e) { if (e.target && e.target.closest && e.target.closest(".pw-ed")) return; tylkoTo(e, zamk); }
+    window.addEventListener("keydown", esc_, true);
     o.addEventListener("click", function (e) { if (e.target === o || e.target.closest("[data-x]")) zamk(); });
     o.querySelector("[data-z]").addEventListener("click", function () {
       bl.hidden = true;
@@ -719,8 +727,8 @@
     var stan = { obszary: [tu ? tu.id : "ogolne"], rodzaj: "blad", zrzut: null };
     var tlo = document.createElement("div"); tlo.id = "pp-zgl";
     var poprzedni = document.activeElement;
-    function zamknij() { tlo.remove(); document.removeEventListener("keydown", klaw); document.removeEventListener("paste", wklej); if (poprzedni && poprzedni.focus) poprzedni.focus(); }
-    function klaw(e) { if (e.key === "Escape") zamknij(); }
+    function zamknij() { tlo.remove(); window.removeEventListener("keydown", klaw, true); document.removeEventListener("paste", wklej); if (poprzedni && poprzedni.focus) poprzedni.focus(); }
+    function klaw(e) { if (e.target && e.target.closest && e.target.closest(".pw-ed") && e.target.value) return; tylkoTo(e, zamknij); }
     function rysuj(dostepne) {
       var tx = tlo.querySelector("textarea"), opis = tx ? tx.value : "";
       tlo.innerHTML = '<div class="ok" role="dialog" aria-modal="true" aria-labelledby="pp-zgl-t">' +
@@ -801,7 +809,7 @@
         })
         .catch(function (err) { w.disabled = false; w.textContent = "Wyślij zgłoszenie"; blad(err.message || "Nie udało się wysłać – spróbuj ponownie."); });
     });
-    document.addEventListener("keydown", klaw); document.addEventListener("paste", wklej);
+    window.addEventListener("keydown", klaw, true); document.addEventListener("paste", wklej);
     document.body.appendChild(tlo);
     rysuj(dostepneObszary);
     konto().then(function (k) {      // tylko obszary, do których konto ma dostęp
