@@ -636,6 +636,13 @@
         return fetch("/administracja/api/google/kalendarz?klucz=" + encodeURIComponent(klucz), { method: "DELETE", credentials: "same-origin" }).then(jsonLubBlad);
       });
     },
+    // 8.11: pełna wiadomość (nagłówki, html / tekst, załączniki) i adres pobrania załącznika
+    wiadomosc: function (id) {
+      return fetch("/administracja/api/google/poczta/" + encodeURIComponent(id), { credentials: "same-origin" }).then(jsonLubBlad);
+    },
+    zalacznik: function (mid, aid, nazwa) {
+      return "/administracja/api/google/poczta/" + encodeURIComponent(mid) + "/zalacznik/" + encodeURIComponent(aid) + "?nazwa=" + encodeURIComponent(nazwa || "");
+    },
     // adresy e-mail stron → {maile: [...]}; gdy niepołączone – null
     poczta: function (adresy) {
       return google.stan().then(function (g) {
