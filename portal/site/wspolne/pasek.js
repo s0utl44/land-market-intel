@@ -541,7 +541,10 @@
     "#pp-prof input:focus{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
     "#pp-prof .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
     "#pp-prof .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-prof .st{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}" +
-    "#pp-prof .bl{color:#b3261e;font-size:13px;margin-top:8px}";
+    "#pp-prof .bl{color:#b3261e;font-size:13px;margin-top:8px}" +
+    "#pp-prof .pg{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .pg h3{margin:0 0 4px;font-size:15px;font-weight:900}" +
+    "#pp-prof .pg .w{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pp-prof .pg .s{flex:1;min-width:180px;font-size:13.5px}" +
+    "#pp-prof .pg .s b{color:#2e7d32}html[data-theme=dark] #pp-prof .pg .s b{color:#7cc59a}";
   function escHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // podsumowanie odprawy (struktura z Odprawy) – pulpit i „Mój profil”
   function podsumowanieHtml(d) {
@@ -556,6 +559,46 @@
       blok("Dodatkowo", d.dodatkowo ? "<p>" + escHtml(d.dodatkowo) + "</p>" : "");
   }
 
+  // 7.11: Google agenta – każda aplikacja woła przez pasek (zawsze konto zalogowanej osoby; Kontakty /administracja/api/google)
+  var googleP = null;
+  function jsonLubBlad(r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) { var e = new Error(j.detail || "Błąd połączenia z Google."); e.status = r.status; e.kod = j.detail; throw e; }
+      return j;
+    });
+  }
+  var google = {
+    stan: function () {
+      if (!googleP) googleP = fetch("/administracja/api/google", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : { dostepne: false }; })
+        .catch(function () { return { dostepne: false }; });
+      return googleP;
+    },
+    // {tytul, od: "RRRR-MM-DDTGG:MM", do, miejsce, opis, link} → {id, link}; gdy niepołączone – null (bez błędu)
+    kalendarz: function (d) {
+      return google.stan().then(function (g) {
+        if (!g.dostepne || !g.polaczone || !g.kalendarz) return null;
+        return fetch("/administracja/api/google/kalendarz", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(d) }).then(jsonLubBlad);
+      });
+    },
+    // adresy e-mail stron → {maile: [...]}; gdy niepołączone – null
+    poczta: function (adresy) {
+      return google.stan().then(function (g) {
+        if (!g.dostepne || !g.polaczone || !g.poczta) return null;
+        return fetch("/administracja/api/google/poczta?adresy=" + encodeURIComponent([].concat(adresy).join(",")), { credentials: "same-origin" }).then(jsonLubBlad);
+      });
+    }
+  };
+  // powrót z okienka Google: usuń ?google=polaczone z adresu i pokaż „Mój profil” z potwierdzeniem
+  try {
+    var pg = new URLSearchParams(location.search);
+    if (pg.get("google") === "polaczone") {
+      pg.delete("google");
+      history.replaceState(null, "", location.pathname + (pg.toString() ? "?" + pg : "") + location.hash);
+      setTimeout(function () { profil(); }, 300);
+    }
+  } catch (e) {}
+
   function profil() {
     if (document.getElementById("pp-prof")) return;
     if (!document.getElementById("pp-prof-styl")) {
@@ -566,8 +609,28 @@
       "<p>Link do Twojego profilu agenta na Otodomie – Twoje ogłoszenia pokażą się przy transakcjach do podpięcia jednym kliknięciem.</p>" +
       '<label>Profil na Otodomie<input id="pp-prof-o" inputmode="url" placeholder="https://www.otodom.pl/pl/profil/agenci-nieruchomosci/…"></label>' +
       '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div>' +
+      '<div class="pg" hidden><h3>Google – kalendarz i poczta</h3><p>Połącz swoje firmowe konto Google: umówione spotkania same trafią do Twojego ' +
+      'kalendarza, a w karcie transakcji zobaczysz maile z klientami (tylko odczyt, nic nie zapisujemy). Możesz odłączyć w każdej chwili.</p>' +
+      '<div class="w"><span class="s"></span><button type="button" class="b" data-gp></button></div></div>' +
       '<div class="ph" hidden><h3>Podsumowania od dyrektora</h3><div class="pl"></div></div></div>';
     document.body.appendChild(o);
+    // 7.11 (decyzja użytkownika): Google (kalendarz i poczta) łączy każdy sam – tylko gdy serwer ma włączone połączenie
+    function rysujGoogle(g) {
+      var sek = o.querySelector(".pg"); if (!g || !g.dostepne) { sek.hidden = true; return; }
+      sek.hidden = false;
+      var b = sek.querySelector("[data-gp]");
+      sek.querySelector(".s").innerHTML = g.polaczone ? "<b>✓ Połączone</b>" + (g.polaczono ? " od " + escHtml(new Date(g.polaczono).toLocaleDateString("pl-PL")) : "") +
+        (g.kalendarz ? "" : " – bez kalendarza") + (g.poczta ? "" : " – bez poczty") : "Nie połączone";
+      b.textContent = g.polaczone ? "Odłącz" : "Połącz z Google";
+      b.className = "b" + (g.polaczone ? "" : " p");
+      b.onclick = function () {
+        if (!g.polaczone) { location.href = "/administracja/api/google/polacz?wroc=" + encodeURIComponent(location.pathname + location.search + location.hash); return; }
+        b.disabled = true;
+        fetch("/administracja/api/google/odlacz", { method: "POST", credentials: "same-origin" }).then(function () { googleP = null; return google.stan(); })
+          .then(rysujGoogle).catch(function () { b.disabled = false; });
+      };
+    }
+    google.stan().then(rysujGoogle);
     // 5.11 (decyzja użytkownika): historia podsumowań odpraw – także schowanych z pulpitu
     fetch("/transakcje/api/podsumowania/moje?wszystkie=1", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : []; })
       .then(function (l) {
@@ -810,7 +873,7 @@
     e.preventDefault(); e.stopPropagation(); cel.click();
   }, true);
 
-  window.PracawrePasek = { liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
