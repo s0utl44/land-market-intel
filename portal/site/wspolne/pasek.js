@@ -581,6 +581,20 @@
           body: JSON.stringify(d) }).then(jsonLubBlad);
       });
     },
+    // 8.11: poprawka / usunięcie wydarzenia dodanego z kluczem (np. „hs-spotkanie:<id>”); gdy niepołączone – null
+    zmien: function (klucz, d) {
+      return google.stan().then(function (g) {
+        if (!g.dostepne || !g.polaczone || !g.kalendarz || !klucz) return null;
+        return fetch("/administracja/api/google/kalendarz", { method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ klucz: klucz }, d)) }).then(jsonLubBlad);
+      });
+    },
+    usun: function (klucz) {
+      return google.stan().then(function (g) {
+        if (!g.dostepne || !g.polaczone || !g.kalendarz || !klucz) return null;
+        return fetch("/administracja/api/google/kalendarz?klucz=" + encodeURIComponent(klucz), { method: "DELETE", credentials: "same-origin" }).then(jsonLubBlad);
+      });
+    },
     // adresy e-mail stron → {maile: [...]}; gdy niepołączone – null
     poczta: function (adresy) {
       return google.stan().then(function (g) {
