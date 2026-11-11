@@ -16,6 +16,9 @@
   // KOMU (decyzja użytkownika przy KAŻDEJ nowości): dla = role (agent, administracja, dyrektor, zarzad, zarzadzanie, pozostale;
   // brak pola = wszyscy), obszar = tylko z dostępem do aplikacji. Administrator widzi wszystkie (wie, co dostali inni).
   var NOWOSCI = [
+    { id: "2026-11-11-cwiczenie", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent"], tytul: "🎓 Ćwiczenie na fikcyjnym kliencie",
+      opis: "Przećwicz w Zimnych drogę leada od ogłoszenia do umówionego telefonu – na fikcyjnych danych, które same się usuwają i nie liczą się w Raportach.",
+      cw: true },
     { id: "2026-11-11-samouczek", data: "2026-11-11", gdzie: "Cała strona", tytul: "🎓 Samouczek",
       opis: "Oprowadzanie po stronie głównej, Zimnych telefonach i Transakcjach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
       start: true },
@@ -75,6 +78,107 @@
     ] }
   ];
 
+  // ---- ĆWICZENIE na fikcyjnym kliencie (11.11, część b): Zimne, sytuacja 1 „Proszę zadzwonić za tydzień” ----
+  // Leady z /leady/api/samouczek (tylko moje, numery 555 2xx 3nn); wszystko w HubSpot z „🎓 SAMOUCZEK”, sprzątane na końcu.
+  var CW = null;                                      // {leady: [{id, imie, numer, …}], rodzaj}
+  function L(n) { return CW && CW.leady ? CW.leady[n - 1] : null; }
+  function nrTxt(n) { var x = L(n); return x ? x.numer.slice(0, 3) + " " + x.numer.slice(3, 6) + " " + x.numer.slice(6) : "…"; }
+  function otwarty() { try { return typeof OTWARTY !== "undefined" ? OTWARTY : null; } catch (e) { return null; } }   // karta leada w Zimnych
+  function otwartyL(n) { var o = otwarty(), x = L(n); return !!(o && x && o.portal === "samouczek" && o.id === x.id) ? o : null; }
+  // zdarzenia: udane zapisy strony (fetch) – samouczek przechodzi dalej, gdy agent zrobił to, o co prosił krok
+  var ZD = [];
+  (function () {
+    if (!window.fetch || window.fetch.__samouczek) return;
+    var f0 = window.fetch;
+    var f = function (u, o) {
+      var url = typeof u === "string" ? u : (u && u.url) || "", m = ((o && o.method) || "GET").toUpperCase();
+      return f0.apply(this, arguments).then(function (r) { try { ZD.push({ u: new URL(url, location.href).pathname, m: m, ok: r.ok, t: Date.now() }); } catch (e) {} return r; });
+    };
+    f.__samouczek = true; window.fetch = f;
+  })();
+  function bylo(re, m, od) { return ZD.some(function (z) { return z.ok && z.m === m && z.t >= (od || 0) && re.test(z.u); }); }
+  function apiL(sciezka, opcje) {
+    return fetch("/leady/api/" + sciezka, Object.assign({ credentials: "same-origin", headers: { "Content-Type": "application/json" } }, opcje || {}))
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "Błąd " + r.status); return d; }); });
+  }
+  function kopiujBtn(n) { return '<button type="button" class="pt-k" data-kopiuj="' + (L(n) ? L(n).numer : "") + '">📋 Kopiuj</button>'; }
+
+  var CWICZENIA = [
+    { id: "cw1", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · sytuacja 1 z 2", cw: true, kroki: [
+      { tytul: "Ćwiczenie: „Proszę zadzwonić za tydzień”", dalejTxt: "Zaczynamy →",
+        tekst: "Przejdziesz prawdziwą drogę leada – ale na <b>fikcyjnym kliencie</b>. Przygotuję 5 przykładowych ogłoszeń widocznych tylko dla Ciebie, z numerami <b>555 2… 3…</b> (takie numery nie istnieją).<br><br>" +
+          "Wszystko, co zapiszesz w HubSpot, dostanie dopisek <b>🎓 SAMOUCZEK</b> – nie liczy się w Raportach, celach ani na pulpicie, a na końcu samo się usunie.",
+        naDalej: function () {
+          return apiL("samouczek/start", { method: "POST" }).then(function (d) { CW = d; zapisz(KL_STAN, { trasa: "cw1", i: 1, czas: Date.now() }); location.reload(); return false; });
+        } },
+      { el: function () { return L(1) && document.querySelector('#lista [data-p="samouczek"][data-i="' + L(1).id + '"]'); }, przepusc: true,
+        przed: function () {
+          var q = document.getElementById("q");
+          if (q && L(1) && !otwartyL(1)) { q.value = "Przykładowa"; q.dispatchEvent(new Event("input", { bubbles: true })); }
+        },
+        czekaj: function () { return !!otwartyL(1); },
+        tytul: "Otwórz leada", tekst: "Na liście są Twoje fikcyjne ogłoszenia (oznaczone 🎓). Wyszukałem pierwsze: <b>mieszkanie na Psim Polu, Pan Tomasz</b>. <b>Kliknij je</b> – otworzy się karta leada.",
+        brak: "Nie widzę tego leada na liście (może zasłaniają go filtry). <button type='button' class='pt-k' data-otworz-l1>Otwórz go za mnie</button>" },
+      { el: "#panel [data-ogloszenie]", przepusc: true,
+        tytul: "Otwórz ogłoszenie i odsłoń numer", tekst: function () {
+          return "Kliknij <b>„Otwórz ogłoszenie”</b> – otworzy się w osobnej karcie. Na portalu sam klikasz <b>„Pokaż numer”</b> (robot numerów nie zbiera). W ćwiczeniu numer to:<div class='pt-nr'><b>" + nrTxt(1) + "</b>" + kopiujBtn(1) + "</div>Wróć tutaj i kliknij <b>Dalej</b>.";
+        } },
+      { el: "#pTel", przepusc: true,
+        czekaj: function () { var o = otwartyL(1); return !!(o && o.telefon === (L(1) || {}).numer) || bylo(/\/leady\/api\/lead\/samouczek\/[^/]+$/, "PUT"); },
+        tytul: "Wklej numer", tekst: function () { return "Wklej numer w pole <b>Telefon</b> (9 cyfr zapisuje się samo). <div class='pt-nr'><b>" + nrTxt(1) + "</b>" + kopiujBtn(1) + "</div>"; } },
+      { el: "#panel [data-wez]", przepusc: true,
+        czekaj: function () { var o = otwartyL(1); return !!(o && o.moj) || bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/biore$/, "POST"); },
+        tytul: "Biorę", tekst: "Kliknij <b>„Biorę”</b>. Lead jest od teraz Twój, a w HubSpot powstaje kontakt (bez opiekuna – opiekuna wyznacza dopiero transakcja). W ćwiczeniu kontakt ma dopisek 🎓 SAMOUCZEK." },
+      { rozmowa: true, tytul: "Dzwonisz do Pana Tomasza", dalejTxt: "Zapisuję wynik rozmowy →",
+        tekst: "<div class='pt-r'><div class='pt-kl'><b>Pan Tomasz:</b> Dzień dobry… tak, ogłoszenie jest aktualne. Ale jestem teraz w pracy, nie bardzo mogę rozmawiać.</div>" +
+          "<div class='pt-hint'>💡 <b>Ze skryptu:</b> szanuj czas klienta, ale zostaw konkret – „Rozumiem, zajmę minutę: mamy klientów szukających takiego mieszkania. Kiedy mogę zadzwonić, żeby spokojnie porozmawiać?”</div>" +
+          "<div class='pt-kl'><b>Pan Tomasz:</b> Wie Pan co, proszę zadzwonić za tydzień, w czwartek po 17. Wtedy będę wiedział, czy znajomy jednak nie weźmie.</div>" +
+          "<div class='pt-ja'>➡️ <b>Teraz zapiszesz:</b> Odebrano → Do ponownego kontaktu → termin <b>czwartek za tydzień, 17:00</b> + krótka notatka.</div></div>" },
+      { el: "#panel #tw", przepusc: true,
+        czekaj: function () { return !!document.querySelector('#panel [data-tw="odebrano"][aria-pressed="true"]'); },
+        tytul: "Wynik: Odebrano", tekst: "Kliknij <b>„Odebrano”</b>. (Gdyby nie odebrał – „Nie odebrano”: lead zostaje u Ciebie w „Zadzwoń ponownie”.)",
+        brak: "Czekam, aż HubSpot pokaże nowy kontakt (zwykle kilka sekund)… Sekcja <b>„Rozmowa i notatki”</b> pojawi się w karcie sama." },
+      { el: "#panel #td", przepusc: true,
+        czekaj: function () { return !!document.querySelector('#panel [data-td="ponownie"][aria-pressed="true"]'); },
+        tytul: "Co dalej? Do ponownego kontaktu", tekst: "Klient prosi o telefon za tydzień – kliknij <b>„Do ponownego kontaktu”</b>. (<i>Stracono</i> = nie zainteresowany, z powodem; <i>Spotkanie umówione</i> = transakcja w Transakcjach.)" },
+      { el: "#panel .hsK.pw-ed", przepusc: true,
+        czekaj: function (k) { return bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/telefon$/, "POST", k.od); },
+        tytul: "Termin i notatka", tekst: "W polu <b>Kiedy</b> ustaw <b>czwartek za tydzień, 17:00</b> (kółko myszy nad polem zmienia dzień, z Shift – tydzień). Przypomnienie zostaw. W polu poniżej wpisz, co ustaliłeś, np. <i>„Znajomy może wziąć mieszkanie, oddzwonić w czwartek po 17.”</i> i kliknij <b>„✓ Zapisz telefon”</b>." },
+      { tytul: "Gotowe – tak wygląda „zadzwoń za tydzień”", dalejTxt: "Zakończ ćwiczenie →",
+        tekst: "<ul class='pp-tour-l'><li>W HubSpot: <b>telefon</b> z wynikiem „Połączono”, <b>zadanie</b> „Zadzwoń ponownie” na czwartek 17:00 z przypomnieniem i Twoja notatka.</li>" +
+          "<li>Lead jest w <b>„Moje zimne na dziś” → „Zadzwoń ponownie”</b> i <b>nie wróci o północy do puli</b> – trzyma go Twoje zadanie.</li>" +
+          "<li>W dniu terminu zadanie pokaże się na <b>pulpicie</b> w „Moje zadania” i jako przypomnienie.</li></ul>" +
+          "Sytuację 2 (spotkanie → umowa → faktura) dodamy wkrótce. Teraz posprzątam wszystko, co powstało w ćwiczeniu." ,
+        naDalej: function () { koniecCwiczenia(); return false; } }
+    ] }
+  ];
+  function trasa(id) { return TRASY.concat(CWICZENIA).filter(function (x) { return x.id === id; })[0] || null; }
+
+  function koniecCwiczenia() {
+    zakoncz(false);
+    var o = okno('<div class="po-n">🎓 Samouczek</div><h2>Sprzątam po ćwiczeniu…</h2><p>Usuwam fikcyjne leady i to, co powstało w HubSpot.</p>');
+    apiL("samouczek/sprzataj", { method: "POST" }).then(function (w) {
+      var kal = (w.kalendarz || []).map(function (kl) { return P.google && P.google.usun ? P.google.usun(kl).then(function () { return null; }, function () { return kl; }) : Promise.resolve(kl); });
+      return Promise.all(kal).then(function (nieusuniete) { return [w, nieusuniete.filter(Boolean)]; });
+    }).then(function (x) {
+      var w = x[0], kal = x[1], u = w.usuniete || {}, lista = Object.keys(u).map(function (k) { return "<li>" + k + ": " + u[k] + "</li>"; }).join("");
+      var reczne = (w.reczne || []).map(function (r) { return "<li>" + r.co + " (HubSpot id " + r.id + ") – z dopiskiem 🎓 SAMOUCZEK</li>"; })
+        .concat(kal.map(function () { return "<li>spotkanie w Twoim Kalendarzu Google z dopiskiem 🎓 SAMOUCZEK</li>"; })).join("");
+      o.querySelector(".po").innerHTML = '<div class="po-n">🎓 Samouczek</div><h2>🎉 Ćwiczenie ukończone</h2>' +
+        "<p>Przeprowadziłeś leada od ogłoszenia do umówionego telefonu – tak samo wygląda prawdziwa praca.</p>" +
+        "<div class='nw'><b>Posprzątane automatycznie</b><ul class='pp-tour-l'>" + (lista || "<li>fikcyjne leady</li>") + "<li>fikcyjne leady i ich historia w Zimnych</li></ul>" +
+        "<small style='margin:0'>Nic z ćwiczenia nie trafiło do Raportów, celów ani na pulpit.</small></div>" +
+        (reczne ? "<div class='nw' style='border-color:#e5534b'><b>⚠ Tego nie udało się usunąć – usuń ręcznie</b><ul class='pp-tour-l'>" + reczne + "</ul></div>" : "") +
+        '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Wracam do pracy</button></div>';
+      o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); location.href = "/leady/"; });
+    }).catch(function (e) {
+      o.querySelector(".po").innerHTML = '<div class="po-n">🎓 Samouczek</div><h2>Nie udało się posprzątać</h2><p>' + String(e.message || e) +
+        "</p><p>Ćwiczenie posprząta się samo po dobie. Możesz też spróbować ponownie: 🎓 → „Zakończ ćwiczenie i posprzątaj”.</p>" +
+        '<div class="po-d"><span></span><button type="button" class="pri" data-ok>OK</button></div>';
+      o.querySelector("[data-ok]").addEventListener("click", zamknijOkno);
+    });
+  }
+
   var CSS =
     "#pp-tour-tlo{position:fixed;inset:0;z-index:2147483100;background:transparent}" +
     "#pp-tour-cel{position:fixed;z-index:2147483101;border-radius:12px;box-shadow:0 0 0 3px #c9a03c,0 0 0 9999px rgba(12,12,10,.55);pointer-events:none;transition:all .2s ease}" +
@@ -112,6 +216,16 @@
     "#pp-tour-ok .mi{display:flex;width:100%;height:auto;min-height:44px;padding:8px 12px;border:0;border-radius:10px;flex-direction:column;align-items:flex-start;gap:1px}" +
     "#pp-tour-ok .mi:hover{background:var(--zt)}#pp-tour-ok .mi small{font-weight:400;color:var(--m);font-size:12.5px}" +
     "#pp-tour-ok .mi[disabled]{opacity:.55;cursor:default;background:none}" +
+    "#pp-tour-dym .pt-nr{display:flex;align-items:center;gap:10px;background:var(--zt);border-radius:10px;padding:8px 12px;margin:8px 0}" +
+    "#pp-tour-dym .pt-nr b{font-size:19px;letter-spacing:.05em;flex:1}" +
+    "#pp-tour-dym .pt-k{height:30px;padding:0 10px;font-size:13px}" +
+    "#pp-tour-dym .pt-cz{margin-top:10px;font-size:13px;color:var(--m)}" +
+    "#pp-tour-dym.rozm{width:min(620px,calc(100vw - 24px))}" +
+    "#pp-tour-dym .pt-r{display:flex;flex-direction:column;gap:10px;margin-top:4px}" +
+    "#pp-tour-dym .pt-kl{align-self:flex-start;max-width:85%;background:var(--l);border-radius:14px 14px 14px 4px;padding:8px 12px}" +
+    "#pp-tour-dym .pt-hint{background:var(--zt);border-radius:12px;padding:8px 12px;font-size:14px}" +
+    "#pp-tour-dym .pt-ja{background:#1f1d1a;color:#fff;border-radius:12px;padding:10px 12px}" +
+    "#pp-tour-tlo.przepusc{pointer-events:none}" +
     "#pp-tour-ok .mi .pp-sam-n{background:#e5534b;color:#fff;border-radius:999px;padding:0 6px;font-size:11px;margin-left:6px}";
 
   function styl() {
@@ -181,12 +295,17 @@
     return o;
   }
   function menu() {
-    var n = nowe().length, t = trasaTu();
+    var n = nowe().length, t = trasaTu(), st0 = czytaj(KL_STAN), cwSt = st0 && st0.trasa && (trasa(st0.trasa) || {}).cw ? st0 : null;
     var o = okno(
       '<button type="button" class="mi" data-m="cale"><b>🎓 Oprowadzanie po stronie</b><small>Strona główna → Zimne telefony → Transakcje – co gdzie jest</small></button>' +
       (t && t.id !== "glowna" ? '<button type="button" class="mi" data-m="tu"><b>Tylko ta strona – ' + t.nazwa + "</b><small>Oprowadzanie po tym, co widzisz teraz</small></button>" : "") +
       '<button type="button" class="mi" data-m="nowosci"><b>Co nowego' + (n ? '<span class="pp-sam-n">' + n + "</span>" : "") + "</b><small>Zmiany w pracawre.com z ostatnich tygodni</small></button>" +
-      '<button type="button" class="mi" disabled><b>Ćwiczenie na przykładowym kliencie</b><small>Od zimnego telefonu do faktury – wkrótce</small></button>', true);
+      (cwSt ? '<button type="button" class="mi" data-m="cw-wroc"><b>▶ Wróć do ćwiczenia</b><small>Tam, gdzie skończyłeś</small></button>' +
+              '<button type="button" class="mi" data-m="cw-koniec"><b>Zakończ ćwiczenie i posprzątaj</b><small>Usuwa fikcyjne leady i to, co powstało w HubSpot</small></button>'
+        : maObszar("leady") ? '<button type="button" class="mi" data-m="cw"><b>Ćwiczenie na przykładowym kliencie</b><small>Fikcyjny lead w Zimnych: „Proszę zadzwonić za tydzień” (ok. 5 min)</small></button>' : ""), true);
+    var bc = o.querySelector('[data-m="cw"]'); if (bc) bc.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start("cw1"); });
+    var bwr = o.querySelector('[data-m="cw-wroc"]'); if (bwr) bwr.addEventListener("click", function () { zamknijOkno(); start(cwSt.trasa); });
+    var bk = o.querySelector('[data-m="cw-koniec"]'); if (bk) bk.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); koniecCwiczenia(); });
     o.querySelector('[data-m="cale"]').addEventListener("click", function () { zamknijOkno(); start("glowna", true); });
     var tu = o.querySelector('[data-m="tu"]'); if (tu) tu.addEventListener("click", function () { zamknijOkno(); start(t.id, false); });
     o.querySelector('[data-m="nowosci"]').addEventListener("click", function () { coNowego(true); });
@@ -200,10 +319,11 @@
       lista.map(function (n) {
         var d = n.data.split("-");
         return '<div class="nw"><b>' + n.tytul + "</b><small>" + n.gdzie + " · " + Number(d[2]) + "." + d[1] + "</small><p>" + n.opis + "</p>" +
-          (n.start ? '<button type="button" data-start>Zacznij oprowadzanie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
+          (n.start ? '<button type="button" data-start>Zacznij oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Zacznij ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
       }).join("") +
       '<div class="po-d"><span>Wszystkie nowości: 🎓 → „Co nowego”</span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
     o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); });
+    var c = o.querySelector("[data-cw]"); if (c) c.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); zapisz(KL_STAN, null); start("cw1"); });
     var s = o.querySelector("[data-start]"); if (s) s.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); start("glowna", true); });
     o.querySelectorAll("[data-pokaz]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -222,12 +342,13 @@
     var r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
   }
-  function znajdz(sel) { if (!sel) return null; var el = document.querySelector(sel); return widoczne(el) ? el : null; }
+  function znajdz(sel) { if (!sel) return null; var el = typeof sel === "function" ? sel() : document.querySelector(sel); return widoczne(el) ? el : null; }
 
   var T = null;   // {trasa, kroki (dostępne), i, cale}
   function start(id, cale) {
-    var t = TRASY.filter(function (x) { return x.id === id; })[0];
+    var t = trasa(id);
     if (!t) return;
+    if (t.cw) return startCw(t);
     if (!ta(t.sciezka)) { zapisz(KL_STAN, { trasa: id, i: 0, cale: cale, czas: Date.now() }); location.href = t.sciezka; return; }
     zapisz(KL_STAN, { trasa: id, i: 0, cale: cale, czas: Date.now() });
     // strona dociąga dane – chwila na pokazanie sekcji, potem tylko kroki, których elementy są widoczne
@@ -238,32 +359,59 @@
       rysuj();
     }, 900);
   }
+  function startCw(t) {
+    var st = czytaj(KL_STAN) || {};
+    if (!ta(t.sciezka)) { zapisz(KL_STAN, { trasa: t.id, i: st.trasa === t.id ? st.i || 0 : 0, czas: Date.now() }); location.href = t.sciezka; return; }
+    apiL("samouczek").then(function (d) {
+      CW = d.aktywny ? d : null;
+      var i = st.trasa === t.id && CW ? st.i || 0 : 0;      // ćwiczenia nie ma na serwerze (posprzątane) – od początku
+      zapisz(KL_STAN, { trasa: t.id, i: i, czas: Date.now() });
+      setTimeout(function () { T = { trasa: t, kroki: t.kroki, i: i, cale: false }; rysuj(); }, 700);
+    }).catch(function () {});
+  }
   function nastepnaTrasa() {
     var i = TRASY.indexOf(T.trasa);
     for (var j = i + 1; j < TRASY.length; j++) if (maObszar(TRASY[j].obszar)) return TRASY[j];
     return null;
   }
-  function zakoncz(gotowe) {
+  var petla = null;
+  function zakoncz(gotowe, pauza) {
     ["pp-tour-tlo", "pp-tour-cel", "pp-tour-dym"].forEach(function (id) { var e = document.getElementById(id); if (e) e.remove(); });
+    clearInterval(petla); petla = null;
+    if (pauza && T && T.trasa.cw) {                  // ćwiczenie przerwane – wraca w tym samym miejscu (🎓 → „Wróć do ćwiczenia”)
+      zapisz(KL_STAN, { trasa: T.trasa.id, i: T.i, czas: Date.now(), pauza: true });
+      window.removeEventListener("keydown", klaw, true);
+      window.removeEventListener("resize", pozycja); window.removeEventListener("scroll", pozycja, true);
+      T = null; return;
+    }
     window.removeEventListener("keydown", klaw, true);
     window.removeEventListener("resize", pozycja); window.removeEventListener("scroll", pozycja, true);
     zapisz(KL_STAN, null);
     T = null;
     if (gotowe) {
       var o = okno('<div class="po-n">🎓 Samouczek</div><h2>Gotowe – znasz już najważniejsze miejsca</h2>' +
-        "<p>Oprowadzanie włączysz ponownie przyciskiem <b>🎓</b> w pasku – tam też są <b>nowości</b>. Ćwiczenie na przykładowym kliencie (od zimnego telefonu do faktury) dodamy wkrótce.</p>" +
+        "<p>Oprowadzanie włączysz ponownie przyciskiem <b>🎓</b> w pasku – tam też są <b>nowości</b>. Przećwicz pracę z leadem: 🎓 → „Ćwiczenie na przykładowym kliencie”.</p>" +
         '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Wracam do pracy</button></div>');
       o.querySelector("[data-ok]").addEventListener("click", zamknijOkno);
     }
   }
   function klaw(e) {
     if (!T || e.defaultPrevented) return;
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); zakoncz(false); }
+    if (T.trasa.cw && e.target && e.target.closest && e.target.closest("input, textarea, select, .pw-ed")) return;   // Esc w polu – dla strony
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); zakoncz(false, true); }
+    else if (T.trasa.cw) return;                      // ćwiczenie: Enter i strzałki należą do pól, które agent wypełnia
     else if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); dalej(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); wstecz(); }
   }
-  function dalej() {
+  function dalej(zKroku) {
     if (!T) return;
+    var k = T.kroki[T.i];
+    if (k.naDalej && !zKroku) {
+      var b = document.querySelector("#pp-tour-dym [data-d]"); if (b) { b.disabled = true; b.textContent = "Chwila…"; }
+      Promise.resolve(k.naDalej()).then(function (dalejTak) { if (dalejTak !== false) dalej(true); },
+        function (e) { if (b) { b.disabled = false; b.textContent = "Spróbuj ponownie"; } var t = document.querySelector("#pp-tour-dym .pt-t"); if (t) t.insertAdjacentHTML("beforeend", "<p style='color:#c0392b'>" + String(e.message || e) + "</p>"); });
+      return;
+    }
     if (T.i < T.kroki.length - 1) { T.i++; zapisz(KL_STAN, { trasa: T.trasa.id, i: T.i, cale: T.cale, czas: Date.now() }); rysuj(); return; }
     var n = T.cale ? nastepnaTrasa() : null;
     if (n) { zapisz(KL_STAN, { trasa: n.id, i: 0, cale: true, czas: Date.now() }); location.href = n.sciezka; }
@@ -285,28 +433,46 @@
     if (!T) return;
     if (!T.kroki.length) return dalej();
     warstwy();
-    var k = T.kroki[T.i], ost = T.i === T.kroki.length - 1, n = ost && T.cale ? nastepnaTrasa() : null;
+    var k = T.kroki[T.i], ost = T.i === T.kroki.length - 1, n = ost && T.cale ? nastepnaTrasa() : null, cw = !!T.trasa.cw;
+    k.od = Date.now();
+    if (k.przed) try { k.przed(); } catch (e) {}
     var d = document.getElementById("pp-tour-dym");
+    d.className = k.rozmowa ? "rozm" : "";
+    document.getElementById("pp-tour-tlo").className = k.przepusc ? "przepusc" : "";
+    var tekst = typeof k.tekst === "function" ? k.tekst() : k.tekst;
     d.innerHTML = '<div class="pt-n">' + T.trasa.nazwa + " · krok " + (T.i + 1) + " z " + T.kroki.length + "</div>" +
-      "<h3>" + k.tytul + '</h3><div class="pt-t">' + k.tekst + "</div>" +
-      '<div class="pt-p"><button type="button" class="pt-x" data-x>Zakończ</button><span class="pt-s"></span>' +
-      '<button type="button" data-w' + (T.i ? "" : " disabled") + ">← Wstecz</button>" +
-      '<button type="button" class="pt-d" data-d>' + (!ost ? "Dalej →" : n ? n.nazwa + " →" : "Gotowe ✓") + "</button></div>";
-    d.querySelector("[data-x]").addEventListener("click", function () { zakoncz(false); });
-    d.querySelector("[data-w]").addEventListener("click", wstecz);
-    d.querySelector("[data-d]").addEventListener("click", dalej);
+      "<h3>" + k.tytul + '</h3><div class="pt-t">' + tekst + "</div>" + (k.czekaj ? '<div class="pt-cz">Samouczek przejdzie dalej sam, gdy to zrobisz.</div><div class="pt-cz pt-brak" hidden></div>' : "") +
+      '<div class="pt-p"><button type="button" class="pt-x" data-x>' + (cw ? "Przerwij" : "Zakończ") + '</button><span class="pt-s"></span>' +
+      (cw ? "" : '<button type="button" data-w' + (T.i ? "" : " disabled") + ">← Wstecz</button>") +
+      (k.czekaj ? "" : '<button type="button" class="pt-d" data-d>' + (k.dalejTxt || (!ost ? "Dalej →" : n ? n.nazwa + " →" : "Gotowe ✓")) + "</button>") + "</div>";
+    d.querySelector("[data-x]").addEventListener("click", function () { zakoncz(false, true); });
+    var bw = d.querySelector("[data-w]"); if (bw) bw.addEventListener("click", wstecz);
+    var bd = d.querySelector("[data-d]"); if (bd) bd.addEventListener("click", function () { dalej(); });
+    d.onclick = function (e) {
+      var kb = e.target.closest("[data-kopiuj]");
+      if (kb && navigator.clipboard) navigator.clipboard.writeText(kb.dataset.kopiuj).then(function () { kb.textContent = "✓ Skopiowano"; });
+      if (e.target.closest("[data-otworz-l1]") && L(1)) location.hash = "#lead/samouczek/" + encodeURIComponent(L(1).id);
+    };
+    clearInterval(petla); petla = null;
+    if (k.czekaj || typeof k.el === "function" || cw) petla = setInterval(function () {
+      if (!T || T.kroki[T.i] !== k) return;
+      if (k.czekaj && k.czekaj(k)) { T.i++; zapisz(KL_STAN, { trasa: T.trasa.id, i: T.i, czas: Date.now() }); if (T.i >= T.kroki.length) return zakoncz(true); return rysuj(); }
+      pozycja();
+    }, 450);
     var el = znajdz(k.el);
     if (el) {
       var r = el.getBoundingClientRect();
       if (r.top < 50 || r.bottom > innerHeight - 20) el.scrollIntoView({ block: r.height > innerHeight * 0.6 ? "start" : "center" });
     }
     pozycja();
-    d.querySelector("[data-d]").focus({ preventScroll: true });
+    if (bd) bd.focus({ preventScroll: true });
   }
   function pozycja() {
     if (!T) return;
     var k = T.kroki[T.i], el = znajdz(k.el), cel = document.getElementById("pp-tour-cel"), d = document.getElementById("pp-tour-dym");
     if (!cel || !d) return;
+    var br = d.querySelector(".pt-brak");
+    if (br) { br.hidden = !!el || !k.brak; if (!el && k.brak && br.innerHTML !== k.brak) br.innerHTML = k.brak; }
     if (!el) {
       cel.className = "srodek";
       d.style.left = Math.max(12, (innerWidth - d.offsetWidth) / 2) + "px";
@@ -319,11 +485,16 @@
     cel.style.left = r.left - m + "px"; cel.style.top = top + "px";
     cel.style.width = r.width + 2 * m + "px"; cel.style.height = Math.max(bottom - top, 20) + "px";
     var dw = d.offsetWidth, dh = d.offsetHeight, x, y;
+    var yBok = Math.min(Math.max(52, top), innerHeight - dh - 12);
+    x = Math.min(Math.max(12, r.left), innerWidth - dw - 12);
     if (innerHeight - bottom > dh + 16) y = bottom + 12;
     else if (top - 48 > dh + 16) y = top - dh - 12;
-    else { y = Math.max(52, innerHeight - dh - 16); }
-    x = Math.min(Math.max(12, r.left), innerWidth - dw - 12);
-    if (y > top - dh && y < bottom && r.width > innerWidth - dw - 40) x = innerWidth - dw - 12;   // duży element – dymek w rogu
+    else if (r.left - m >= dw + 24) { x = r.left - m - dw - 12; y = yBok; }            // wysoki element – dymek obok, nie na nim
+    else if (innerWidth - r.right - m >= dw + 24) { x = r.right + m + 12; y = yBok; }
+    else {
+      y = Math.max(52, innerHeight - dh - 16);
+      if (r.width > innerWidth - dw - 40) x = innerWidth - dw - 12;                       // duży element – dymek w rogu
+    }
     d.style.left = x + "px"; d.style.top = y + "px";
   }
   function pokazJeden(p) {
@@ -355,8 +526,9 @@
       return;
     }
     if (st && st.trasa) {
-      var t = TRASY.filter(function (x) { return x.id === st.trasa; })[0];
-      if (t && ta(t.sciezka)) { start(t.id, st.cale); return; }
+      var t = trasa(st.trasa);
+      if (t && t.cw && st.pauza) { /* przerwane – wraca z menu 🎓 */ }
+      else if (t && ta(t.sciezka)) { start(t.id, st.cale); return; }
     }
     // nowości – po zalogowaniu raz; nie na okno „Czy spotkania się odbyły?” (czekamy, aż zniknie)
     var proby = 0;
