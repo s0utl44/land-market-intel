@@ -13,14 +13,16 @@
   var KL_STAN = "pracawre-samouczek", KL_NOW = "pracawre-nowosci", DOBA = 24 * 3600 * 1000;
 
   // ---- NOWOŚCI (najnowsze na górze; id NIE zmieniać – po nim pamiętamy, kto już widział) ----
+  // KOMU (decyzja użytkownika przy KAŻDEJ nowości): dla = role (agent, administracja, dyrektor, zarzad, zarzadzanie, pozostale;
+  // brak pola = wszyscy), obszar = tylko z dostępem do aplikacji. Administrator widzi wszystkie (wie, co dostali inni).
   var NOWOSCI = [
     { id: "2026-11-11-samouczek", data: "2026-11-11", gdzie: "Cała strona", tytul: "🎓 Samouczek",
       opis: "Oprowadzanie po stronie głównej, Zimnych telefonach i Transakcjach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
       start: true },
-    { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
+    { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent", "administracja"], tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
       opis: "Podczas dzwonienia otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje – z podręcznika agenta.",
       pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } },
-    { id: "2026-11-11-sciaga-spotkanie", data: "2026-11-11", gdzie: "Transakcje", obszar: "transakcje", tytul: "📋 Lista przed spotkaniem",
+    { id: "2026-11-11-sciaga-spotkanie", data: "2026-11-11", gdzie: "Transakcje", obszar: "transakcje", dla: ["agent", "dyrektor"], tytul: "📋 Lista przed spotkaniem",
       opis: "W karcie transakcji przed spotkaniem pozyskowym – etapy spotkania i checklista, co zabrać i o co zapytać.",
       pokaz: { sciezka: "/transakcje/", el: "#tablica", tytul: "Lista przed spotkaniem", tekst: "Otwórz transakcję na etapie <b>Nowy</b>, <b>Spotkanie umówione</b> albo <b>Zadzwoń ponownie</b>. Pod przyciskami działań znajdziesz <b>„📋 Lista przed spotkaniem”</b>." } },
     { id: "2026-11-11-wdrozenie", data: "2026-11-11", gdzie: "Wdrożenie", obszar: "wdrozenie", tytul: "📘 Podręcznik agenta i Moja ścieżka",
@@ -129,10 +131,16 @@
   }
 
   // ---- nowości ----
+  function dlaMnie(n) {
+    if (!maObszar(n.obszar)) return false;
+    if (!n.dla || (KONTO && KONTO.admin)) return true;
+    var role = (KONTO && (KONTO.role || [KONTO.rola])) || [];
+    return n.dla.some(function (r) { return role.indexOf(r) >= 0; });
+  }
   function widziane() { return czytaj(KL_NOW) || []; }
   function nowe() {
     var w = widziane(), od = Date.now() - 30 * 24 * 3600 * 1000;
-    return NOWOSCI.filter(function (n) { return w.indexOf(n.id) < 0 && Date.parse(n.data) >= od && maObszar(n.obszar); });
+    return NOWOSCI.filter(function (n) { return w.indexOf(n.id) < 0 && Date.parse(n.data) >= od && dlaMnie(n); });
   }
   function oznaczWidziane() { zapisz(KL_NOW, NOWOSCI.map(function (n) { return n.id; })); licznik(); }
   function licznik() {
@@ -166,7 +174,7 @@
     o.querySelector('[data-m="nowosci"]').addEventListener("click", function () { coNowego(true); });
   }
   function coNowego(wszystkie) {
-    var lista = wszystkie ? NOWOSCI.filter(function (n) { return maObszar(n.obszar); }).slice(0, 8) : nowe();
+    var lista = wszystkie ? NOWOSCI.filter(dlaMnie).slice(0, 8) : nowe();
     if (!lista.length) return;
     var nw = nowe().length;
     var o = okno('<div class="po-n">Co nowego' + (wszystkie ? "" : " · od Twojej ostatniej wizyty") + "</div>" +
