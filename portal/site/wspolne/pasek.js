@@ -259,6 +259,14 @@
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); });
+    samouczek();
+  }
+  // 11.11 (decyzja użytkownika): samouczek – przycisk 🎓 obok konta, oprowadzanie i „Co nowego” (/wspolne/samouczek.js)
+  function samouczek() {
+    if (window.PracawreSamouczek) { window.PracawreSamouczek.przycisk(); return; }
+    if (document.getElementById("pp-samouczek-js") || window.top !== window) return;
+    var s = document.createElement("script"); s.id = "pp-samouczek-js"; s.src = "/wspolne/samouczek.js"; s.defer = true;
+    (document.head || html).appendChild(s);
   }
 
   // karta z lewej: ☰ albo awatar otwiera; ✕, klik obok, Esc albo wybór pozycji zamyka
