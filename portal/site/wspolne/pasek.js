@@ -16,7 +16,9 @@
     { href: "/radar/", obszar: "radar", grupa: "rynek", opis: "Działki na Dolnym Śląsku – oferty, ceny, pozwolenia", nazwa: "Radar działek", zastrzezony: true, ikona: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>' },
     { href: "/leady/", obszar: "leady", grupa: "sprzedaz", opis: "Prywatne ogłoszenia mieszkań, domów i gruntów", nazwa: "Zimne telefony", zastrzezony: true, ikona: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>' },
     { href: "/transakcje/", obszar: "transakcje", grupa: "sprzedaz", opis: "Lejek transakcji – Twoje sprawy, etapy i sumy", nazwa: "Transakcje", zastrzezony: true, ikona: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/>' },
-    { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Raporty – wyniki, podsumowania i dashboard", nazwa: "Raporty", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' }
+    { href: "/odprawa/", obszar: "odprawa", grupa: "sprzedaz", opis: "Raporty – wyniki, podsumowania i dashboard", nazwa: "Raporty", zastrzezony: true, ikona: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' },
+    // 11.11 (decyzja użytkownika): podręcznik agenta – w grupie Biuro (nad Administracją), domyślnie nikt; dostęp nadaje administrator
+    { href: "/wdrozenie/", obszar: "wdrozenie", grupa: "biuro", opis: "Podręcznik agenta – telefon, pozysk, rozwój", nazwa: "Wdrożenie", zastrzezony: true, ikona: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7M8 11h5"/>' }
   ];
   // grupa i opis – zakładki w grupach (pasek) i kafelki na pulpicie (strona główna)
   // zastrzezony: zakładka ukryta, dopóki konto (panel Administracja) nie potwierdzi dostępu – bez mignięcia u osób bez uprawnień
@@ -227,7 +229,9 @@
       '<a class="pp-z" href="/"' + (location.pathname === "/" ? ' aria-current="page"' : "") + ">" + svg('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>') +
       "<span><b>Strona główna</b><small>Moje zadania i to, co czeka na zrobienie</small></span></a>" +
       zakladki(znane) +
-      '<div class="pp-grp pp-biuro" hidden><div class="pp-gt">Biuro</div><a class="pp-z pp-adm" href="/administracja/"' +
+      '<div class="pp-grp pp-biuro" hidden><div class="pp-gt">Biuro</div>' +
+      APPS.filter(function (a) { return a.grupa === "biuro"; }).map(function (a) { return link(a, znane); }).join("") +
+      '<a class="pp-z pp-adm" hidden href="/administracja/"' +
       (location.pathname.indexOf("/administracja") === 0 ? ' aria-current="page"' : "") + ">" +
       svg('<path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>') +
       '<span><b>Administracja</b><small>Konta, uprawnienia, zgłoszenia błędów, stan systemu</small><span class="pp-l" data-l="administracja"></span></span></a></div>' +
@@ -343,7 +347,8 @@
     el.querySelectorAll(".pp-av").forEach(function (a) { a.textContent = inicjaly(nazwa); });
     el.querySelector(".pp-konto").title = nazwa;
     el.querySelector(".pp-kto-t").innerHTML = "<b>" + esc(nazwa) + "</b><small>" + esc(k.email || "") + "</small>";
-    el.querySelector(".pp-biuro").hidden = !k.admin || ag;
+    el.querySelector(".pp-adm").hidden = !k.admin || ag;
+    el.querySelector(".pp-biuro").hidden = !el.querySelector(".pp-biuro a:not([hidden])");
     el.querySelector(".pp-adm").href = k.zgloszeniaNowe ? "/administracja/#zgloszenia" : "/administracja/";
     el.querySelector(".pp-kropka").hidden = !(k.admin && !ag && k.zgloszeniaNowe);
     var przel = el.querySelector("[data-agent]");
@@ -495,7 +500,8 @@
     { id: "radar", nazwa: "Radar działek", sciezka: "/radar" },
     { id: "leady", nazwa: "Zimne telefony", sciezka: "/leady" },
     { id: "transakcje", nazwa: "Transakcje", sciezka: "/transakcje" },
-    { id: "odprawa", nazwa: "Raporty", sciezka: "/odprawa" }
+    { id: "odprawa", nazwa: "Raporty", sciezka: "/odprawa" },
+    { id: "wdrozenie", nazwa: "Wdrożenie", sciezka: "/wdrozenie" }
   ];
   var RODZAJE_ZGL = [["blad", "Błąd"], ["poprawka", "Poprawka"], ["pomysl", "Pomysł"]];
   var STANY_ZGL = { nowe: "Nowe", w_toku: "W toku", zrobione: "Zrobione", odrzucone: "Odrzucone" };
