@@ -137,12 +137,30 @@
     var role = (KONTO && (KONTO.role || [KONTO.rola])) || [];
     return n.dla.some(function (r) { return role.indexOf(r) >= 0; });
   }
-  function widziane() { return czytaj(KL_NOW) || []; }
+  // widziane – na KONCIE (Kontakty: profil.nowosci, PUT /administracja/api/ja/nowosci); localStorage tylko na wypadek braku serwera
+  function klNow() { return KL_NOW + ":" + ((KONTO && KONTO.email) || ""); }   // wspólny komputer – osobno dla każdego konta
+  function widziane() {
+    var z = (KONTO && KONTO.profil && KONTO.profil.nowosci) || [];
+    return z.concat(czytaj(klNow()) || []);
+  }
   function nowe() {
     var w = widziane(), od = Date.now() - 30 * 24 * 3600 * 1000;
     return NOWOSCI.filter(function (n) { return w.indexOf(n.id) < 0 && Date.parse(n.data) >= od && dlaMnie(n); });
   }
-  function oznaczWidziane() { zapisz(KL_NOW, NOWOSCI.map(function (n) { return n.id; })); licznik(); }
+  function oznaczWidziane() {
+    var ids = NOWOSCI.map(function (n) { return n.id; });
+    zapisz(klNow(), ids);
+    if (KONTO) {
+      KONTO.profil = KONTO.profil || {};
+      KONTO.profil.nowosci = ids;
+      fetch("/administracja/api/ja/nowosci", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widziane: ids }) }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+        if (!d) return;
+        try { var k = JSON.parse(sessionStorage.getItem("pracawre-konto") || "null"); if (k) { k.profil = k.profil || {}; k.profil.nowosci = d.nowosci; sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } } catch (e) {}
+      }).catch(function () {});
+    }
+    licznik();
+  }
   function licznik() {
     var n = nowe().length;
     document.querySelectorAll(".pp-sam-n").forEach(function (e) { e.textContent = n; e.hidden = !n; });
