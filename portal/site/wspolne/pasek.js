@@ -66,6 +66,7 @@
     "::view-transition-old(root),::view-transition-new(root){animation-duration:.22s}" +
     // 30.10 (zgłoszenie: „przewinę do połowy, widzę błąd i muszę wracać na górę po ☰ / Zgłoś”): pasek pływa – zawsze na górze
     "#pracawre-pasek{flex:none;position:sticky;top:0;z-index:60}" +
+    "html:not(.pw-sciagi) [data-sciaga]{display:none!important}" +
     // 28.10 (decyzja użytkownika): górny pasek = tylko ☰, logo i nazwa otwartego narzędzia; wszystko inne (narzędzia z liczbami,
     // konto, motyw, zgłoś błąd, widok agenta, administracja, wyloguj) w wysuwanej karcie z lewej na całą wysokość
     ".pp{view-transition-name:pracawre-pasek;box-sizing:border-box;display:flex;align-items:center;gap:4px;height:40px;" +
@@ -347,6 +348,9 @@
   }
   function uprawnieniaWPasku(el, k) {
     if (!k || !el) return;
+    // 11.11 (decyzja użytkownika): ściągi (📋 Skrypt i obiekcje, 📋 Lista przed spotkaniem) – tylko z dostępem „Ściągi” (rola Młody agent)
+    var sc = (k.obszary || {}).sciagi;
+    html.classList.toggle("pw-sciagi", sc === "dostep" || sc === "admin");
     APPS.forEach(function (a) {
       el.querySelectorAll('[data-obszar="' + a.obszar + '"]').forEach(function (link) { link.hidden = !widoczny(a, k); });
     });

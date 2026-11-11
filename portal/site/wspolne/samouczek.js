@@ -17,15 +17,15 @@
   // brak pola = wszyscy), obszar = tylko z dostępem do aplikacji. Administrator widzi wszystkie (wie, co dostali inni).
   var NOWOSCI = [
     { id: "2026-11-11-cwiczenie", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent"], tytul: "🎓 Ćwiczenie na fikcyjnym kliencie",
-      opis: "Przećwicz w Zimnych drogę leada od ogłoszenia do umówionego telefonu – na fikcyjnych danych, które same się usuwają i nie liczą się w Raportach.",
+      opis: "Dwa ćwiczenia w Zimnych: praca z listy leadów i tryb „Zacznij dzwonić” – na fikcyjnych klientach, nic nie liczy się w Raportach i wszystko samo się usuwa.",
       cw: true },
     { id: "2026-11-11-samouczek", data: "2026-11-11", gdzie: "Cała strona", tytul: "🎓 Samouczek",
       opis: "Oprowadzanie po stronie głównej, Zimnych telefonach i Transakcjach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
       start: true },
-    { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent", "administracja"], tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
+    { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "sciagi", tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
       opis: "Podczas dzwonienia otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje – z podręcznika agenta.",
       pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } },
-    { id: "2026-11-11-sciaga-spotkanie", data: "2026-11-11", gdzie: "Transakcje", obszar: "transakcje", dla: ["agent", "dyrektor"], tytul: "📋 Lista przed spotkaniem",
+    { id: "2026-11-11-sciaga-spotkanie", data: "2026-11-11", gdzie: "Transakcje", obszar: "sciagi", tytul: "📋 Lista przed spotkaniem",
       opis: "W karcie transakcji przed spotkaniem pozyskowym – etapy spotkania i checklista, co zabrać i o co zapytać.",
       pokaz: { sciezka: "/transakcje/", el: "#tablica", tytul: "Lista przed spotkaniem", tekst: "Otwórz transakcję na etapie <b>Nowy</b>, <b>Spotkanie umówione</b> albo <b>Zadzwoń ponownie</b>. Pod przyciskami działań znajdziesz <b>„📋 Lista przed spotkaniem”</b>." } },
     { id: "2026-11-11-wdrozenie", data: "2026-11-11", gdzie: "Wdrożenie", obszar: "wdrozenie", tytul: "📘 Podręcznik agenta i Moja ścieżka",
@@ -62,7 +62,7 @@
           "<li><b>Spotkanie umówione</b> – powstaje transakcja w <b>Transakcjach</b> na etapie „Spotkanie umówione” i spotkanie w HubSpot (oraz w Twoim kalendarzu Google).</li>" +
           "<li><b>Niekwalifikowany?</b> – biuro, deweloper, nieaktualne, duplikat – dotyczy tylko tego ogłoszenia.</li></ul>" +
           "Lead bez Twojego zadania wraca o północy do wspólnej puli." },
-      { el: "#dzwonPrz", tytul: "Tryb „Dzwonię”", tekst: "Jeden lead naraz, wynik klawiszami 1–4, następny lead podaje się sam. Z boku otworzysz <b>„📋 Skrypt i obiekcje”</b>." }
+      { el: "#dzwonPrz", tytul: "Tryb „Dzwonię”", tekst: "Jeden lead naraz, wynik klawiszami 1–4, następny lead podaje się sam." }
     ] },
     { id: "transakcje", sciezka: "/transakcje/", obszar: "transakcje", nazwa: "Transakcje", kroki: [
       { el: "#lejki", tytul: "Transakcje", tekst: "Twoje sprawy od spotkania do faktury. Proces: <b>Nieruchomości</b> (domyślny), Finanse, DoneHome." },
@@ -74,13 +74,13 @@
           "<li>Etap, kwoty i czynności zapisują się w HubSpot same.</li></ul>" },
       { el: "#bLead", tytul: "+ Nowa transakcja", tekst: "Klient z polecenia albo telefonu do biura: najpierw telefon / e-mail – sprawdzimy, czy klienta już nie ma – potem źródło i etap." },
       { el: "#q", tytul: "Szukaj", tekst: "Po nazwie, kliencie, telefonie albo lokalizacji. Stracone sprawy znajdziesz pod tablicą." },
-      { tytul: "Karta transakcji", tekst: "Kliknięcie w kartę otwiera sprawę: <b>Notatka, Telefon, Zadanie, Spotkanie</b>, strony transakcji, ogłoszenia, umowy i oś czasu (z pocztą, jeśli połączysz Google). Przed spotkaniem pozyskowym – <b>„📋 Lista przed spotkaniem”</b>." }
+      { tytul: "Karta transakcji", tekst: "Kliknięcie w kartę otwiera sprawę: <b>Notatka, Telefon, Zadanie, Spotkanie</b>, strony transakcji, ogłoszenia, umowy i oś czasu (z pocztą, jeśli połączysz Google)." }
     ] }
   ];
 
   // ---- ĆWICZENIE na fikcyjnym kliencie (11.11, część b): Zimne, sytuacja 1 „Proszę zadzwonić za tydzień” ----
   // Leady z /leady/api/samouczek (tylko moje, numery 555 2xx 3nn); wszystko w HubSpot z „🎓 SAMOUCZEK”, sprzątane na końcu.
-  var CW = null;                                      // {leady: [{id, imie, numer, …}], rodzaj}
+  var CW = null, ROZMOWA_TOMASZ = null;                                      // {leady: [{id, imie, numer, …}], rodzaj}
   function L(n) { return CW && CW.leady ? CW.leady[n - 1] : null; }
   function nrTxt(n) { var x = L(n); return x ? x.numer.slice(0, 3) + " " + x.numer.slice(3, 6) + " " + x.numer.slice(6) : "…"; }
   function otwarty() { try { return typeof OTWARTY !== "undefined" ? OTWARTY : null; } catch (e) { return null; } }   // karta leada w Zimnych
@@ -104,19 +104,22 @@
   function kopiujBtn(n) { return '<button type="button" class="pt-k" data-kopiuj="' + (L(n) ? L(n).numer : "") + '">📋 Kopiuj</button>'; }
 
   var CWICZENIA = [
-    { id: "cw1", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · sytuacja 1 z 2", cw: true, kroki: [
-      { tytul: "Ćwiczenie: „Proszę zadzwonić za tydzień”", dalejTxt: "Zaczynamy →",
-        tekst: "Przejdziesz prawdziwą drogę leada – ale na <b>fikcyjnym kliencie</b>. Przygotuję 5 przykładowych ogłoszeń widocznych tylko dla Ciebie, z numerami <b>555 2… 3…</b> (takie numery nie istnieją).<br><br>" +
-          "Wszystko, co zapiszesz w HubSpot, dostanie dopisek <b>🎓 SAMOUCZEK</b> – nie liczy się w Raportach, celach ani na pulpicie, a na końcu samo się usunie.",
+    { id: "cw1", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · lista leadów", cw: true, kroki: [
+      { tytul: "Ćwiczenie: praca z listy leadów", dalejTxt: "Zaczynamy →",
+        tekst: "Przejdziesz drogę leada z listy Zimnych – od ogłoszenia do umówionego telefonu – na <b>fikcyjnych klientach</b>.<br><br>" +
+          "Wszystko, co zapiszesz, dostanie dopisek <b>🎓 SAMOUCZEK</b>: nie liczy się w Raportach, celach ani na pulpicie i na końcu samo się usunie.",
         naDalej: function () {
-          return apiL("samouczek/start", { method: "POST" }).then(function (d) { CW = d; zapisz(KL_STAN, { trasa: "cw1", i: 1, czas: Date.now() }); location.reload(); return false; });
+          return startSerwer("cw1");
         } },
       { el: function () { return L(1) && document.querySelector('#lista [data-p="samouczek"][data-i="' + L(1).id + '"]'); }, przepusc: true,
         przed: function () {
           var q = document.getElementById("q");
           if (q && L(1) && !otwartyL(1)) { q.value = "Przykładowa"; q.dispatchEvent(new Event("input", { bubbles: true })); }
         },
-        czekaj: function () { return !!otwartyL(1); },
+        czekaj: function (k) {
+          if (!otwartyL(1) && L(1) && !znajdz(k.el) && Date.now() - k.od > 6000 && !k.auto) { k.auto = true; location.hash = "#lead/samouczek/" + encodeURIComponent(L(1).id); }
+          return !!otwartyL(1);
+        },
         tytul: "Otwórz leada", tekst: "Na liście są Twoje fikcyjne ogłoszenia (oznaczone 🎓). Wyszukałem pierwsze: <b>mieszkanie na Psim Polu, Pan Tomasz</b>. <b>Kliknij je</b> – otworzy się karta leada.",
         brak: "Nie widzę tego leada na liście (może zasłaniają go filtry). <button type='button' class='pt-k' data-otworz-l1>Otwórz go za mnie</button>" },
       { el: "#panel [data-ogloszenie]", przepusc: true,
@@ -152,6 +155,49 @@
         naDalej: function () { koniecCwiczenia(); return false; } }
     ] }
   ];
+  function startSerwer(id) {
+    return apiL("samouczek/start", { method: "POST" }).then(function (d) { CW = d; zapisz(KL_STAN, { trasa: id, i: 1, czas: Date.now() }); location.reload(); return false; });
+  }
+  function dz() { try { return typeof DZ !== "undefined" ? DZ : null; } catch (e) { return null; } }   // tryb „Dzwonię” w Zimnych
+  function dzLeadL(n) { var d = dz(), x = L(n); return !!(d && d.lead && x && d.lead.portal === "samouczek" && d.lead.id === x.id) ? d.lead : null; }
+  function trybOtwarty() { var e = document.getElementById("dz"); return !!(e && !e.hidden); }
+  ROZMOWA_TOMASZ = function (koniec) {
+    return "<div class='pt-r'><div class='pt-kl'><b>Pan Tomasz:</b> Dzień dobry… tak, ogłoszenie jest aktualne. Ale jestem teraz w pracy, nie bardzo mogę rozmawiać.</div>" +
+      "<div class='pt-hint'>💡 <b>Ze skryptu:</b> szanuj czas klienta, ale zostaw konkret – „Rozumiem, zajmę minutę: mamy klientów szukających takiego mieszkania. Kiedy mogę zadzwonić, żeby spokojnie porozmawiać?”</div>" +
+      "<div class='pt-kl'><b>Pan Tomasz:</b> Wie Pan co, proszę zadzwonić za tydzień, w czwartek po 17. Wtedy będę wiedział, czy znajomy jednak nie weźmie.</div>" +
+      "<div class='pt-ja'>➡️ <b>Teraz zapiszesz:</b> " + koniec + "</div></div>";
+  };
+  CWICZENIA.push({ id: "cw2", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · Zacznij dzwonić", cw: true, kroki: [
+    { tytul: "Ćwiczenie: tryb „Zacznij dzwonić”", dalejTxt: "Zaczynamy →",
+      tekst: "Przećwiczysz dzwonienie w trybie <b>„Dzwonię”</b> – system podaje klienta po kliencie, Ty dzwonisz i zapisujesz wynik. Klienci w ćwiczeniu są <b>fikcyjni</b>.<br><br>" +
+        "Wszystko, co zapiszesz, dostanie dopisek <b>🎓 SAMOUCZEK</b>: nie liczy się w Raportach, celach ani na pulpicie i na końcu samo się usunie.",
+      naDalej: function () { return startSerwer("cw2"); } },
+    { el: function () { var o = document.getElementById("okSp"); return o && !o.hidden ? o.querySelector(".ok") : document.getElementById("dzwonPrz"); }, przepusc: true,
+      czekaj: function () { return trybOtwarty(); },
+      tytul: "Zacznij dzwonić", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. Jeśli pojawi się okno <b>„📞 Dziś dzwonię”</b> – wybierz, co chcesz, i kliknij <b>„▶ Zaczynam”</b>. Fikcyjny klient i tak przyjdzie pierwszy.",
+      brak: "Nie widzę lwa na tej stronie. <button type='button' class='pt-k' data-tryb>Uruchom tryb za mnie</button>" },
+    { el: "#dz [data-dz-ogl]", przepusc: true,
+      tytul: "Otwórz ogłoszenie i odsłoń numer", tekst: function () {
+        return "Tryb podał Ci klienta (oznaczenie 🎓). Kliknij <b>„1. Otwórz ogłoszenie”</b> – na portalu sam klikasz <b>„Pokaż numer”</b>. W ćwiczeniu numer to:<div class='pt-nr'><b>" + nrTxt(1) + "</b>" + kopiujBtn(1) + "</div>Wróć tutaj i kliknij <b>Dalej</b>.";
+      }, brak: "Czekam, aż tryb poda klienta…" },
+    { el: "#dzTel", przepusc: true,
+      czekaj: function () { var d = dzLeadL(1); return !!(d && d.telefon) || bylo(/\/leady\/api\/dzwonie\/samouczek\/[^/]+\/numer$/, "POST"); },
+      tytul: "Wklej numer", tekst: function () { return "Wklej numer w pole <b>„2. Wklej numer”</b>. W trybie „Dzwonię” lead od razu jest Twój – bez „Biorę”. <div class='pt-nr'><b>" + nrTxt(1) + "</b>" + kopiujBtn(1) + "</div>"; } },
+    { rozmowa: true, tytul: "Dzwonisz do Pana Tomasza", dalejTxt: "Zapisuję wynik rozmowy →",
+      tekst: function () { return ROZMOWA_TOMASZ("„⏰ Odebrał – oddzwonić” → <b>Za tydzień</b>, godzina <b>17:00</b> + krótka notatka."); } },
+    { el: '#dz [data-dz-w="ponownie"]', przepusc: true,
+      czekaj: function () { return !!document.querySelector('#dz [data-dz-w="ponownie"][aria-pressed="true"]'); },
+      tytul: "Odebrał – oddzwonić", tekst: "Kliknij <b>„⏰ Odebrał – oddzwonić”</b> (albo klawisz <b>2</b>). Inne wyniki: <i>Nie odebrał</i> – wróci w kolejnej próbie, <i>Nie jest zainteresowany</i> – z powodem, <i>Spotkanie umówione</i> – transakcja w Transakcjach." },
+    { el: "#dzDalej .dalej", przepusc: true,
+      czekaj: function (k) { return bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/telefon$/, "POST", k.od); },
+      tytul: "Termin i notatka", tekst: "Kliknij <b>„Za tydzień”</b>, w polu <b>Termin</b> zmień godzinę na <b>17:00</b>, dopisz notatkę, np. <i>„Znajomy może wziąć mieszkanie, oddzwonić w czwartek po 17.”</i> i kliknij <b>„Zapisz i dalej →”</b>." },
+    { tytul: "Gotowe – tak wygląda praca w trybie „Dzwonię”", dalejTxt: "Zakończ ćwiczenie →",
+      tekst: "<ul class='pp-tour-l'><li>Zaraz po zapisie tryb podaje <b>następnego klienta</b> – telefon, wynik, następny.</li>" +
+        "<li>W HubSpot: telefon z wynikiem „Połączono”, <b>zadanie</b> na czwartek 17:00 z przypomnieniem i notatka.</li>" +
+        "<li>W dniu terminu Pan Tomasz będzie <b>pierwszy w kolejce</b> („Zadzwoń ponownie – termin”) i w „Moje zadania” na pulpicie.</li></ul>" +
+        "Teraz posprzątam wszystko, co powstało w ćwiczeniu.",
+      naDalej: function () { koniecCwiczenia(); return false; } }
+  ] });
   function trasa(id) { return TRASY.concat(CWICZENIA).filter(function (x) { return x.id === id; })[0] || null; }
 
   function koniecCwiczenia() {
@@ -241,7 +287,10 @@
   function maObszar(o) {
     if (!o) return true;
     if (!KONTO || !P.aplikacje) return false;
-    return P.aplikacje(KONTO).some(function (a) { return a.obszar === o; });
+    if (P.aplikacje(KONTO).some(function (a) { return a.obszar === o; })) return true;
+    if (o === "leady" || o === "transakcje" || o === "wdrozenie") return false;          // aplikacje – tylko widoczne w menu
+    var p = (KONTO.obszary || {})[o];                                                     // pozostałe obszary (np. ściągi) – z konta
+    return p === "dostep" || p === "admin";
   }
 
   // ---- nowości ----
@@ -302,8 +351,9 @@
       '<button type="button" class="mi" data-m="nowosci"><b>Co nowego' + (n ? '<span class="pp-sam-n">' + n + "</span>" : "") + "</b><small>Zmiany w pracawre.com z ostatnich tygodni</small></button>" +
       (cwSt ? '<button type="button" class="mi" data-m="cw-wroc"><b>▶ Wróć do ćwiczenia</b><small>Tam, gdzie skończyłeś</small></button>' +
               '<button type="button" class="mi" data-m="cw-koniec"><b>Zakończ ćwiczenie i posprzątaj</b><small>Usuwa fikcyjne leady i to, co powstało w HubSpot</small></button>'
-        : maObszar("leady") ? '<button type="button" class="mi" data-m="cw"><b>Ćwiczenie na przykładowym kliencie</b><small>Fikcyjny lead w Zimnych: „Proszę zadzwonić za tydzień” (ok. 5 min)</small></button>' : ""), true);
-    var bc = o.querySelector('[data-m="cw"]'); if (bc) bc.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start("cw1"); });
+        : maObszar("leady") ? '<button type="button" class="mi" data-m="cw1"><b>Ćwiczenie – lista leadów</b><small>Fikcyjny klient: od ogłoszenia z listy do umówionego telefonu</small></button>' +
+          '<button type="button" class="mi" data-m="cw2"><b>Ćwiczenie – „Zacznij dzwonić”</b><small>Fikcyjny klient w trybie „Dzwonię”: telefon, wynik, następny</small></button>' : ""), true);
+    ["cw1", "cw2"].forEach(function (id) { var bc = o.querySelector('[data-m="' + id + '"]'); if (bc) bc.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start(id); }); });
     var bwr = o.querySelector('[data-m="cw-wroc"]'); if (bwr) bwr.addEventListener("click", function () { zamknijOkno(); start(cwSt.trasa); });
     var bk = o.querySelector('[data-m="cw-koniec"]'); if (bk) bk.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); koniecCwiczenia(); });
     o.querySelector('[data-m="cale"]').addEventListener("click", function () { zamknijOkno(); start("glowna", true); });
@@ -319,11 +369,11 @@
       lista.map(function (n) {
         var d = n.data.split("-");
         return '<div class="nw"><b>' + n.tytul + "</b><small>" + n.gdzie + " · " + Number(d[2]) + "." + d[1] + "</small><p>" + n.opis + "</p>" +
-          (n.start ? '<button type="button" data-start>Zacznij oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Zacznij ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
+          (n.start ? '<button type="button" data-start>Zacznij oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
       }).join("") +
       '<div class="po-d"><span>Wszystkie nowości: 🎓 → „Co nowego”</span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
     o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); });
-    var c = o.querySelector("[data-cw]"); if (c) c.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); zapisz(KL_STAN, null); start("cw1"); });
+    var c = o.querySelector("[data-cw]"); if (c) c.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); menu(); });
     var s = o.querySelector("[data-start]"); if (s) s.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); start("glowna", true); });
     o.querySelectorAll("[data-pokaz]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -452,6 +502,7 @@
       var kb = e.target.closest("[data-kopiuj]");
       if (kb && navigator.clipboard) navigator.clipboard.writeText(kb.dataset.kopiuj).then(function () { kb.textContent = "✓ Skopiowano"; });
       if (e.target.closest("[data-otworz-l1]") && L(1)) location.hash = "#lead/samouczek/" + encodeURIComponent(L(1).id);
+      if (e.target.closest("[data-tryb]")) try { if (typeof dzStart === "function") dzStart(); } catch (er) {}
     };
     clearInterval(petla); petla = null;
     if (k.czekaj || typeof k.el === "function" || cw) petla = setInterval(function () {
@@ -491,9 +542,13 @@
     else if (top - 48 > dh + 16) y = top - dh - 12;
     else if (r.left - m >= dw + 24) { x = r.left - m - dw - 12; y = yBok; }            // wysoki element – dymek obok, nie na nim
     else if (innerWidth - r.right - m >= dw + 24) { x = r.right + m + 12; y = yBok; }
-    else {
-      y = Math.max(52, innerHeight - dh - 16);
-      if (r.width > innerWidth - dw - 40) x = innerWidth - dw - 12;                       // duży element – dymek w rogu
+    else {                                                                                  // nic nie pasuje – róg, który najmniej zasłania
+      var naj = null;
+      [[12, innerHeight - dh - 12], [innerWidth - dw - 12, innerHeight - dh - 12], [innerWidth - dw - 12, 52], [12, 52]].forEach(function (p) {
+        var ox = Math.max(0, Math.min(p[0] + dw, r.right) - Math.max(p[0], r.left)), oy = Math.max(0, Math.min(p[1] + dh, r.bottom) - Math.max(p[1], r.top));
+        if (!naj || ox * oy < naj[2]) naj = [p[0], p[1], ox * oy];
+      });
+      x = Math.max(12, naj[0]); y = Math.max(52, naj[1]);
     }
     d.style.left = x + "px"; d.style.top = y + "px";
   }
