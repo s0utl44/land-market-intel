@@ -936,7 +936,89 @@
     e.preventDefault(); e.stopPropagation(); cel.click();
   }, true);
 
-  window.PracawrePasek = { liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
+
+  // --- Ściągi z podręcznika (11.11, decyzja użytkownika: dla WSZYSTKICH agentów) -----------------------------------------------
+  // PracawrePasek.sciaga("telefon" | "spotkanie") – boczny panel (bez zasłaniania strony) z treścią z /wdrozenie/api/sciagi/<rodzaj>
+  // (trasa Traefika bez wre-wdrozenie). Treść = aktualny podręcznik z poprawkami dyrektora. Esc / ✕ / ponowne wywołanie zamyka.
+  var CSS_SC = "#pp-sc{position:fixed;top:42px;right:0;bottom:0;z-index:2147481000;width:min(520px,100vw);box-sizing:border-box;" +
+    "background:var(--card,#fff);color:var(--ink,#1f1d1a);border-left:1px solid var(--line,#e2ddd2);box-shadow:-12px 0 32px rgba(0,0,0,.12);" +
+    "display:flex;flex-direction:column;font:14px/1.5 Lato,'Segoe UI',system-ui,sans-serif}" +
+    "#pp-sc .pp-sc-g{display:flex;align-items:center;gap:8px;padding:12px 14px 12px 18px;border-bottom:1px solid var(--line,#e2ddd2)}" +
+    "#pp-sc .pp-sc-g b{flex:1;font-size:15px}#pp-sc .pp-sc-g a{font-size:12.5px;color:var(--gold-d,#7a5f1c)}" +
+    "#pp-sc .pp-sc-x{all:unset;cursor:pointer;width:34px;height:34px;border-radius:10px;display:grid;place-items:center}" +
+    "#pp-sc .pp-sc-x:hover{background:var(--hover,#f7f3e8)}#pp-sc .pp-sc-x svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}" +
+    "#pp-sc .pp-sc-w{overflow:auto;padding:12px 16px 24px;overscroll-behavior:contain}" +
+    "#pp-sc details{border:1px solid var(--line,#e2ddd2);border-radius:12px;margin-top:10px}" +
+    "#pp-sc summary{cursor:pointer;font-weight:800;padding:10px 14px}#pp-sc .pp-sc-c{padding:0 14px 12px}" +
+    "#pp-sc .pp-sc-c p{margin:6px 0}#pp-sc .pp-sc-c ul,#pp-sc .pp-sc-c ol{margin:6px 0;padding-left:20px}#pp-sc li+li{margin-top:3px}" +
+    "#pp-sc .pp-sc-k{background:var(--gold-bg,#fbf6e8);border-radius:10px;padding:8px 12px}" +
+    "#pp-sc .pp-sc-t{display:flex;flex-direction:column;gap:8px}#pp-sc .pp-sc-r{border:1px solid var(--line2,#ece8df);border-radius:10px;padding:8px 10px}" +
+    "#pp-sc .pp-sc-r b{display:block}#pp-sc .pp-sc-r span{display:block;color:var(--muted,#6b665d);font-size:12.5px;margin-top:2px}" +
+    "#pp-sc .pp-sc-r i{font-style:normal}";
+  function mdLinia(t) {
+    return esc(t).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "$1");
+  }
+  // uproszczony Markdown ściąg: akapity, listy (z ptaszkami), cytat „W skrócie”, tabele jako karty (1. kolumna = nagłówek karty)
+  function mdSciagi(md) {
+    var L = String(md || "").split("\n"), o = [], i = 0, par = [];
+    function akapit() { if (par.length) { o.push("<p>" + mdLinia(par.join(" ")) + "</p>"); par = []; } }
+    function kom(l) { return l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(function (x) { return x.trim(); }); }
+    while (i < L.length) {
+      var l = L[i];
+      if (!l.trim()) { akapit(); i++; continue; }
+      if (/^>/.test(l)) { akapit(); var w = []; while (i < L.length && /^>/.test(L[i])) w.push(L[i++].replace(/^>\s?/, "")); o.push('<div class="pp-sc-k">' + mdSciagi(w.join("\n")) + "</div>"); continue; }
+      if (/^\s*\|/.test(l) && /^\s*\|[\s:|-]+\|\s*$/.test(L[i + 1] || "")) {
+        akapit(); var nag = kom(l), r = []; i += 2;
+        while (i < L.length && /^\s*\|/.test(L[i])) r.push(kom(L[i++]));
+        o.push('<div class="pp-sc-t">' + r.map(function (w) {
+          return '<div class="pp-sc-r"><b>' + mdLinia(w[0]) + "</b>" + w.slice(1).map(function (k, j) {
+            return "<span><i>" + mdLinia(nag[j + 1] || "") + ":</i> " + mdLinia(k) + "</span>"; }).join("") + "</div>"; }).join("") + "</div>");
+        continue;
+      }
+      var m = /^(\s*)([-*]|\d+\.)\s+(.*)$/.exec(l);
+      if (m) {
+        akapit(); var num = /\d/.test(m[2]), el = [];
+        while (i < L.length) {
+          var k2 = /^(\s*)([-*]|\d+\.)\s+(.*)$/.exec(L[i]);
+          if (k2) { el.push(k2[3]); i++; continue; }
+          if (L[i].trim() && /^\s{2,}\S/.test(L[i]) && el.length) { el[el.length - 1] += " " + L[i].trim(); i++; continue; }
+          break;
+        }
+        o.push((num ? "<ol>" : "<ul>") + el.map(function (t) { return "<li>" + mdLinia(t.replace(/^\[( |x)\]\s+/i, "☐ ")) + "</li>"; }).join("") + (num ? "</ol>" : "</ul>"));
+        continue;
+      }
+      if (/^#{1,6}\s/.test(l)) { akapit(); o.push("<p><b>" + mdLinia(l.replace(/^#+\s+/, "")) + "</b></p>"); i++; continue; }
+      par.push(l.trim()); i++;
+    }
+    akapit();
+    return o.join("");
+  }
+  var scOtwarta = null;
+  function zamknijSciage() { var el = document.getElementById("pp-sc"); if (el) el.remove(); window.removeEventListener("keydown", klawSc, true); scOtwarta = null; }
+  function klawSc(e) { if (document.getElementById("pp-sc")) tylkoTo(e, zamknijSciage); }
+  function sciaga(rodzaj) {
+    if (scOtwarta === rodzaj) return zamknijSciage();
+    zamknijSciage(); styl();
+    if (!document.getElementById("pp-sc-styl")) { var st = document.createElement("style"); st.id = "pp-sc-styl"; st.textContent = CSS_SC; document.head.appendChild(st); }
+    var el = document.createElement("aside");
+    el.id = "pp-sc"; el.setAttribute("aria-label", "Ściąga");
+    el.innerHTML = '<div class="pp-sc-g"><b>Ściąga</b><button type="button" class="pp-sc-x" title="Zamknij (Esc)" aria-label="Zamknij">' +
+      svg('<path d="M6 6l12 12M18 6 6 18"/>') + '</button></div><div class="pp-sc-w"><p>Wczytywanie…</p></div>';
+    document.body.appendChild(el); scOtwarta = rodzaj;
+    el.querySelector(".pp-sc-x").addEventListener("click", zamknijSciage);
+    window.addEventListener("keydown", klawSc, true);
+    fetch("/wdrozenie/api/sciagi/" + encodeURIComponent(rodzaj), { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        el.querySelector(".pp-sc-g b").textContent = d.tytul;
+        el.querySelector(".pp-sc-w").innerHTML = d.czesci.map(function (c, n) {
+          return "<details" + (n < 2 ? " open" : "") + "><summary>" + esc(c.tytul) + '</summary><div class="pp-sc-c">' + mdSciagi(c.md) + "</div></details>";
+        }).join("");
+      })
+      .catch(function () { el.querySelector(".pp-sc-w").innerHTML = "<p>Nie udało się wczytać ściągi – spróbuj za chwilę.</p>"; });
+  }
+
+  window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
