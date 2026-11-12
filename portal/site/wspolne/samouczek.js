@@ -19,6 +19,13 @@
   // Nowość pokazuje się po wejściu RAZ; zamknięta przepada (bez listy „Co nowego” w menu 🎓).
   // Wzór wpisu: { id: "RRRR-MM-DD-nazwa", data: "RRRR-MM-DD", gdzie, tytul, opis, dla?: [role], obszar?, pokaz?: {sciezka, el, tytul, tekst} }
   var NOWOSCI = [
+    // 12.11 – zatwierdzone przez użytkownika (1 i 2)
+    { id: "2026-11-11-samouczek", data: "2026-11-12", gdzie: "Cała strona", tytul: "🎓 Samouczek",
+      opis: "Przycisk 🎓 w pasku: samouczek strony głównej i Zimnych telefonów – co gdzie jest i ćwiczenie na fikcyjnym kliencie.",
+      start: true },
+    { id: "2026-11-11-sciaga-telefon", data: "2026-11-12", gdzie: "Zimne", obszar: "sciagi", tytul: "📋 Skrypt i obiekcje / Lista przed spotkaniem",
+      opis: "W trybie „Dzwonię” otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje, a w karcie transakcji przed spotkaniem – listę, co zabrać i o co zapytać.",
+      pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } }
   ];
 
   // ---- OPROWADZANIE: trasy po kolei; krok bez el = dymek na środku; brak elementu na stronie = krok pominięty ----
@@ -340,7 +347,7 @@
       lista.map(function (n) {
         var d = n.data.split("-");
         return '<div class="nw"><b>' + n.tytul + "</b><small>" + n.gdzie + " · " + Number(d[2]) + "." + d[1] + "</small><p>" + n.opis + "</p>" +
-          (n.start ? '<button type="button" data-start>Wybierz oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
+          (n.start ? '<button type="button" data-start>Wybierz samouczek →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
       }).join("") +
       '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
     o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); });
