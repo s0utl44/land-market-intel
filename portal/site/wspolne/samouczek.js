@@ -15,25 +15,10 @@
   // ---- NOWOŚCI (najnowsze na górze; id NIE zmieniać – po nim pamiętamy, kto już widział) ----
   // KOMU (decyzja użytkownika przy KAŻDEJ nowości): dla = role (agent, administracja, dyrektor, zarzad, zarzadzanie, pozostale;
   // brak pola = wszyscy), obszar = tylko z dostępem do aplikacji. Administrator widzi wszystkie (wie, co dostali inni).
+  // 12.11 (decyzja użytkownika): TREŚĆ i ODBIORCÓW każdej nowości zatwierdza użytkownik – nic nie dopisujemy bez jego zgody.
+  // Nowość pokazuje się po wejściu RAZ; zamknięta przepada (bez listy „Co nowego” w menu 🎓).
+  // Wzór wpisu: { id: "RRRR-MM-DD-nazwa", data: "RRRR-MM-DD", gdzie, tytul, opis, dla?: [role], obszar?, pokaz?: {sciezka, el, tytul, tekst} }
   var NOWOSCI = [
-    { id: "2026-11-12-role", data: "2026-11-12", gdzie: "Administracja", dla: ["administrator"], tytul: "👥 Dostęp całej roli naraz",
-      opis: "Administracja → zakładka „Role”: zmieniasz dostęp wszystkim z daną rolą jednym kliknięciem (np. agenci – tylko Zimne telefony). Wyjątki dla pojedynczych osób – jak dotąd w Kontach.",
-      pokaz: { sciezka: "/administracja/", el: '[data-z="role"]', tytul: "Zakładka „Role”", tekst: "Tu ustawiasz dostęp całej roli. Zmiana działa od razu dla wszystkich z tą rolą; „↺ Domyślne” przywraca ustawienia startowe." } },
-    { id: "2026-11-11-cwiczenie", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent"], tytul: "🎓 Ćwiczenie na fikcyjnym kliencie",
-      opis: "Dwa ćwiczenia w Zimnych: praca z listy leadów i tryb „Zacznij dzwonić” – na fikcyjnych klientach, nic nie liczy się w Raportach i wszystko samo się usuwa.",
-      cw: true },
-    { id: "2026-11-11-samouczek", data: "2026-11-11", gdzie: "Cała strona", tytul: "🎓 Samouczek",
-      opis: "Oprowadzanie po stronie głównej i po Zimnych telefonach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
-      start: true },
-    { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "sciagi", tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
-      opis: "Podczas dzwonienia otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje – z podręcznika agenta.",
-      pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } },
-    { id: "2026-11-11-sciaga-spotkanie", data: "2026-11-11", gdzie: "Transakcje", obszar: "sciagi", tytul: "📋 Lista przed spotkaniem",
-      opis: "W karcie transakcji przed spotkaniem pozyskowym – etapy spotkania i checklista, co zabrać i o co zapytać.",
-      pokaz: { sciezka: "/transakcje/", el: "#tablica", tytul: "Lista przed spotkaniem", tekst: "Otwórz transakcję na etapie <b>Nowy</b>, <b>Spotkanie umówione</b> albo <b>Zadzwoń ponownie</b>. Pod przyciskami działań znajdziesz <b>„📋 Lista przed spotkaniem”</b>." } },
-    { id: "2026-11-11-wdrozenie", data: "2026-11-11", gdzie: "Wdrożenie", obszar: "wdrozenie", tytul: "📘 Podręcznik agenta i Moja ścieżka",
-      opis: "Menu ☰ → Biuro → Wdrożenie: podręcznik (zimny telefon, spotkanie, umowy, najem, notariusz) i plan pierwszych tygodni z zadaniami do odhaczenia.",
-      pokaz: { sciezka: "/wdrozenie/", el: "#zakl", tytul: "Podręcznik i Moja ścieżka", tekst: "<b>Podręcznik</b> – rozdziały z „W skrócie” na początku i szukaniem po każdym słowie. <b>Moja ścieżka</b> – zadania na pierwsze tygodnie; przeczytany rozdział odhaczysz przyciskiem w jego stopce." } }
   ];
 
   // ---- OPROWADZANIE: trasy po kolei; krok bez el = dymek na środku; brak elementu na stronie = krok pominięty ----
@@ -50,7 +35,7 @@
       { el: "#podsS", tytul: "Podsumowanie od dyrektora", tekst: "Po odprawie dyrektor wysyła Ci podsumowanie i ustalenia – tutaj je przeczytasz." },
       { el: "#dzwonPrz", tytul: "Zacznij dzwonić", tekst: "Lew uruchamia tryb <b>„Dzwonię”</b> – system podaje lead po leadzie, Ty tylko dzwonisz i zapisujesz wynik. Lwa możesz przesunąć myszą w wygodne miejsce." }
     ] },
-    { id: "zimne", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony", opis: "Lista, filtry, karta leada i wyniki telefonu", kroki: [
+    { id: "zimne", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony", potem: "cw1", opis: "Co gdzie jest, a potem praca na fikcyjnym kliencie – z listy i w trybie „Zacznij dzwonić”", kroki: [
       { el: "#heroTyt", tytul: "Zimne telefony", tekst: "Prywatne ogłoszenia z portali (Otodom, Adresowo, Gratka) – właściciele bez pośrednika. Nowe ogłoszenia przychodzą codziennie wieczorem." },
       { el: "#rodzaj", tytul: "Sprzedaż / Najem", tekst: "Wybierz rodzaj ogłoszeń. Jeśli masz dostęp, są też <b>Grunty</b> i <b>Marketing</b> (leady z formularzy i kampanii)." },
       { el: "#widok", tytul: "Pula i Twoje leady", tekst: "<b>Zimne</b> – wspólna pula do wzięcia. <b>Moje zimne na dziś</b> – Twoje: „Do zadzwonienia” (nic jeszcze nie zrobione) i „Zadzwoń ponownie” (umówiony telefon, nieodebrane)." },
@@ -95,8 +80,8 @@
   function kopiujBtn(n) { return '<button type="button" class="pt-k" data-kopiuj="' + (L(n) ? L(n).numer : "") + '">📋 Kopiuj</button>'; }
 
   var CWICZENIA = [
-    { id: "cw1", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · lista leadów", cw: true, kroki: [
-      { tytul: "Ćwiczenie: praca z listy leadów", dalejTxt: "Zaczynamy →",
+    { id: "cw1", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony · ćwiczenie 1 z 2", cw: true, kroki: [
+      { tytul: "Ćwiczenie: lead z listy", dalejTxt: "Zaczynamy →",
         tekst: "Przejdziesz drogę leada z listy Zimnych – od ogłoszenia do umówionego telefonu – na <b>fikcyjnych klientach</b>.<br><br>" +
           "Wszystko, co zapiszesz, dostanie dopisek <b>🎓 SAMOUCZEK</b>: nie liczy się w Raportach, celach ani na pulpicie i na końcu samo się usunie.",
         naDalej: function () {
@@ -138,12 +123,12 @@
       { el: "#panel .hsK.pw-ed", przepusc: true,
         czekaj: function (k) { return bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/telefon$/, "POST", k.od); },
         tytul: "Termin i notatka", tekst: "W polu <b>Kiedy</b> ustaw <b>czwartek za tydzień, 17:00</b> (kółko myszy nad polem zmienia dzień, z Shift – tydzień). Przypomnienie zostaw. W polu poniżej wpisz, co ustaliłeś, np. <i>„Znajomy może wziąć mieszkanie, oddzwonić w czwartek po 17.”</i> i kliknij <b>„✓ Zapisz telefon”</b>." },
-      { tytul: "Gotowe – tak wygląda „zadzwoń za tydzień”", dalejTxt: "Zakończ ćwiczenie →",
+      { tytul: "Gotowe – tak wygląda „zadzwoń za tydzień”", dalejTxt: "Dalej: „Zacznij dzwonić” →",
         tekst: "<ul class='pp-tour-l'><li>W HubSpot: <b>telefon</b> z wynikiem „Połączono”, <b>zadanie</b> „Zadzwoń ponownie” na czwartek 17:00 z przypomnieniem i Twoja notatka.</li>" +
           "<li>Lead jest w <b>„Moje zimne na dziś” → „Zadzwoń ponownie”</b> i <b>nie wróci o północy do puli</b> – trzyma go Twoje zadanie.</li>" +
           "<li>W dniu terminu zadanie pokaże się na <b>pulpicie</b> w „Moje zadania” i jako przypomnienie.</li></ul>" +
-          "Teraz posprzątam wszystko, co powstało w ćwiczeniu.",
-        naDalej: function () { koniecCwiczenia(); return false; } }
+          "Teraz to samo w trybie <b>„Zacznij dzwonić”</b> – tak dzwoni się na co dzień.",
+        naDalej: function () { zapisz(KL_STAN, null); T = null; start("cw2"); return false; } }
     ] }
   ];
   function startSerwer(id) {
@@ -158,10 +143,10 @@
       "<div class='pt-kl'><b>Pan Tomasz:</b> Wie Pan co, proszę zadzwonić za tydzień, w czwartek po 17. Wtedy będę wiedział, czy znajomy jednak nie weźmie.</div>" +
       "<div class='pt-ja'>➡️ <b>Teraz zapiszesz:</b> " + koniec + "</div></div>";
   };
-  CWICZENIA.push({ id: "cw2", sciezka: "/leady/", obszar: "leady", nazwa: "Ćwiczenie · Zacznij dzwonić", cw: true, kroki: [
-    { tytul: "Ćwiczenie: tryb „Zacznij dzwonić”", dalejTxt: "Zaczynamy →",
+  CWICZENIA.push({ id: "cw2", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony · ćwiczenie 2 z 2", cw: true, kroki: [
+    { tytul: "Ćwiczenie: tryb „Zacznij dzwonić”", dalejTxt: "Dalej →",
       tekst: "Przećwiczysz dzwonienie w trybie <b>„Dzwonię”</b> – system podaje klienta po kliencie, Ty dzwonisz i zapisujesz wynik. Klienci w ćwiczeniu są <b>fikcyjni</b>.<br><br>" +
-        "Wszystko, co zapiszesz, dostanie dopisek <b>🎓 SAMOUCZEK</b>: nie liczy się w Raportach, celach ani na pulpicie i na końcu samo się usunie.",
+        "Jak poprzednio wszystko z dopiskiem <b>🎓 SAMOUCZEK</b> – na końcu samo się usunie.",
       naDalej: function () { return startSerwer("cw2"); } },
     { el: function () { var o = document.getElementById("okSp"); return o && !o.hidden ? o.querySelector(".ok") : document.getElementById("dzwonPrz"); }, przepusc: true,
       czekaj: function () { return trybOtwarty(); },
@@ -337,19 +322,14 @@
   function menu() {
     var n = nowe().length, t = trasaTu(), st0 = czytaj(KL_STAN), cwSt = st0 && st0.trasa && (trasa(st0.trasa) || {}).cw ? st0 : null;
     var o = okno(
+      (cwSt ? '<button type="button" class="mi" data-m="cw-wroc"><b>▶ Wróć do samouczka</b><small>Tam, gdzie skończyłeś</small></button>' +
+              '<button type="button" class="mi" data-m="cw-koniec"><b>Zakończ samouczek i posprzątaj</b><small>Usuwa fikcyjne leady i to, co powstało w HubSpot</small></button>' : "") +
       TRASY.filter(function (x) { return maObszar(x.obszar); }).map(function (x) {
-        return '<button type="button" class="mi" data-m="tr-' + x.id + '"><b>🎓 Oprowadzanie – ' + x.nazwa + "</b><small>" + x.opis + "</small></button>";
-      }).join("") +
-      '<button type="button" class="mi" data-m="nowosci"><b>Co nowego' + (n ? '<span class="pp-sam-n">' + n + "</span>" : "") + "</b><small>Zmiany w pracawre.com z ostatnich tygodni</small></button>" +
-      (cwSt ? '<button type="button" class="mi" data-m="cw-wroc"><b>▶ Wróć do ćwiczenia</b><small>Tam, gdzie skończyłeś</small></button>' +
-              '<button type="button" class="mi" data-m="cw-koniec"><b>Zakończ ćwiczenie i posprzątaj</b><small>Usuwa fikcyjne leady i to, co powstało w HubSpot</small></button>'
-        : maObszar("leady") ? '<button type="button" class="mi" data-m="cw1"><b>Ćwiczenie – lista leadów</b><small>Fikcyjny klient: od ogłoszenia z listy do umówionego telefonu</small></button>' +
-          '<button type="button" class="mi" data-m="cw2"><b>Ćwiczenie – „Zacznij dzwonić”</b><small>Fikcyjny klient w trybie „Dzwonię”: telefon, wynik, następny</small></button>' : ""), true);
-    ["cw1", "cw2"].forEach(function (id) { var bc = o.querySelector('[data-m="' + id + '"]'); if (bc) bc.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start(id); }); });
+        return '<button type="button" class="mi" data-m="tr-' + x.id + '"><b>🎓 ' + x.nazwa + "</b><small>" + x.opis + "</small></button>";
+      }).join(""), true);
     var bwr = o.querySelector('[data-m="cw-wroc"]'); if (bwr) bwr.addEventListener("click", function () { zamknijOkno(); start(cwSt.trasa); });
     var bk = o.querySelector('[data-m="cw-koniec"]'); if (bk) bk.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); koniecCwiczenia(); });
     TRASY.forEach(function (x) { var b = o.querySelector('[data-m="tr-' + x.id + '"]'); if (b) b.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start(x.id, false); }); });
-    o.querySelector('[data-m="nowosci"]').addEventListener("click", function () { coNowego(true); });
   }
   function coNowego(wszystkie) {
     var lista = wszystkie ? NOWOSCI.filter(dlaMnie).slice(0, 8) : nowe();
@@ -362,7 +342,7 @@
         return '<div class="nw"><b>' + n.tytul + "</b><small>" + n.gdzie + " · " + Number(d[2]) + "." + d[1] + "</small><p>" + n.opis + "</p>" +
           (n.start ? '<button type="button" data-start>Wybierz oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
       }).join("") +
-      '<div class="po-d"><span>Wszystkie nowości: 🎓 → „Co nowego”</span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
+      '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
     o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); });
     var c = o.querySelector("[data-cw]"); if (c) c.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); menu(); });
     var s = o.querySelector("[data-start]"); if (s) s.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); menu(); });
@@ -431,7 +411,7 @@
     T = null;
     if (gotowe) {
       var o = okno('<div class="po-n">🎓 Samouczek</div><h2>Gotowe – znasz już najważniejsze miejsca</h2>' +
-        "<p>Oprowadzanie po innych sekcjach i ćwiczenia znajdziesz pod przyciskiem <b>🎓</b> w pasku – tam też są <b>nowości</b>. Przećwicz pracę z leadem: 🎓 → „Ćwiczenie na przykładowym kliencie”.</p>" +
+        "<p>Samouczki innych sekcji znajdziesz pod przyciskiem <b>🎓</b> w pasku. Przećwicz pracę z leadem: 🎓 → „Ćwiczenie na przykładowym kliencie”.</p>" +
         '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Wracam do pracy</button></div>');
       o.querySelector("[data-ok]").addEventListener("click", zamknijOkno);
     }
@@ -456,6 +436,7 @@
     if (T.i < T.kroki.length - 1) { T.i++; zapisz(KL_STAN, { trasa: T.trasa.id, i: T.i, cale: T.cale, czas: Date.now() }); rysuj(); return; }
     var n = T.cale ? nastepnaTrasa() : null;
     if (n) { zapisz(KL_STAN, { trasa: n.id, i: 0, cale: true, czas: Date.now() }); location.href = n.sciezka; }
+    else if (T.trasa.potem) { var p = T.trasa.potem; zapisz(KL_STAN, null); T = null; start(p); }   // 12.11: oprowadzanie i ćwiczenia = jeden samouczek
     else zakoncz(true);
   }
   function wstecz() { if (T && T.i > 0) { T.i--; zapisz(KL_STAN, { trasa: T.trasa.id, i: T.i, cale: T.cale, czas: Date.now() }); rysuj(); } }
@@ -485,7 +466,7 @@
       "<h3>" + k.tytul + '</h3><div class="pt-t">' + tekst + "</div>" + (k.czekaj ? '<div class="pt-cz">Samouczek przejdzie dalej sam, gdy to zrobisz.</div><div class="pt-cz pt-brak" hidden></div>' : "") +
       '<div class="pt-p"><button type="button" class="pt-x" data-x>' + (cw ? "Przerwij" : "Zakończ") + '</button><span class="pt-s"></span>' +
       (cw ? "" : '<button type="button" data-w' + (T.i ? "" : " disabled") + ">← Wstecz</button>") +
-      (k.czekaj ? "" : '<button type="button" class="pt-d" data-d>' + (k.dalejTxt || (!ost ? "Dalej →" : n ? n.nazwa + " →" : "Gotowe ✓")) + "</button>") + "</div>";
+      (k.czekaj ? "" : '<button type="button" class="pt-d" data-d>' + (k.dalejTxt || (!ost ? "Dalej →" : n ? n.nazwa + " →" : T.trasa.potem ? "Dalej: ćwiczenie →" : "Gotowe ✓")) + "</button>") + "</div>";
     d.querySelector("[data-x]").addEventListener("click", function () { zakoncz(false, true); });
     var bw = d.querySelector("[data-w]"); if (bw) bw.addEventListener("click", wstecz);
     var bd = d.querySelector("[data-d]"); if (bd) bd.addEventListener("click", function () { dalej(); });
@@ -554,8 +535,8 @@
     if (!r || r.querySelector(".pp-sam")) return !!r;
     styl();
     var b = document.createElement("button");
-    b.type = "button"; b.className = "pp-sam"; b.title = "Samouczek – oprowadzanie po stronie i nowości";
-    b.innerHTML = '🎓<span class="pp-sam-t">Samouczek</span><span class="pp-sam-n" hidden></span>';
+    b.type = "button"; b.className = "pp-sam"; b.title = "Samouczek – oprowadzanie i ćwiczenia";
+    b.innerHTML = '🎓<span class="pp-sam-t">Samouczek</span>';
     b.addEventListener("click", menu);
     r.insertBefore(b, r.querySelector(".pp-konto"));
     licznik();
