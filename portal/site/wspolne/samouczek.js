@@ -25,7 +25,11 @@
       start: true },
     { id: "2026-11-11-sciaga-telefon", data: "2026-11-12", gdzie: "Zimne", obszar: "sciagi", tytul: "📋 Skrypt i obiekcje / Lista przed spotkaniem",
       opis: "W trybie „Dzwonię” otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje, a w karcie transakcji przed spotkaniem – listę, co zabrać i o co zapytać.",
-      pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } }
+      pokaz: { sciezka: "/leady/", el: "#dzwonPrz", tytul: "Skrypt i obiekcje", tekst: "Kliknij lwa <b>„Zacznij dzwonić”</b>. W pasku trybu „Dzwonię” jest przycisk <b>„📋 Skrypt i obiekcje”</b> – otwiera ściągę z boku, bez zasłaniania leada." } },
+    // 12.11 – zatwierdzone przez użytkownika (wszystkie role)
+    { id: "2026-11-12-notatnik", data: "2026-11-12", gdzie: "Cała strona", tytul: "📝 Notatnik",
+      opis: "Twoje prywatne notatki na każdej stronie: przycisk „Notatnik” w pasku albo Alt+N. Okno przesuwasz i zmieniasz mu rozmiar, notatkę możesz przypiąć jako karteczkę na stronie głównej. Wyłączysz go w „Mój profil”.",
+      pokaz: { sciezka: "/", el: "#pracawre-pasek .pp-not", tytul: "Notatnik", tekst: "Kliknij <b>„📝 Notatnik”</b> (albo Alt+N) – otworzy się okno z Twoimi notatkami. Przesuwasz je za ciemny nagłówek, rozmiar zmieniasz prawym dolnym rogiem." } }
   ];
 
   // ---- OPROWADZANIE: trasy po kolei; krok bez el = dymek na środku; brak elementu na stronie = krok pominięty ----
