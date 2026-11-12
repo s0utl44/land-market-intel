@@ -16,6 +16,9 @@
   // KOMU (decyzja użytkownika przy KAŻDEJ nowości): dla = role (agent, administracja, dyrektor, zarzad, zarzadzanie, pozostale;
   // brak pola = wszyscy), obszar = tylko z dostępem do aplikacji. Administrator widzi wszystkie (wie, co dostali inni).
   var NOWOSCI = [
+    { id: "2026-11-12-role", data: "2026-11-12", gdzie: "Administracja", dla: ["administrator"], tytul: "👥 Dostęp całej roli naraz",
+      opis: "Administracja → zakładka „Role”: zmieniasz dostęp wszystkim z daną rolą jednym kliknięciem (np. agenci – tylko Zimne telefony). Wyjątki dla pojedynczych osób – jak dotąd w Kontach.",
+      pokaz: { sciezka: "/administracja/", el: '[data-z="role"]', tytul: "Zakładka „Role”", tekst: "Tu ustawiasz dostęp całej roli. Zmiana działa od razu dla wszystkich z tą rolą; „↺ Domyślne” przywraca ustawienia startowe." } },
     { id: "2026-11-11-cwiczenie", data: "2026-11-11", gdzie: "Zimne", obszar: "leady", dla: ["agent"], tytul: "🎓 Ćwiczenie na fikcyjnym kliencie",
       opis: "Dwa ćwiczenia w Zimnych: praca z listy leadów i tryb „Zacznij dzwonić” – na fikcyjnych klientach, nic nie liczy się w Raportach i wszystko samo się usuwa.",
       cw: true },
