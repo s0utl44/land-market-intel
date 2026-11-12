@@ -1030,14 +1030,22 @@
       .catch(function () { el.querySelector(".pp-sc-w").innerHTML = "<p>Nie udało się wczytać ściągi – spróbuj za chwilę.</p>"; });
   }
 
-  // 12.11 (zgłoszenie: po wygaśnięciu sesji agenci widzieli „403” i nie wiedzieli, co robić): zapytanie aplikacji zamiast danych
-  // dostało stronę logowania → jedno okienko „Sesja wygasła” z przyciskiem „Zaloguj się ponownie” (odświeżenie = logowanie i powrót tutaj)
+  // 12.11 (decyzja użytkownika: „po kliknięciu czegokolwiek, jak jesteśmy wylogowani – wyrzuca do logowania”): zapytanie aplikacji
+  // zamiast danych dostało stronę logowania → od razu odświeżenie strony = logowanie Google i powrót w to samo miejsce. Okienko
+  // „Sesja wygasła” tylko gdy to samo zdarzy się drugi raz w ciągu minuty (zabezpieczenie przed pętlą odświeżania).
   (function () {
     if (!window.fetch || window.fetch.__sesja) return;
     var f0 = window.fetch, pokazane = false;
     function oknoSesji() {
       if (pokazane || document.getElementById("pp-sesja")) return;
       pokazane = true;
+      var ost = 0;
+      try { ost = +sessionStorage.getItem("pracawre-sesja-odswiez") || 0; } catch (e) {}
+      if (Date.now() - ost > 60000) {
+        try { sessionStorage.setItem("pracawre-sesja-odswiez", String(Date.now())); } catch (e) {}
+        location.reload();
+        return;
+      }
       var o = document.createElement("div");
       o.id = "pp-sesja"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
       o.innerHTML = '<div class="pp-ses-k"><div style="font-size:34px">🔒</div><h2>Sesja wygasła</h2>' +

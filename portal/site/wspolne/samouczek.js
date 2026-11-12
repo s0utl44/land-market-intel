@@ -1,5 +1,5 @@
 /* Samouczek pracawre.com (11.11.2026, decyzje użytkownika) – część (a): przycisk 🎓 w pasku obok konta (dla wszystkich),
-   OPROWADZANIE (strona główna → Zimne telefony → Transakcje; podświetlenie miejsca + dymek z opisem, Wstecz / Dalej / Zakończ,
+   OPROWADZANIE (12.11: osobno dla każdej sekcji – strona główna, Zimne telefony; bez Transakcji; podświetlenie miejsca + dymek z opisem, Wstecz / Dalej / Zakończ,
    Esc kończy, strzałki przewijają kroki; przejście między stronami pamiętane w localStorage, po 24 h bez ruchu znika)
    i „CO NOWEGO” (lista NOWOSCI – po zalogowaniu raz każdej osobie nowości z 30 dni, do których ma dostęp; licznik na 🎓;
    „Pokaż mi →” = jeden krok na właściwej stronie).
@@ -23,7 +23,7 @@
       opis: "Dwa ćwiczenia w Zimnych: praca z listy leadów i tryb „Zacznij dzwonić” – na fikcyjnych klientach, nic nie liczy się w Raportach i wszystko samo się usuwa.",
       cw: true },
     { id: "2026-11-11-samouczek", data: "2026-11-11", gdzie: "Cała strona", tytul: "🎓 Samouczek",
-      opis: "Oprowadzanie po stronie głównej, Zimnych telefonach i Transakcjach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
+      opis: "Oprowadzanie po stronie głównej i po Zimnych telefonach – co gdzie jest i co dzieje się po każdym kliknięciu. Włączysz je w każdej chwili przyciskiem 🎓 w pasku.",
       start: true },
     { id: "2026-11-11-sciaga-telefon", data: "2026-11-11", gdzie: "Zimne", obszar: "sciagi", tytul: "📋 Skrypt i obiekcje w trybie „Dzwonię”",
       opis: "Podczas dzwonienia otworzysz z boku skrypt rozmowy i odpowiedzi na obiekcje – z podręcznika agenta.",
@@ -38,19 +38,19 @@
 
   // ---- OPROWADZANIE: trasy po kolei; krok bez el = dymek na środku; brak elementu na stronie = krok pominięty ----
   var TRASY = [
-    { id: "glowna", sciezka: "/", nazwa: "Strona główna", kroki: [
+    { id: "glowna", sciezka: "/", nazwa: "Strona główna", opis: "Pulpit, menu, konto – co gdzie jest", kroki: [
       { tytul: "Witaj w pracawre.com", tekst: "Tu są wszystkie narzędzia biura WRE. W kilku krokach pokażę, co gdzie jest i co się dzieje po kliknięciu.<br><br>Przerwiesz w każdej chwili (<b>Esc</b> albo „Zakończ”), a wrócisz przyciskiem <b>🎓</b> w pasku. Po stronach przechodzisz strzałkami ← → albo przyciskami." },
-      { el: "#pracawre-pasek .pp-otw", tytul: "Menu ☰", tekst: "Wszystkie narzędzia: <b>Zimne telefony</b>, <b>Transakcje</b>, <b>Generator umów</b>, <b>Kontakty</b>, <b>Wdrożenie</b>… Liczby przy nazwach to rzeczy do zrobienia. Na dole menu: motyw jasny / ciemny, <b>Mój profil</b>, <b>Zgłoś błąd</b>, Wyloguj." },
+      { el: "#pracawre-pasek .pp-otw", tytul: "Menu ☰", tekst: "Wszystkie narzędzia, do których masz dostęp, np. <b>Zimne telefony</b>… Liczby przy nazwach to rzeczy do zrobienia. Na dole menu: motyw jasny / ciemny, <b>Mój profil</b>, <b>Zgłoś błąd</b>, Wyloguj." },
       { el: "#pracawre-pasek .pp-konto", tytul: "Twoje konto", tekst: "Otwiera to samo menu. W <b>„Mój profil”</b> połączysz swój kalendarz i pocztę Google – wtedy umówione spotkania same trafiają do kalendarza, a maile z klientami widać w transakcji." },
       { el: "#spotkaniaS", tytul: "Spotkania", tekst: "Spotkania na dziś i jutro. Po terminie zapytamy <b>„Czy spotkanie się odbyło?”</b> – odpowiadasz Tak / Nie od razu tutaj (albo w okienku na dowolnej stronie)." },
-      { el: "#naDzis", tytul: "Moje zadania", tekst: "Zadania: zaległe, na dziś i na najbliższe 7 dni. Kliknięcie otwiera transakcję albo leada w Zimnych." },
+      { el: "#naDzis", tytul: "Moje zadania", tekst: "Zadania: zaległe, na dziś i na najbliższe 7 dni. Kliknięcie otwiera właściwe miejsce, np. leada w Zimnych." },
       { el: "#celeS", tytul: "Moje cele", tekst: "Cele na miesiąc – ustala je z Tobą dyrektor. Pasek pokazuje, ile już zrobione." },
       { el: "#sprawyS", tytul: "Moje transakcje", tekst: "Otwarte sprawy, wynagrodzenie w toku i sukces w tym miesiącu; pigułki w kolorach etapów prowadzą do tablicy Transakcji." },
       { el: "#zimneS", tytul: "Zimne w tym tygodniu", tekst: "Odebrane telefony i umówione spotkania od poniedziałku – liczą się wszystkie Twoje telefony zapisane w systemie." },
       { el: "#podsS", tytul: "Podsumowanie od dyrektora", tekst: "Po odprawie dyrektor wysyła Ci podsumowanie i ustalenia – tutaj je przeczytasz." },
       { el: "#dzwonPrz", tytul: "Zacznij dzwonić", tekst: "Lew uruchamia tryb <b>„Dzwonię”</b> – system podaje lead po leadzie, Ty tylko dzwonisz i zapisujesz wynik. Lwa możesz przesunąć myszą w wygodne miejsce." }
     ] },
-    { id: "zimne", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony", kroki: [
+    { id: "zimne", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony", opis: "Lista, filtry, karta leada i wyniki telefonu", kroki: [
       { el: "#heroTyt", tytul: "Zimne telefony", tekst: "Prywatne ogłoszenia z portali (Otodom, Adresowo, Gratka) – właściciele bez pośrednika. Nowe ogłoszenia przychodzą codziennie wieczorem." },
       { el: "#rodzaj", tytul: "Sprzedaż / Najem", tekst: "Wybierz rodzaj ogłoszeń. Jeśli masz dostęp, są też <b>Grunty</b> i <b>Marketing</b> (leady z formularzy i kampanii)." },
       { el: "#widok", tytul: "Pula i Twoje leady", tekst: "<b>Zimne</b> – wspólna pula do wzięcia. <b>Moje zimne na dziś</b> – Twoje: „Do zadzwonienia” (nic jeszcze nie zrobione) i „Zadzwoń ponownie” (umówiony telefon, nieodebrane)." },
@@ -62,23 +62,11 @@
           "<li><b>Nie odebrał</b> – lead zostaje u Ciebie w „Zadzwoń ponownie”. 3 nieodebrane w różne dni → wraca do puli.</li>" +
           "<li><b>Odebrał – zadzwoń ponownie</b> – zadanie z terminem i przypomnieniem; lead zostaje przy Tobie także po północy.</li>" +
           "<li><b>Stracono / Nie zainteresowany</b> (z powodem) – kontakt „Niekwalifikowany”, lead wolny od jutra, Tobie nie wróci przez 7 dni.</li>" +
-          "<li><b>Spotkanie umówione</b> – powstaje transakcja w <b>Transakcjach</b> na etapie „Spotkanie umówione” i spotkanie w HubSpot (oraz w Twoim kalendarzu Google).</li>" +
+          "<li><b>Spotkanie umówione</b> – wpisujesz termin; spotkanie zapisuje się w HubSpot i w Twoim kalendarzu Google (gdy go połączysz).</li>" +
           "<li><b>Niekwalifikowany?</b> – biuro, deweloper, nieaktualne, duplikat – dotyczy tylko tego ogłoszenia.</li></ul>" +
           "Lead bez Twojego zadania wraca o północy do wspólnej puli." },
       { el: "#dzwonPrz", tytul: "Tryb „Dzwonię”", tekst: "Jeden lead naraz, wynik klawiszami 1–4, następny lead podaje się sam." }
     ] },
-    { id: "transakcje", sciezka: "/transakcje/", obszar: "transakcje", nazwa: "Transakcje", kroki: [
-      { el: "#lejki", tytul: "Transakcje", tekst: "Twoje sprawy od spotkania do faktury. Proces: <b>Nieruchomości</b> (domyślny), Finanse, DoneHome." },
-      { el: "#tablica", tytul: "Tablica etapów", tekst: "Sprawa idzie od lewej do prawej: Spotkanie umówione → Umowa otwarta / Agencyjna / Wyłączność → Oferta pracująca → Oferta realna → Przedwstępna → Faktura → Opłacono. <b>Przeciągnij kartę</b>, żeby zmienić etap; przeciągnięcie na dół = stracona (z powodem)." },
-      { tytul: "Co się dzieje przy zmianie etapu", tekst: "<ul class='pp-tour-l'>" +
-          "<li>Po spotkaniu system zapyta o <b>źródło leada</b> – bez niego sprawa nie pójdzie dalej.</li>" +
-          "<li>Umowę pośrednictwa przygotujesz z karty: <b>„📝 Wygeneruj”</b> → Generator umów z danymi klienta.</li>" +
-          "<li><b>Przedwstępna, Faktura, Opłacono</b> – okno z ceną i wynagrodzeniem; tam też <b>„📄 Poproś o fakturę”</b>.</li>" +
-          "<li>Etap, kwoty i czynności zapisują się w HubSpot same.</li></ul>" },
-      { el: "#bLead", tytul: "+ Nowa transakcja", tekst: "Klient z polecenia albo telefonu do biura: najpierw telefon / e-mail – sprawdzimy, czy klienta już nie ma – potem źródło i etap." },
-      { el: "#q", tytul: "Szukaj", tekst: "Po nazwie, kliencie, telefonie albo lokalizacji. Stracone sprawy znajdziesz pod tablicą." },
-      { tytul: "Karta transakcji", tekst: "Kliknięcie w kartę otwiera sprawę: <b>Notatka, Telefon, Zadanie, Spotkanie</b>, strony transakcji, ogłoszenia, umowy i oś czasu (z pocztą, jeśli połączysz Google)." }
-    ] }
   ];
 
   // ---- ĆWICZENIE na fikcyjnym kliencie (11.11, część b): Zimne, sytuacja 1 „Proszę zadzwonić za tydzień” ----
@@ -134,7 +122,7 @@
         tytul: "Wklej numer", tekst: function () { return "Wklej numer w pole <b>Telefon</b> (9 cyfr zapisuje się samo). <div class='pt-nr'><b>" + nrTxt(1) + "</b>" + kopiujBtn(1) + "</div>"; } },
       { el: "#panel [data-wez]", przepusc: true,
         czekaj: function () { var o = otwartyL(1); return !!(o && o.moj) || bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/biore$/, "POST"); },
-        tytul: "Biorę", tekst: "Kliknij <b>„Biorę”</b>. Lead jest od teraz Twój, a w HubSpot powstaje kontakt (bez opiekuna – opiekuna wyznacza dopiero transakcja). W ćwiczeniu kontakt ma dopisek 🎓 SAMOUCZEK." },
+        tytul: "Biorę", tekst: "Kliknij <b>„Biorę”</b>. Lead jest od teraz Twój, a w HubSpot powstaje kontakt. W ćwiczeniu kontakt ma dopisek 🎓 SAMOUCZEK." },
       { rozmowa: true, tytul: "Dzwonisz do Pana Tomasza", dalejTxt: "Zapisuję wynik rozmowy →",
         tekst: "<div class='pt-r'><div class='pt-kl'><b>Pan Tomasz:</b> Dzień dobry… tak, ogłoszenie jest aktualne. Ale jestem teraz w pracy, nie bardzo mogę rozmawiać.</div>" +
           "<div class='pt-hint'>💡 <b>Ze skryptu:</b> szanuj czas klienta, ale zostaw konkret – „Rozumiem, zajmę minutę: mamy klientów szukających takiego mieszkania. Kiedy mogę zadzwonić, żeby spokojnie porozmawiać?”</div>" +
@@ -146,7 +134,7 @@
         brak: "Czekam, aż HubSpot pokaże nowy kontakt (zwykle kilka sekund)… Sekcja <b>„Rozmowa i notatki”</b> pojawi się w karcie sama." },
       { el: "#panel #td", przepusc: true,
         czekaj: function () { return !!document.querySelector('#panel [data-td="ponownie"][aria-pressed="true"]'); },
-        tytul: "Co dalej? Do ponownego kontaktu", tekst: "Klient prosi o telefon za tydzień – kliknij <b>„Do ponownego kontaktu”</b>. (<i>Stracono</i> = nie zainteresowany, z powodem; <i>Spotkanie umówione</i> = transakcja w Transakcjach.)" },
+        tytul: "Co dalej? Do ponownego kontaktu", tekst: "Klient prosi o telefon za tydzień – kliknij <b>„Do ponownego kontaktu”</b>. (<i>Stracono</i> = nie zainteresowany, z powodem; <i>Spotkanie umówione</i> = termin spotkania w HubSpot i w kalendarzu.)" },
       { el: "#panel .hsK.pw-ed", przepusc: true,
         czekaj: function (k) { return bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/telefon$/, "POST", k.od); },
         tytul: "Termin i notatka", tekst: "W polu <b>Kiedy</b> ustaw <b>czwartek za tydzień, 17:00</b> (kółko myszy nad polem zmienia dzień, z Shift – tydzień). Przypomnienie zostaw. W polu poniżej wpisz, co ustaliłeś, np. <i>„Znajomy może wziąć mieszkanie, oddzwonić w czwartek po 17.”</i> i kliknij <b>„✓ Zapisz telefon”</b>." },
@@ -154,7 +142,7 @@
         tekst: "<ul class='pp-tour-l'><li>W HubSpot: <b>telefon</b> z wynikiem „Połączono”, <b>zadanie</b> „Zadzwoń ponownie” na czwartek 17:00 z przypomnieniem i Twoja notatka.</li>" +
           "<li>Lead jest w <b>„Moje zimne na dziś” → „Zadzwoń ponownie”</b> i <b>nie wróci o północy do puli</b> – trzyma go Twoje zadanie.</li>" +
           "<li>W dniu terminu zadanie pokaże się na <b>pulpicie</b> w „Moje zadania” i jako przypomnienie.</li></ul>" +
-          "Sytuację 2 (spotkanie → umowa → faktura) dodamy wkrótce. Teraz posprzątam wszystko, co powstało w ćwiczeniu." ,
+          "Teraz posprzątam wszystko, co powstało w ćwiczeniu.",
         naDalej: function () { koniecCwiczenia(); return false; } }
     ] }
   ];
@@ -190,7 +178,7 @@
       tekst: function () { return ROZMOWA_TOMASZ("„⏰ Odebrał – oddzwonić” → <b>Za tydzień</b>, godzina <b>17:00</b> + krótka notatka."); } },
     { el: '#dz [data-dz-w="ponownie"]', przepusc: true,
       czekaj: function () { return !!document.querySelector('#dz [data-dz-w="ponownie"][aria-pressed="true"]'); },
-      tytul: "Odebrał – oddzwonić", tekst: "Kliknij <b>„⏰ Odebrał – oddzwonić”</b> (albo klawisz <b>2</b>). Inne wyniki: <i>Nie odebrał</i> – wróci w kolejnej próbie, <i>Nie jest zainteresowany</i> – z powodem, <i>Spotkanie umówione</i> – transakcja w Transakcjach." },
+      tytul: "Odebrał – oddzwonić", tekst: "Kliknij <b>„⏰ Odebrał – oddzwonić”</b> (albo klawisz <b>2</b>). Inne wyniki: <i>Nie odebrał</i> – wróci w kolejnej próbie, <i>Nie jest zainteresowany</i> – z powodem, <i>Spotkanie umówione</i> – termin spotkania w HubSpot i w kalendarzu." },
     { el: "#dzDalej .dalej", przepusc: true,
       czekaj: function (k) { return bylo(/\/leady\/api\/lead\/samouczek\/[^/]+\/telefon$/, "POST", k.od); },
       tytul: "Termin i notatka", tekst: "Kliknij <b>„Za tydzień”</b>, w polu <b>Termin</b> zmień godzinę na <b>17:00</b>, dopisz notatkę, np. <i>„Znajomy może wziąć mieszkanie, oddzwonić w czwartek po 17.”</i> i kliknij <b>„Zapisz i dalej →”</b>." },
@@ -349,8 +337,9 @@
   function menu() {
     var n = nowe().length, t = trasaTu(), st0 = czytaj(KL_STAN), cwSt = st0 && st0.trasa && (trasa(st0.trasa) || {}).cw ? st0 : null;
     var o = okno(
-      '<button type="button" class="mi" data-m="cale"><b>🎓 Oprowadzanie po stronie</b><small>Strona główna → Zimne telefony → Transakcje – co gdzie jest</small></button>' +
-      (t && t.id !== "glowna" ? '<button type="button" class="mi" data-m="tu"><b>Tylko ta strona – ' + t.nazwa + "</b><small>Oprowadzanie po tym, co widzisz teraz</small></button>" : "") +
+      TRASY.filter(function (x) { return maObszar(x.obszar); }).map(function (x) {
+        return '<button type="button" class="mi" data-m="tr-' + x.id + '"><b>🎓 Oprowadzanie – ' + x.nazwa + "</b><small>" + x.opis + "</small></button>";
+      }).join("") +
       '<button type="button" class="mi" data-m="nowosci"><b>Co nowego' + (n ? '<span class="pp-sam-n">' + n + "</span>" : "") + "</b><small>Zmiany w pracawre.com z ostatnich tygodni</small></button>" +
       (cwSt ? '<button type="button" class="mi" data-m="cw-wroc"><b>▶ Wróć do ćwiczenia</b><small>Tam, gdzie skończyłeś</small></button>' +
               '<button type="button" class="mi" data-m="cw-koniec"><b>Zakończ ćwiczenie i posprzątaj</b><small>Usuwa fikcyjne leady i to, co powstało w HubSpot</small></button>'
@@ -359,8 +348,7 @@
     ["cw1", "cw2"].forEach(function (id) { var bc = o.querySelector('[data-m="' + id + '"]'); if (bc) bc.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start(id); }); });
     var bwr = o.querySelector('[data-m="cw-wroc"]'); if (bwr) bwr.addEventListener("click", function () { zamknijOkno(); start(cwSt.trasa); });
     var bk = o.querySelector('[data-m="cw-koniec"]'); if (bk) bk.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); koniecCwiczenia(); });
-    o.querySelector('[data-m="cale"]').addEventListener("click", function () { zamknijOkno(); start("glowna", true); });
-    var tu = o.querySelector('[data-m="tu"]'); if (tu) tu.addEventListener("click", function () { zamknijOkno(); start(t.id, false); });
+    TRASY.forEach(function (x) { var b = o.querySelector('[data-m="tr-' + x.id + '"]'); if (b) b.addEventListener("click", function () { zamknijOkno(); zapisz(KL_STAN, null); start(x.id, false); }); });
     o.querySelector('[data-m="nowosci"]').addEventListener("click", function () { coNowego(true); });
   }
   function coNowego(wszystkie) {
@@ -372,12 +360,12 @@
       lista.map(function (n) {
         var d = n.data.split("-");
         return '<div class="nw"><b>' + n.tytul + "</b><small>" + n.gdzie + " · " + Number(d[2]) + "." + d[1] + "</small><p>" + n.opis + "</p>" +
-          (n.start ? '<button type="button" data-start>Zacznij oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
+          (n.start ? '<button type="button" data-start>Wybierz oprowadzanie →</button>' : n.cw ? '<button type="button" data-cw>Wybierz ćwiczenie →</button>' : n.pokaz ? '<button type="button" data-pokaz="' + n.id + '">Pokaż mi →</button>' : "") + "</div>";
       }).join("") +
       '<div class="po-d"><span>Wszystkie nowości: 🎓 → „Co nowego”</span><button type="button" class="pri" data-ok>Rozumiem</button></div>');
     o.querySelector("[data-ok]").addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); });
     var c = o.querySelector("[data-cw]"); if (c) c.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); menu(); });
-    var s = o.querySelector("[data-start]"); if (s) s.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); start("glowna", true); });
+    var s = o.querySelector("[data-start]"); if (s) s.addEventListener("click", function () { zamknijOkno(); oznaczWidziane(); menu(); });
     o.querySelectorAll("[data-pokaz]").forEach(function (b) {
       b.addEventListener("click", function () {
         var n = NOWOSCI.filter(function (x) { return x.id === b.dataset.pokaz; })[0];
@@ -443,7 +431,7 @@
     T = null;
     if (gotowe) {
       var o = okno('<div class="po-n">🎓 Samouczek</div><h2>Gotowe – znasz już najważniejsze miejsca</h2>' +
-        "<p>Oprowadzanie włączysz ponownie przyciskiem <b>🎓</b> w pasku – tam też są <b>nowości</b>. Przećwicz pracę z leadem: 🎓 → „Ćwiczenie na przykładowym kliencie”.</p>" +
+        "<p>Oprowadzanie po innych sekcjach i ćwiczenia znajdziesz pod przyciskiem <b>🎓</b> w pasku – tam też są <b>nowości</b>. Przećwicz pracę z leadem: 🎓 → „Ćwiczenie na przykładowym kliencie”.</p>" +
         '<div class="po-d"><span></span><button type="button" class="pri" data-ok>Wracam do pracy</button></div>');
       o.querySelector("[data-ok]").addEventListener("click", zamknijOkno);
     }
