@@ -34,6 +34,7 @@
       { tytul: "Witaj w pracawre.com", tekst: "Tu są wszystkie narzędzia biura WRE. W kilku krokach pokażę, co gdzie jest i co się dzieje po kliknięciu.<br><br>Przerwiesz w każdej chwili (<b>Esc</b> albo „Zakończ”), a wrócisz przyciskiem <b>🎓</b> w pasku. Po stronach przechodzisz strzałkami ← → albo przyciskami." },
       { el: "#pracawre-pasek .pp-otw", tytul: "Menu ☰", tekst: "Wszystkie narzędzia, do których masz dostęp, np. <b>Zimne telefony</b>… Liczby przy nazwach to rzeczy do zrobienia. Na dole menu: motyw jasny / ciemny, <b>Mój profil</b>, <b>Zgłoś błąd</b>, Wyloguj." },
       { el: "#pracawre-pasek .pp-konto", tytul: "Twoje konto", tekst: "Otwiera to samo menu. W <b>„Mój profil”</b> połączysz swój kalendarz i pocztę Google – wtedy umówione spotkania same trafiają do kalendarza, a maile z klientami widać w transakcji." },
+      { el: "#pracawre-pasek .pp-not", tytul: "Notatnik", tekst: "Twoje prywatne notatki – na każdej stronie (skrót <b>Alt+N</b>). Okno przesuwasz i zmieniasz mu rozmiar, notatki dzielisz na własne kategorie. „📌 Przypnij na stronie głównej” zrobi z notatki karteczkę tutaj. Wyłączysz go w „Mój profil”." },
       { el: "#spotkaniaS", tytul: "Spotkania", tekst: "Spotkania na dziś i jutro. Po terminie zapytamy <b>„Czy spotkanie się odbyło?”</b> – odpowiadasz Tak / Nie od razu tutaj (albo w okienku na dowolnej stronie)." },
       { el: "#naDzis", tytul: "Moje zadania", tekst: "Zadania: zaległe, na dziś i na najbliższe 7 dni. Kliknięcie otwiera właściwe miejsce, np. leada w Zimnych." },
       { el: "#celeS", tytul: "Moje cele", tekst: "Cele na miesiąc – ustala je z Tobą dyrektor. Pasek pokazuje, ile już zrobione." },
@@ -291,7 +292,7 @@
   }
   function nowe() {
     var w = widziane(), od = Date.now() - 30 * 24 * 3600 * 1000;
-    return NOWOSCI.filter(function (n) { return w.indexOf(n.id) < 0 && Date.parse(n.data) >= od && dlaMnie(n); });
+    return NOWOSCI.filter(function (n) { return w.indexOf(n.id) < 0 && Date.parse(n.data) >= od && dlaMnie(n) && !(wylaczony() && (n.start || n.cw)); });
   }
   function oznaczWidziane() {
     var ids = NOWOSCI.map(function (n) { return n.id; });
@@ -536,9 +537,18 @@
     setTimeout(function () { T = { trasa: t, kroki: t.kroki, i: 0, cale: false }; rysuj(); }, 900);
   }
 
+  // 12.11 (decyzja użytkownika): samouczek wyłączony w „Mój profil” – bez przycisku 🎓 i bez wznawiania oprowadzania;
+  // „Co nowego” zostaje (bez wpisów, które zapraszają do samouczka)
+  function wylaczony() {
+    var k = KONTO; if (!k) try { k = JSON.parse(sessionStorage.getItem("pracawre-konto") || "null"); } catch (e) {}
+    var u = k && k.profil && k.profil.ustawienia; return !!(u && u.samouczek === false);
+  }
+  function odswiez(k) { if (k) KONTO = k; if (wylaczony()) { document.querySelectorAll(".pp-sam").forEach(function (b) { b.remove(); }); if (T && !T.trasa.cw) zakoncz(false); } else przycisk(); }
+
   // ---- przycisk w pasku ----
   function przycisk() {
     var r = document.querySelector("#pracawre-pasek .pp-r");
+    if (r && wylaczony()) { var x = r.querySelector(".pp-sam"); if (x) x.remove(); return true; }
     if (!r || r.querySelector(".pp-sam")) return !!r;
     styl();
     var b = document.createElement("button");
@@ -559,7 +569,7 @@
       if (n && ta(n.pokaz.sciezka)) pokazJeden(n.pokaz);
       return;
     }
-    if (st && st.trasa) {
+    if (st && st.trasa && !wylaczony()) {
       var t = trasa(st.trasa);
       if (t && t.cw && st.pauza) { /* przerwane – wraca z menu 🎓 */ }
       else if (t && ta(t.sciezka)) { start(t.id, st.cale); return; }
@@ -585,6 +595,6 @@
     });
   }
 
-  window.PracawreSamouczek = { przycisk: przycisk, menu: menu, start: start, coNowego: coNowego, NOWOSCI: NOWOSCI, TRASY: TRASY };
+  window.PracawreSamouczek = { przycisk: przycisk, odswiez: odswiez, menu: menu, start: start, coNowego: coNowego, NOWOSCI: NOWOSCI, TRASY: TRASY };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

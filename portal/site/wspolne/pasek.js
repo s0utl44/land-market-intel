@@ -259,8 +259,9 @@
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
-    konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); alarmAdmina(el, k); });
+    konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); alarmAdmina(el, k); if (k) notatnik(k); });
     samouczek();
+    if (wlaczone(znane, "notatnik")) notatnik(znane);
   }
   // 12.11 (decyzja użytkownika: „jak się coś wykrzaczy, ma mnie informować i krzyczeć – nie zaglądam codziennie”): administrator na
   // KAŻDEJ stronie dostaje czerwony pasek pod paskiem witryny, gdy któraś aplikacja nie odpowiada albo pobieranie stoi. Sprawdzenie
@@ -317,6 +318,18 @@
     if (window.PracawreSamouczek) { window.PracawreSamouczek.przycisk(); return; }
     if (document.getElementById("pp-samouczek-js") || window.top !== window) return;
     var s = document.createElement("script"); s.id = "pp-samouczek-js"; s.src = "/wspolne/samouczek.js"; s.defer = true;
+    (document.head || html).appendChild(s);
+  }
+
+  // 12.11 (decyzja użytkownika): Notatnik i Samouczek – każdy włącza / wyłącza sam w „Mój profil” (profil.ustawienia; domyślnie włączone)
+  function wlaczone(k, co) { var u = k && k.profil && k.profil.ustawienia; return !(u && u[co] === false); }
+  // 12.11 (decyzja użytkownika): notatnik – przycisk 📝 w pasku, pływające okno, karteczki na stronie głównej (/wspolne/notatnik.js)
+  function notatnik(k) {
+    if (window.top !== window) return;
+    if (!wlaczone(k, "notatnik")) { if (window.PracawreNotatnik) window.PracawreNotatnik.wylacz(); return; }
+    if (window.PracawreNotatnik) { window.PracawreNotatnik.wlacz(); return; }
+    if (document.getElementById("pp-notatnik-js")) return;
+    var s = document.createElement("script"); s.id = "pp-notatnik-js"; s.src = "/wspolne/notatnik.js"; s.defer = true;
     (document.head || html).appendChild(s);
   }
 
@@ -609,6 +622,9 @@
     "#pp-prof h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-prof p{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
     "#pp-prof label{display:block;font-size:12.5px;font-weight:700;color:var(--m)}" +
     "#pp-prof input{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:0 12px;font:inherit;outline:none}" +
+    "#pp-prof .pu{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .pu h3{margin:0 0 2px;font-size:15px;font-weight:900}#pp-prof .pu p{margin:0 0 8px}" +
+    "#pp-prof .pu label{display:flex;gap:12px;align-items:flex-start;padding:8px 0;cursor:pointer;color:var(--t);font-size:14px;font-weight:400}" +
+    "#pp-prof .pu input{display:inline-block;width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:#bd9302}#pp-prof .pu b{display:block}#pp-prof .pu small{color:var(--m);font-size:12.5px}" +
     "#pp-prof input:focus{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
     "#pp-prof .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
     "#pp-prof .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-prof .st{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}" +
@@ -737,6 +753,9 @@
       '<div class="pg" hidden><h3>Google – kalendarz i poczta</h3><p>Połącz swoje firmowe konto Google: umówione spotkania same trafią do Twojego ' +
       'kalendarza, a w karcie transakcji zobaczysz maile z klientami (tylko odczyt, nic nie zapisujemy). Możesz odłączyć w każdej chwili.</p>' +
       '<div class="w"><span class="s"></span><button type="button" class="b" data-gp></button></div></div>' +
+      '<div class="pu"><h3>Narzędzia w pasku</h3><p>Włącz albo wyłącz – tylko u siebie, zmiana od razu.</p>' +
+      '<label><input type="checkbox" data-ust="notatnik"><span><b>📝 Notatnik</b><small>Prywatne notatki z paska (Alt+N) i karteczki na stronie głównej</small></span></label>' +
+      '<label><input type="checkbox" data-ust="samouczek"><span><b>🎓 Samouczek</b><small>Oprowadzanie i ćwiczenia (przycisk w pasku)</small></span></label></div>' +
       '<div class="ph" hidden><h3>Podsumowania od dyrektora</h3><div class="pl"></div></div></div>';
     document.body.appendChild(o);
     // 7.11 (decyzja użytkownika): Google (kalendarz i poczta) łączy każdy sam – tylko gdy serwer ma włączone połączenie
@@ -766,6 +785,21 @@
             "</small></summary><div class=\"pt\">" + podsumowanieHtml(s.dane || {}) + "</div></details>";
         }).join("");
       }).catch(function () {});
+    konto().then(function (k) { o.querySelectorAll("[data-ust]").forEach(function (c) { c.checked = wlaczone(k, c.dataset.ust); }); });
+    o.querySelectorAll("[data-ust]").forEach(function (c) {
+      c.addEventListener("change", function () {
+        var z = {}; z[c.dataset.ust] = c.checked; c.disabled = true;
+        fetch("/administracja/api/ja/ustawienia", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(z) })
+          .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+          .then(function (k) {
+            try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {}
+            kontoP = Promise.resolve(k); notatnik(k);
+            if (window.PracawreSamouczek && window.PracawreSamouczek.odswiez) window.PracawreSamouczek.odswiez(k);
+          })
+          .catch(function () { c.checked = !c.checked; })
+          .then(function () { c.disabled = false; });
+      });
+    });
     var inp = o.querySelector("#pp-prof-o"), bl = o.querySelector(".bl");
     konto().then(function (k) { if (k && k.profil && k.profil.otodom && !inp.value) inp.value = k.profil.otodom; });
     function zamk() { o.remove(); window.removeEventListener("keydown", esc_, true); }
