@@ -1030,6 +1030,41 @@
       .catch(function () { el.querySelector(".pp-sc-w").innerHTML = "<p>Nie udało się wczytać ściągi – spróbuj za chwilę.</p>"; });
   }
 
+  // 12.11 (zgłoszenie: po wygaśnięciu sesji agenci widzieli „403” i nie wiedzieli, co robić): zapytanie aplikacji zamiast danych
+  // dostało stronę logowania → jedno okienko „Sesja wygasła” z przyciskiem „Zaloguj się ponownie” (odświeżenie = logowanie i powrót tutaj)
+  (function () {
+    if (!window.fetch || window.fetch.__sesja) return;
+    var f0 = window.fetch, pokazane = false;
+    function oknoSesji() {
+      if (pokazane || document.getElementById("pp-sesja")) return;
+      pokazane = true;
+      var o = document.createElement("div");
+      o.id = "pp-sesja"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
+      o.innerHTML = '<div class="pp-ses-k"><div style="font-size:34px">🔒</div><h2>Sesja wygasła</h2>' +
+        "<p>Ze względów bezpieczeństwa logowanie co jakiś czas wygasa. Zaloguj się ponownie – wrócisz w to samo miejsce. Niezapisany tekst skopiuj przed kliknięciem.</p>" +
+        '<button type="button" data-ses>Zaloguj się ponownie</button></div>';
+      var st = document.createElement("style");
+      st.textContent = "#pp-sesja{position:fixed;inset:0;z-index:2147483600;background:rgba(15,14,12,.6);display:grid;place-items:center;padding:16px;font:15px/1.5 Lato,system-ui,sans-serif}" +
+        "#pp-sesja .pp-ses-k{background:#fff;color:#1f1d1a;border-radius:18px;padding:24px 26px;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
+        "html[data-theme=dark] #pp-sesja .pp-ses-k{background:#212326;color:#e8e5de}#pp-sesja h2{margin:6px 0 8px;font-size:21px}" +
+        "#pp-sesja button{all:unset;cursor:pointer;margin-top:12px;height:42px;padding:0 22px;border-radius:999px;background:#c9a03c;color:#141518;font-weight:800;display:inline-flex;align-items:center}";
+      document.head.appendChild(st); document.body.appendChild(o);
+      o.querySelector("[data-ses]").addEventListener("click", function () { location.reload(); });
+    }
+    var f = function (u, opt) {
+      return f0.apply(this, arguments).then(function (r) {
+        try {
+          var url = new URL(typeof u === "string" ? u : (u && u.url) || "", location.href);
+          if (url.origin === location.origin && (r.status === 401 || r.status === 403) && /text\/html/.test(r.headers.get("content-type") || "")) {
+            r.clone().text().then(function (t) { if (/oauth2\/start|oauth2\/sign_in/.test(t)) oknoSesji(); }).catch(function () {});
+          }
+        } catch (e) {}
+        return r;
+      });
+    };
+    f.__sesja = true; window.fetch = f;
+  })();
+
   window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });

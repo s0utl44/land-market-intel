@@ -27,6 +27,10 @@ services:
       OAUTH2_PROXY_COOKIE_SAMESITE: lax
       OAUTH2_PROXY_COOKIE_EXPIRE: 72h        # 3 dni (decyzja 22.10)
       OAUTH2_PROXY_COOKIE_REFRESH: 1h
+      # 12.11 (zgłoszenie: „wyrzuca, 403, agenci nie wiedzą co robić”): logowanie w kilku kartach naraz – każda karta ma własny
+      # znacznik CSRF (bez tego druga karta nadpisywała znacznik pierwszej i ta kończyła logowanie błędem 403)
+      OAUTH2_PROXY_COOKIE_CSRF_PER_REQUEST: "true"
+      OAUTH2_PROXY_COOKIE_CSRF_EXPIRE: 15m
       OAUTH2_PROXY_CUSTOM_TEMPLATES_DIR: /templates
       OAUTH2_PROXY_FOOTER: "-"
     volumes:
