@@ -259,9 +259,59 @@
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
-    konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); });
+    konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); alarmAdmina(el, k); });
     samouczek();
   }
+  // 12.11 (decyzja użytkownika: „jak się coś wykrzaczy, ma mnie informować i krzyczeć – nie zaglądam codziennie”): administrator na
+  // KAŻDEJ stronie dostaje czerwony pasek pod paskiem witryny, gdy któraś aplikacja nie odpowiada albo pobieranie stoi. Sprawdzenie
+  // najwyżej co 10 min (wynik w localStorage pracawre-alarm); „✕” chowa pasek, dopóki lista problemów się nie zmieni.
+  var ALARM_CSS = ".pp-alarm{display:flex;align-items:center;gap:10px;padding:8px max(12px,env(safe-area-inset-right)) 8px 14px;background:#b3261e;color:#fff;" +
+    "font:700 13.5px/1.35 Lato,'Segoe UI',system-ui,sans-serif}.pp-alarm a{color:#fff;text-decoration:underline;white-space:nowrap}.pp-alarm .t{flex:1;min-width:0}" +
+    ".pp-alarm button{all:unset;cursor:pointer;width:26px;height:26px;border-radius:50%;display:grid;place-items:center}.pp-alarm button:hover{background:rgba(255,255,255,.18)}";
+  function sprawdzAlarmy() {
+    var j = function (u) { return fetch(u, { credentials: "same-origin", cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json().catch(function () { return {}; }); }); };
+    var zdrowie = [["Generator umów", "/umowy/zdrowie"], ["Zarządzanie", "/protokoly/sb/zdrowie"], ["Kontakty", "/kartoteka/zdrowie"], ["Zimne", "/leady/zdrowie"],
+      ["Raporty", "/odprawa/zdrowie"], ["Transakcje", "/transakcje/zdrowie"], ["Wdrożenie", "/wdrozenie/zdrowie"]];
+    var h = function (t) { return Math.round((Date.now() - new Date(t)) / 36e5); };
+    var spr = zdrowie.map(function (a) { return fetch(a[1], { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.ok ? null : a[0] + " nie odpowiada (" + r.status + ")"; }, function () { return a[0] + " nie odpowiada"; }); });
+    spr.push(j("/leady/api/stan").then(function (d) {
+      var out = [], ost = (d.przebiegi || [])[0];
+      if (!d.trwa && (!ost || h(ost.koniec || ost.start) > 36)) out.push("Zimne – ogłoszenia nie pobierały się od " + (ost ? h(ost.koniec || ost.start) + " godz." : "dawna"));
+      Object.keys((ost && ost.portale) || {}).forEach(function (k) {
+        var w = ost.portale[k], st = [w.status].concat(Object.keys(w.rodzaje || {}).map(function (r) { return w.rodzaje[r].status; })).filter(Boolean);
+        if (st.some(function (x) { return x !== "ok" && x !== "czesciowo"; })) out.push("Zimne – portal " + ((d.nazwy_portali || {})[k] || k) + ": błąd pobierania");
+      });
+      if (d.hubspot === false) out.push("Zimne – HubSpot niepodłączony");
+      return out;
+    }, function () { return []; }));
+    spr.push(j("/transakcje/api/stan").then(function (d) { return !d.hubspot ? ["Transakcje – brak połączenia z HubSpot"] : d.blad ? ["Transakcje – błąd pobierania z HubSpot"] : []; }, function () { return []; }));
+    spr.push(j("/odprawa/api/status").then(function (d) { return !d.token || !d.mapa ? ["Raporty – brak połączenia z HubSpot"] : d.ostatni_blad ? ["Raporty – ostatnie pobieranie z błędem"] : []; }, function () { return []; }));
+    return Promise.all(spr).then(function (w) { return [].concat.apply([], w).filter(Boolean); });
+  }
+  function alarmAdmina(el, k) {
+    if (!k || !k.admin || widokAgenta() || window.top !== window) return;
+    var zap = null;
+    try { zap = JSON.parse(localStorage.getItem("pracawre-alarm") || "null"); } catch (e) {}
+    var pokaz = function (lista) {
+      var stary = el.querySelector(".pp-alarm"); if (stary) stary.remove();
+      var klucz = lista.join("|"), zamk = "";
+      try { zamk = localStorage.getItem("pracawre-alarm-zamkniety") || ""; } catch (e) {}
+      el.querySelector(".pp-kropka").hidden = !(lista.length || (k.zgloszeniaNowe && !widokAgenta()));
+      if (!lista.length || zamk === klucz) return;
+      if (!document.getElementById("pp-alarm-styl")) { var st = document.createElement("style"); st.id = "pp-alarm-styl"; st.textContent = ALARM_CSS; document.head.appendChild(st); }
+      var a = document.createElement("div"); a.className = "pp-alarm"; a.setAttribute("role", "alert");
+      a.innerHTML = '<span>⚠</span><span class="t">' + esc(lista.slice(0, 3).join(" · ")) + (lista.length > 3 ? " · i " + (lista.length - 3) + " więcej" : "") +
+        '</span><a href="/administracja/#stan">Stan systemu →</a><button type="button" title="Schowaj, dopóki nie pojawi się nowy problem" aria-label="Schowaj">✕</button>';
+      a.querySelector("button").addEventListener("click", function () { try { localStorage.setItem("pracawre-alarm-zamkniety", klucz); } catch (e) {} a.remove(); });
+      el.querySelector(".pp").insertAdjacentElement("afterend", a);
+    };
+    if (zap && Date.now() - zap.czas < 600000) return pokaz(zap.lista || []);
+    sprawdzAlarmy().then(function (lista) {
+      try { localStorage.setItem("pracawre-alarm", JSON.stringify({ czas: Date.now(), lista: lista })); } catch (e) {}
+      pokaz(lista);
+    });
+  }
+
   // 11.11 (decyzja użytkownika): samouczek – przycisk 🎓 obok konta, oprowadzanie i „Co nowego” (/wspolne/samouczek.js)
   function samouczek() {
     if (window.PracawreSamouczek) { window.PracawreSamouczek.przycisk(); return; }
