@@ -1041,7 +1041,9 @@
       pokazane = true;
       var ost = 0;
       try { ost = +sessionStorage.getItem("pracawre-sesja-odswiez") || 0; } catch (e) {}
-      if (Date.now() - ost > 60000) {
+      // agent właśnie coś pisze (pole tekstowe z treścią) – nie odświeżamy w ciemno, tylko okienko: najpierw skopiuje tekst
+      var a = document.activeElement, pisze = a && /^(TEXTAREA|INPUT)$/.test(a.tagName) && !/^(button|checkbox|radio|submit|hidden)$/.test(a.type || "") && (a.value || "").trim().length > 3;
+      if (!pisze && Date.now() - ost > 60000) {
         try { sessionStorage.setItem("pracawre-sesja-odswiez", String(Date.now())); } catch (e) {}
         location.reload();
         return;
