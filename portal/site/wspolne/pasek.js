@@ -253,7 +253,7 @@
       '<div class="pp-sz-d"><div class="pp-motywy" role="group" aria-label="Motyw">' +
       ["auto", "light", "dark"].map(function (m) { return '<button type="button" data-motyw="' + m + '" aria-pressed="false">' + svg(IKONY[m]) + NAZWY_MOTYWOW[m] + "</button>"; }).join("") +
       "</div>" +
-      '<button type="button" data-profil>' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') + "<span>Mój profil</span></button>" +
+      '<a href="/profil/" target="pracawre-profil" data-profil>' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') + "<span>Mój profil</span></a>" +
       '<button type="button" data-zglos>' + svg('<path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 13H3M21 13h-3.5M6 9.4 3.5 7.5M18 9.4l2.5-1.9M6 17.6 3.5 19.5M18 17.6l2.5 1.9"/>') +
       "<span>Zgłoś błąd albo uwagę</span></button>" +
       '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
@@ -269,7 +269,6 @@
     sz.addEventListener("click", function (e) { if (e.target.closest("a")) zamknij(true); });
     el.querySelectorAll("[data-motyw]").forEach(function (b) { b.addEventListener("click", function () { ustaw(b.dataset.motyw); }); });
     el.querySelector("[data-zglos]").addEventListener("click", function () { zamknij(); zglos(); });
-    el.querySelector("[data-profil]").addEventListener("click", function () { zamknij(); profil(); });
     el.querySelector("[data-agent]").addEventListener("click", function () { ustawWidokAgenta(!widokAgenta()); });
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
     el.querySelector("[data-dh]").addEventListener("click", function () { ustawWidokDoneHome(!widokDoneHome()); location.href = widokDoneHome() ? "/transakcje/" : "/"; });
@@ -639,28 +638,6 @@
 
   // --- Mój profil (1.11, decyzja użytkownika): każdy wpisuje link do SWOJEGO profilu agenta na Otodomie – Transakcje pokazują
   // z niego ogłoszenia do podpięcia przy transakcji („Nasze ogłoszenia”). Zapis: Kartoteka PUT /administracja/api/ja/profil.
-  var PROF_CSS = "#pp-prof{position:fixed;inset:0;z-index:2147483001;background:rgba(15,14,12,.55);display:grid;place-items:center;padding:16px;" +
-    "--k:#fff;--t:#1f1d1a;--m:#6b665d;--l:#e2ddd2;--z:#c9a03c;font:15px/1.45 Lato,system-ui,sans-serif}" +
-    "html[data-theme=dark] #pp-prof{--k:#212326;--t:#e8e5de;--m:#a39e94;--l:#33363a}" +
-    "#pp-prof *{box-sizing:border-box}#pp-prof .pk{background:var(--k);color:var(--t);width:min(620px,100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:18px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
-    "#pp-prof .ph{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .ph h3{margin:0 0 8px;font-size:15px;font-weight:900}" +
-    "#pp-prof details{border:1px solid var(--l);border-radius:12px;padding:8px 12px;margin-bottom:8px}#pp-prof summary{cursor:pointer;font-weight:700}" +
-    "#pp-prof summary small{color:var(--m);font-weight:400}#pp-prof .pt h4{margin:10px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--z)}" +
-    "#pp-prof .pt ul{margin:0;padding-left:18px;font-size:13.5px}#pp-prof .pt li{margin:2px 0}#pp-prof .pt p{margin:0;color:var(--t);white-space:pre-wrap}" +
-    "#pp-prof h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-prof p{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
-    "#pp-prof label{display:block;font-size:12.5px;font-weight:700;color:var(--m)}" +
-    "#pp-prof input{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:0 12px;font:inherit;outline:none}" +
-    "#pp-prof .pf{margin:-6px 0 12px}#pp-prof .pf a{font-weight:800;color:var(--z)}" +
-    "#pp-prof .pu{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .pu h3{margin:0 0 2px;font-size:15px;font-weight:900}#pp-prof .pu p{margin:0 0 8px}" +
-    "#pp-prof .pu label{display:flex;gap:12px;align-items:flex-start;padding:8px 0;cursor:pointer;color:var(--t);font-size:14px;font-weight:400}" +
-    "#pp-prof .pu input{display:inline-block;width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:#bd9302}#pp-prof .pu b{display:block}#pp-prof .pu small{color:var(--m);font-size:12.5px}" +
-    "#pp-prof input:focus{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
-    "#pp-prof .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
-    "#pp-prof .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-prof .st{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}" +
-    "#pp-prof .bl{color:#b3261e;font-size:13px;margin-top:8px}" +
-    "#pp-prof .pg{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .pg h3{margin:0 0 4px;font-size:15px;font-weight:900}" +
-    "#pp-prof .pg .w{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pp-prof .pg .s{flex:1;min-width:180px;font-size:13.5px}" +
-    "#pp-prof .pg .s b{color:#2e7d32}html[data-theme=dark] #pp-prof .pg .s b{color:#7cc59a}";
   function escHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // podsumowanie odprawy (struktura z Odprawy) – pulpit i „Mój profil”
   function podsumowanieHtml(d) {
@@ -759,98 +736,15 @@
       });
     }
   };
-  // powrót z okienka Google: usuń ?google=polaczone z adresu i pokaż „Mój profil” z potwierdzeniem
-  try {
-    var pg = new URLSearchParams(location.search);
-    if (pg.get("google") === "polaczone") {
-      pg.delete("google");
-      history.replaceState(null, "", location.pathname + (pg.toString() ? "?" + pg : "") + location.hash);
-      setTimeout(function () { profil(); }, 300);
-    }
-  } catch (e) {}
-
-  function profil() {
-    if (document.getElementById("pp-prof")) return;
-    if (!document.getElementById("pp-prof-styl")) {
-      var st = document.createElement("style"); st.id = "pp-prof-styl"; st.textContent = PROF_CSS; document.head.appendChild(st);
-    }
-    var o = document.createElement("div"); o.id = "pp-prof";
-    o.innerHTML = '<div class="pk" role="dialog" aria-modal="true" aria-labelledby="pp-prof-t"><h2 id="pp-prof-t">Mój profil</h2>' +
-      '<p class="pf" hidden><a href="/profil/">Faktury i przychody →</a></p>' +
-      "<p>Link do Twojego profilu agenta na Otodomie – Twoje ogłoszenia pokażą się przy transakcjach do podpięcia jednym kliknięciem.</p>" +
-      '<label>Profil na Otodomie<input id="pp-prof-o" inputmode="url" placeholder="https://www.otodom.pl/pl/profil/agenci-nieruchomosci/…"></label>' +
-      '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div>' +
-      '<div class="pg" hidden><h3>Google – kalendarz i poczta</h3><p>Połącz swoje firmowe konto Google: umówione spotkania same trafią do Twojego ' +
-      'kalendarza, a w karcie transakcji zobaczysz maile z klientami (tylko odczyt, nic nie zapisujemy). Możesz odłączyć w każdej chwili.</p>' +
-      '<div class="w"><span class="s"></span><button type="button" class="b" data-gp></button></div></div>' +
-      '<div class="pu"><h3>Narzędzia w pasku</h3><p>Włącz albo wyłącz – tylko u siebie, zmiana od razu.</p>' +
-      '<label><input type="checkbox" data-ust="notatnik"><span><b>📝 Notatnik</b><small>Prywatne notatki z paska (Alt+N) i karteczki na stronie głównej</small></span></label>' +
-      '<label><input type="checkbox" data-ust="samouczek"><span><b>🎓 Samouczek</b><small>Oprowadzanie i ćwiczenia (przycisk w pasku)</small></span></label></div>' +
-      '<div class="ph" hidden><h3>Podsumowania od dyrektora</h3><div class="pl"></div></div></div>';
-    document.body.appendChild(o);
-    // 7.11 (decyzja użytkownika): Google (kalendarz i poczta) łączy każdy sam – tylko gdy serwer ma włączone połączenie
-    function rysujGoogle(g) {
-      var sek = o.querySelector(".pg"); if (!g || !g.dostepne) { sek.hidden = true; return; }
-      sek.hidden = false;
-      var b = sek.querySelector("[data-gp]");
-      sek.querySelector(".s").innerHTML = g.polaczone ? "<b>✓ Połączone</b>" + (g.polaczono ? " od " + escHtml(new Date(g.polaczono).toLocaleDateString("pl-PL")) : "") +
-        (g.kalendarz ? "" : " – bez kalendarza") + (g.poczta ? "" : " – bez poczty") : "Nie połączone";
-      b.textContent = g.polaczone ? "Odłącz" : "Połącz z Google";
-      b.className = "b" + (g.polaczone ? "" : " p");
-      b.onclick = function () {
-        if (!g.polaczone) { location.href = "/administracja/api/google/polacz?wroc=" + encodeURIComponent(location.pathname + location.search + location.hash); return; }
-        b.disabled = true;
-        fetch("/administracja/api/google/odlacz", { method: "POST", credentials: "same-origin" }).then(function () { googleP = null; return google.stan(); })
-          .then(rysujGoogle).catch(function () { b.disabled = false; });
-      };
-    }
-    google.stan().then(rysujGoogle);
-    // 5.11 (decyzja użytkownika): historia podsumowań odpraw – także schowanych z pulpitu
-    fetch("/transakcje/api/podsumowania/moje?wszystkie=1", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : []; })
-      .then(function (l) {
-        if (!l || !l.length) return;
-        var h = o.querySelector(".ph"); h.hidden = false;
-        h.querySelector(".pl").innerHTML = l.map(function (s, i) {
-          return "<details" + (i ? "" : " open") + "><summary>" + escHtml(s.etykieta || s.okres) + " <small>" + escHtml(new Date(s.kiedy).toLocaleDateString("pl-PL")) +
-            "</small></summary><div class=\"pt\">" + podsumowanieHtml(s.dane || {}) + "</div></details>";
-        }).join("");
-      }).catch(function () {});
-    konto().then(function (k) { o.querySelectorAll("[data-ust]").forEach(function (c) { c.checked = wlaczone(k, c.dataset.ust); }); });
-    // 13.11 (decyzja użytkownika): „Mój profil” – osobna aplikacja /profil/ (faktury i przychody z ClickUp), tylko z dostępem do obszaru „profil”
-    konto().then(function (k) { var p = ((k && k.obszary) || {}).profil; o.querySelector(".pf").hidden = !(p === "dostep" || p === "admin"); });
-    o.querySelectorAll("[data-ust]").forEach(function (c) {
-      c.addEventListener("change", function () {
-        var z = {}; z[c.dataset.ust] = c.checked; c.disabled = true;
-        fetch("/administracja/api/ja/ustawienia", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(z) })
-          .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
-          .then(function (k) {
-            try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {}
-            kontoP = Promise.resolve(k); notatnik(k);
-            if (window.PracawreSamouczek && window.PracawreSamouczek.odswiez) window.PracawreSamouczek.odswiez(k);
-          })
-          .catch(function () { c.checked = !c.checked; })
-          .then(function () { c.disabled = false; });
-      });
-    });
-    var inp = o.querySelector("#pp-prof-o"), bl = o.querySelector(".bl");
-    konto().then(function (k) { if (k && k.profil && k.profil.otodom && !inp.value) inp.value = k.profil.otodom; });
-    function zamk() { o.remove(); window.removeEventListener("keydown", esc_, true); }
-    function esc_(e) { if (e.target && e.target.closest && e.target.closest(".pw-ed")) return; tylkoTo(e, zamk); }
-    window.addEventListener("keydown", esc_, true);
-    o.addEventListener("click", function (e) { if (e.target === o || e.target.closest("[data-x]")) zamk(); });
-    o.querySelector("[data-z]").addEventListener("click", function () {
-      bl.hidden = true;
-      fetch("/administracja/api/ja/profil", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otodom: inp.value.trim() }) })
-        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Nie udało się zapisać."); return j; }); })
-        .then(function (k) {
-          try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {}
-          kontoP = Promise.resolve(k); zamk();
-          window.dispatchEvent(new CustomEvent("pracawre-profil", { detail: k }));
-        })
-        .catch(function (e) { bl.textContent = e.message; bl.hidden = false; });
-    });
-    setTimeout(function () { inp.focus(); }, 0);
+  // 13.11 (decyzja użytkownika): „Mój profil” to OSOBNA KARTA przeglądarki – strona /profil/ (repo WRE-profil): Otodom, Google (kalendarz
+  // i poczta), narzędzia w pasku, podsumowania od dyrektora, faktury. Jedna nazwana karta „pracawre-profil” – kolejne kliknięcie wraca do niej.
+  function profil() { var w = window.open("/profil/", "pracawre-profil"); if (w) w.focus(); else location.href = "/profil/"; }
+  // strona /profil/ po zmianie ustawień: konto w pamięci paska, Notatnik i Samouczek od razu
+  function ustawKonto(k) {
+    try { sessionStorage.setItem("pracawre-konto", JSON.stringify(k)); } catch (e) {}
+    kontoP = Promise.resolve(k); notatnik(k);
+    if (window.PracawreSamouczek && window.PracawreSamouczek.odswiez) window.PracawreSamouczek.odswiez(k);
+    window.dispatchEvent(new CustomEvent("pracawre-profil", { detail: k }));
   }
 
   function zglos() {
@@ -1236,7 +1130,7 @@
     f.__sesja = true; window.fetch = f;
   })();
 
-  window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, widokDoneHome: widokDoneHome, jakDoneHome: jakDoneHome, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, widokDoneHome: widokDoneHome, jakDoneHome: jakDoneHome, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, ustawKonto: ustawKonto, podsumowanieHtml: podsumowanieHtml, google: google, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
   window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT || e.key === KLUCZ_DH) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
