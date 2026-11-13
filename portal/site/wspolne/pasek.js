@@ -272,7 +272,7 @@
   function sprawdzAlarmy() {
     var j = function (u) { return fetch(u, { credentials: "same-origin", cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json().catch(function () { return {}; }); }); };
     var zdrowie = [["Generator umów", "/umowy/zdrowie"], ["Zarządzanie", "/protokoly/sb/zdrowie"], ["Kontakty", "/kartoteka/zdrowie"], ["Zimne", "/leady/zdrowie"],
-      ["Raporty", "/odprawa/zdrowie"], ["Transakcje", "/transakcje/zdrowie"], ["Wdrożenie", "/wdrozenie/zdrowie"]];
+      ["Raporty", "/odprawa/zdrowie"], ["Transakcje", "/transakcje/zdrowie"], ["Wdrożenie", "/wdrozenie/zdrowie"], ["Mój profil", "/profil/zdrowie"]];
     var h = function (t) { return Math.round((Date.now() - new Date(t)) / 36e5); };
     var spr = zdrowie.map(function (a) { return fetch(a[1], { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.ok ? null : a[0] + " nie odpowiada (" + r.status + ")"; }, function () { return a[0] + " nie odpowiada"; }); });
     spr.push(j("/leady/api/stan").then(function (d) {
@@ -622,6 +622,7 @@
     "#pp-prof h2{margin:0 0 4px;font-size:20px;font-weight:900}#pp-prof p{color:var(--m);font-size:13.5px;margin:0 0 14px}" +
     "#pp-prof label{display:block;font-size:12.5px;font-weight:700;color:var(--m)}" +
     "#pp-prof input{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid var(--l);background:var(--k);color:var(--t);padding:0 12px;font:inherit;outline:none}" +
+    "#pp-prof .pf{margin:-6px 0 12px}#pp-prof .pf a{font-weight:800;color:var(--z)}" +
     "#pp-prof .pu{margin-top:18px;border-top:1px solid var(--l);padding-top:14px}#pp-prof .pu h3{margin:0 0 2px;font-size:15px;font-weight:900}#pp-prof .pu p{margin:0 0 8px}" +
     "#pp-prof .pu label{display:flex;gap:12px;align-items:flex-start;padding:8px 0;cursor:pointer;color:var(--t);font-size:14px;font-weight:400}" +
     "#pp-prof .pu input{display:inline-block;width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:#bd9302}#pp-prof .pu b{display:block}#pp-prof .pu small{color:var(--m);font-size:12.5px}" +
@@ -747,6 +748,7 @@
     }
     var o = document.createElement("div"); o.id = "pp-prof";
     o.innerHTML = '<div class="pk" role="dialog" aria-modal="true" aria-labelledby="pp-prof-t"><h2 id="pp-prof-t">Mój profil</h2>' +
+      '<p class="pf" hidden><a href="/profil/">Faktury i przychody →</a></p>' +
       "<p>Link do Twojego profilu agenta na Otodomie – Twoje ogłoszenia pokażą się przy transakcjach do podpięcia jednym kliknięciem.</p>" +
       '<label>Profil na Otodomie<input id="pp-prof-o" inputmode="url" placeholder="https://www.otodom.pl/pl/profil/agenci-nieruchomosci/…"></label>' +
       '<div class="bl" hidden></div><div class="st"><button type="button" class="b" data-x>Anuluj</button><button type="button" class="b p" data-z>Zapisz</button></div>' +
@@ -786,6 +788,8 @@
         }).join("");
       }).catch(function () {});
     konto().then(function (k) { o.querySelectorAll("[data-ust]").forEach(function (c) { c.checked = wlaczone(k, c.dataset.ust); }); });
+    // 13.11 (decyzja użytkownika): „Mój profil” – osobna aplikacja /profil/ (faktury i przychody z ClickUp), tylko z dostępem do obszaru „profil”
+    konto().then(function (k) { var p = ((k && k.obszary) || {}).profil; o.querySelector(".pf").hidden = !(p === "dostep" || p === "admin"); });
     o.querySelectorAll("[data-ust]").forEach(function (c) {
       c.addEventListener("change", function () {
         var z = {}; z[c.dataset.ust] = c.checked; c.disabled = true;
