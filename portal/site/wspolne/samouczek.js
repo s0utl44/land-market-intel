@@ -49,7 +49,7 @@
     ] },
     { id: "zimne", sciezka: "/leady/", obszar: "leady", nazwa: "Zimne telefony", potem: "cw1", opis: "Co gdzie jest, a potem praca na fikcyjnym kliencie – z listy i w trybie „Zacznij dzwonić”", kroki: [
       { el: "#heroTyt", tytul: "Zimne telefony", tekst: "Prywatne ogłoszenia z portali (Otodom, Adresowo, Gratka) – właściciele bez pośrednika. Nowe ogłoszenia przychodzą codziennie wieczorem." },
-      { el: "#rodzaj", tytul: "Sprzedaż / Najem", tekst: "Wybierz rodzaj ogłoszeń. Jeśli masz dostęp, są też <b>Grunty</b> i <b>Marketing</b> (leady z formularzy i kampanii)." },
+      { el: "#rodzaj", tytul: "Sprzedaż / Najem", tekst: "Wybierz rodzaj ogłoszeń. <b>Sprzedaż</b> to rynek wtórny – na niego dzwonimy; <b>Rynek pierwotny</b> jest osobno i nie trafia do trybu „Dzwonię”. Jeśli masz dostęp, są też <b>Grunty</b> i <b>Marketing</b> (leady z formularzy i kampanii)." },
       { el: "#widok", tytul: "Pula i Twoje leady", tekst: "<b>Zimne</b> – wspólna pula do wzięcia. <b>Moje zimne na dziś</b> – Twoje: „Do zadzwonienia” (nic jeszcze nie zrobione) i „Zadzwoń ponownie” (umówiony telefon, nieodebrane)." },
       { el: "#q", tytul: "Szukaj", tekst: "Po numerze telefonu (wystarczą 3 cyfry), imieniu, ulicy albo tytule – we wszystkich leadach, także cudzych (zobaczysz, kto prowadzi)." },
       { el: "#filtryR", tytul: "Filtry", tekst: "Portale, rodzaj nieruchomości, pokoje, cena i kolejność. Wybór zapamiętuje się w przeglądarce." },
