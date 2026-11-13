@@ -155,6 +155,9 @@
     "#pp-nt .nt-c .ked{visibility:hidden;font-style:normal;font-size:12px;color:var(--m);padding:0 3px;border-radius:5px}#pp-nt .nt-c:hover .ked{visibility:visible}#pp-nt .nt-c .ked:hover{background:var(--l);color:var(--t)}" +
     "#pp-nt .nt-c[aria-pressed=true]{background:var(--zj);font-weight:800}#pp-nt .nt-c i{margin-left:auto;font-style:normal;color:var(--m);font-size:12px;font-weight:400}" +
     "#pp-nt .cd{width:10px;height:10px;border-radius:3px;flex:none;display:inline-block}" +
+    "#pp-nt .nt-ke{align-items:center}#pp-nt .nt-ke .kol{all:unset;cursor:pointer;width:18px;height:18px;border-radius:5px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}" +
+    "#pp-nt .nt-ke .m{all:unset;cursor:pointer;height:26px;min-width:26px;padding:0 4px;border-radius:7px;display:grid;place-items:center;font-size:12px;color:var(--m);white-space:nowrap}" +
+    "#pp-nt .nt-ke .m:hover{background:var(--l)}#pp-nt .nt-ke .m.us{background:#c0392b;color:#fff;font-weight:800}" +
     "#pp-nt .nt-sep{border-top:1px solid var(--l);margin:7px 4px}#pp-nt .nt-c.z{color:var(--zt);font-weight:800}#pp-nt .nt-c.m{color:var(--m);font-size:12.5px}" +
     "#pp-nt .nt-c input{accent-color:#bd9302;margin:0}" +
     "#pp-nt .nt-nk{display:flex;gap:4px;padding:2px 2px}#pp-nt .nt-nk input{flex:1;min-width:0;height:28px;border:1px solid var(--z);border-radius:8px;background:var(--k);color:var(--t);padding:0 8px;font:inherit;font-size:13px;outline:none}" +
@@ -292,10 +295,17 @@
     okno.querySelector(".nt-q").addEventListener("input", function (e) { S.q = e.target.value; rysujListe(); });
     okno.addEventListener("click", klik);
     okno.addEventListener("change", zmiana);
+    okno.addEventListener("mousedown", function (e) {
+      if (e.target.closest(".nt-ke button")) { e.preventDefault(); S.klikKe = true; setTimeout(function () { S.klikKe = false; }, 400); }
+    });
     okno.addEventListener("focusout", function (e) {     // wyjście z pola nazwy (Enter, klik obok) – zapis, także bez zmiany
       var t = e.target; if (!t.matches) return;
-      if (t.matches("[data-kedyt]") && S.edKat === +t.dataset.kedyt) zmienNazwe(+t.dataset.kedyt, t.value);
-      if (t.matches("[data-znowa]") && S.zarzNowa) { S.zarzNowa = false; var v = t.value.trim(); if (v) dodajKategorie(v); else rysujZarzadzanie(); }
+      // zapis po chwili i tylko, gdy kursor naprawdę wyszedł z wiersza (kolor / usuń w tym wierszu go nie zabierają)
+      if (t.matches("[data-kedyt]")) setTimeout(function () {
+        var ae = document.activeElement;
+        if (S.klikKe || (ae && ae.matches && ae.matches("[data-kedyt]")) || S.edKat !== +t.dataset.kedyt) return;
+        zmienNazwe(+t.dataset.kedyt, t.value);
+      }, 120);
     });
     // podwójne kliknięcie (zwykłe zdarzenie przeglądarki): kategoria = zmiana nazwy, notatka na liście = pisanie w niej
     okno.addEventListener("dblclick", function (e) {
@@ -306,10 +316,7 @@
     });
     okno.addEventListener("input", function (e) { if (e.target.classList.contains("nt-t") && S.id) zmien(S.id, { tresc: e.target.value }, "okno"); });
     okno.addEventListener("keydown", function (e) {
-      if (e.target.matches("[data-znowa]")) {
-        if (e.key === "Enter") { e.preventDefault(); e.target.blur(); }
-        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); S.zarzNowa = false; e.target.value = ""; rysujZarzadzanie(); }
-      }
+      if (e.target.matches("[data-kedyt]") && e.key === "Enter") { e.preventDefault(); zmienNazwe(+e.target.dataset.kedyt, e.target.value); return; }
       if (e.target.matches(".nt-nk input")) {
         if (e.key === "Enter") { e.preventDefault(); e.target.blur(); }     // zapis w „change” – jedno miejsce
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); S.nowaKat = false; S.edKat = null; rysujKategorie(); }
@@ -320,7 +327,6 @@
     var q = bezOgonkow(S.q).split(/\s+/).filter(Boolean);
     return D.notatki.filter(function (n) {
       if (S.kat === "none" ? n.kategoria != null : typeof S.kat === "number" && n.kategoria !== S.kat) return false;
-      if (S.przyp && !n.przypieta) return false;
       var t = bezOgonkow(n.tresc); return q.every(function (s) { return t.indexOf(s) >= 0; });
     });
   }
@@ -331,19 +337,18 @@
     var bez = ile(function (n) { return n.kategoria == null; });
     var h = '<button type="button" class="nt-c" data-k="all" aria-pressed="' + (S.kat === "all") + '">Wszystkie<i>' + D.notatki.length + "</i></button>" +
       D.kategorie.map(function (k) {
-        if (S.edKat === k.id) return '<div class="nt-nk"><input data-kedyt="' + k.id + '" maxlength="40" value="' + esc(k.nazwa) + '" aria-label="Nowa nazwa kategorii"></div>';
+        if (S.edKat === k.id) return '<div class="nt-nk nt-ke" data-kid="' + k.id + '"><button type="button" class="kol" data-kol title="Zmień kolor" aria-label="Zmień kolor" style="background:' + esc(k.kolor) + '"></button>' +
+          '<input data-kedyt="' + k.id + '" maxlength="40" value="' + esc(S.edNazwa != null ? S.edNazwa : k.nazwa) + '" aria-label="Nazwa kategorii">' +
+          '<button type="button" class="m' + (S.usunKat === k.id ? " us" : "") + '" data-kusun title="Usuń kategorię (notatki zostaną bez kategorii)" aria-label="Usuń kategorię">' + (S.usunKat === k.id ? "Usunąć?" : "🗑") + "</button></div>";
         return '<button type="button" class="nt-c" title="Dwa kliknięcia – zmień nazwę" data-k="' + k.id + '" aria-pressed="' + (S.kat === k.id) + '"><span class="cd" style="background:' + esc(k.kolor) + '"></span>' +
           esc(k.nazwa) + "<i>" + ile(function (n) { return n.kategoria === k.id; }) + '</i><b class="ked" data-ked="' + k.id + '" title="Zmień nazwę">✎</b></button>';
       }).join("") +
       (bez && D.kategorie.length ? '<button type="button" class="nt-c" data-k="none" aria-pressed="' + (S.kat === "none") + '"><span class="cd" style="background:var(--l)"></span>Bez kategorii<i>' + bez + "</i></button>" : "") +
       '<div class="nt-sep"></div>' +
       (S.nowaKat ? '<div class="nt-nk"><input maxlength="40" placeholder="Nazwa kategorii" aria-label="Nazwa nowej kategorii"></div>' : '<button type="button" class="nt-c z" data-nkat>+ Kategoria</button>') +
-      '<button type="button" class="nt-c m" data-zarz>⚙ Zarządzaj kategoriami</button>' +
-      '<div class="nt-sep"></div>' +
-      '<label class="nt-c m"><input type="checkbox" data-przyp' + (S.przyp ? " checked" : "") + '><span>Tylko przypięte do: <b>Strona główna</b></span></label>' +
-      (D.kosz ? '<button type="button" class="nt-c m" data-kosz>🗑 Kosz<i>' + D.kosz + "</i></button>" : "");
+      (D.kosz ? '<div class="nt-sep"></div>' + '<button type="button" class="nt-c m" data-kosz>🗑 Kosz<i>' + D.kosz + "</i></button>" : "");
     okno.querySelector(".nt-kat").innerHTML = h;
-    var nk = okno.querySelector(".nt-nk input"); if (nk) { nk.focus(); if (nk.dataset.kedyt) nk.select(); }
+    var nk = okno.querySelector(".nt-nk input"); if (nk) { nk.focus(); if (nk.dataset.kedyt && S.edNazwa == null) nk.select(); }
     okno.querySelector(".nt-kats").innerHTML = '<option value="all">Wszystkie kategorie</option>' +
       D.kategorie.map(function (k) { return '<option value="' + k.id + '"' + (S.kat === k.id ? " selected" : "") + ">" + esc(k.nazwa) + "</option>"; }).join("") +
       (bez && D.kategorie.length ? '<option value="none"' + (S.kat === "none" ? " selected" : "") + ">Bez kategorii</option>" : "");
@@ -403,16 +408,6 @@
         '<div class="nt-zs"><button type="button" class="nt-p" data-zarz-x>← Wróć</button></div>';
       return;
     }
-    z.innerHTML = "<h3>Moje kategorie</h3><p>Tylko Twoje – nikt inny ich nie widzi. Usunięcie kategorii nie usuwa notatek (trafiają do „Bez kategorii”).</p>" +
-      D.kategorie.map(function (k, i) {
-        return '<div class="nt-zr" data-kid="' + k.id + '"><button type="button" class="kol" data-kol title="Zmień kolor" aria-label="Zmień kolor" style="background:' + esc(k.kolor) + '"></button>' +
-          '<input value="' + esc(k.nazwa) + '" maxlength="40" aria-label="Nazwa kategorii" data-knaz>' +
-          '<button type="button" class="m" data-gora title="W górę" aria-label="W górę"' + (i ? "" : " disabled") + ">↑</button>" +
-          '<button type="button" class="m" data-dol title="W dół" aria-label="W dół"' + (i < D.kategorie.length - 1 ? "" : " disabled") + ">↓</button>" +
-          '<button type="button" class="m" data-kusun title="Usuń kategorię" aria-label="Usuń kategorię">🗑</button></div>';
-      }).join("") +
-      (S.zarzNowa ? '<div class="nt-zr"><span class="kol" style="background:var(--l)"></span><input data-znowa maxlength="40" placeholder="Nazwa nowej kategorii – Enter dodaje" aria-label="Nazwa nowej kategorii"></div>' : "") +
-      '<div class="nt-zs"><button type="button" class="nt-p" data-zarz-nowa>+ Dodaj kategorię</button><span style="flex:1"></span><button type="button" class="nt-p" data-zarz-x aria-pressed="true">Gotowe</button></div>';
   }
   function dodajKategorie(nazwa) {
     nazwa = (nazwa || "").trim(); S.nowaKat = false;
@@ -421,17 +416,13 @@
       .catch(function (e) { alert(e.message); rysujKategorie(); });
   }
   function zmienNazwe(id, nazwa) {
-    nazwa = (nazwa || "").trim(); S.edKat = null;
+    nazwa = (nazwa || "").trim(); S.edKat = null; S.edNazwa = null; S.usunKat = null;
     var k = kategoria(id);
     if (!k || !nazwa || nazwa === k.nazwa) { rysujKategorie(); return; }
     k.nazwa = nazwa; rysuj(); rysujKartki();
     api("PUT", "/kategorie/" + id, { nazwa: nazwa }).then(rozeslij).catch(function (e) { alert(e.message); laduj(); });
   }
-  function kolejnosc(i, o) {
-    var l = D.kategorie.slice(), j = i + o; if (j < 0 || j >= l.length) return;
-    var t = l[i]; l[i] = l[j]; l[j] = t; D.kategorie = l; rysuj();
-    api("PUT", "/kolejnosc", { kategorie: l.map(function (k) { return k.id; }) }).then(function () { rozeslij(); rysujKartki(); }).catch(function () {});
-  }
+
   function klik(e) {
     var ked = e.target.closest("[data-ked]");
     if (ked) { S.edKat = +ked.dataset.ked; rysujKategorie(); return; }
@@ -448,26 +439,23 @@
     }
     else if (d.n) wybierz(+d.n);
     else if ("nkat" in d) { S.nowaKat = true; rysujKategorie(); }
-    else if ("zarz" in d) { S.zarz = true; S.kosz = null; rysujZarzadzanie(); }
     else if ("kosz" in d) { S.zarz = true; api("GET", "/kosz").then(function (k) { S.kosz = k.notatki; rysujZarzadzanie(); }); }
     else if (d.przywroc) api("POST", "/kosz/" + d.przywroc).then(function (n) { S.kosz = S.kosz.filter(function (x) { return x.id !== n.id; }); D.kosz--; D.notatki.unshift(n); rozeslij(); rysuj(); });
     else if ("zarzX" in d) { S.zarz = false; S.kosz = null; var z = okno.querySelector(".nt-zarz"); if (z) z.remove(); rysuj(); }
-    else if ("zarzNowa" in d) { S.zarzNowa = true; rysujZarzadzanie(); var zi = okno.querySelector("[data-znowa]"); if (zi) zi.focus(); }
     else if ("pin" in d) przypnij(S.id, !notatka(S.id).przypieta);
     else if ("kop" in d) kopiuj(notatka(S.id).tresc, b);
     else if ("usun" in d) usun(S.id);
     else {
       var r = b.closest("[data-kid]"); if (!r) return;
-      var id = +r.dataset.kid, k = kategoria(id), i = D.kategorie.indexOf(k);
+      var id = +r.dataset.kid, k = kategoria(id);
+      var we = r.querySelector("[data-kedyt]"); if (we) S.edNazwa = we.value;      // wpisana nazwa nie ginie
       if ("kol" in d) {
         var kol = D.kolory[(D.kolory.indexOf(k.kolor) + 1) % D.kolory.length];
-        k.kolor = kol; rysuj(); rysujKartki();
+        k.kolor = kol; S.usunKat = null; rysujKategorie(); rysujListe(); rysujKartki();
         api("PUT", "/kategorie/" + id, { kolor: kol }).then(rozeslij).catch(function () {});
-      } else if ("gora" in d) kolejnosc(i, -1);
-      else if ("dol" in d) kolejnosc(i, 1);
-      else if ("kusun" in d) {
-        var ile = D.notatki.filter(function (n) { return n.kategoria === id; }).length;
-        if (!confirm("Usunąć kategorię „" + k.nazwa + "”?" + (ile ? "\n" + ile + " notat. zostanie bez kategorii." : ""))) return;
+      } else if ("kusun" in d) {
+        if (S.usunKat !== id) { S.usunKat = id; rysujKategorie(); return; }   // drugie kliknięcie „Usunąć?” = usuń
+        S.usunKat = null; S.edKat = null; S.edNazwa = null;
         api("DELETE", "/kategorie/" + id).then(function () {
           D.kategorie = D.kategorie.filter(function (x) { return x.id !== id; });
           D.notatki.forEach(function (n) { if (n.kategoria === id) n.kategoria = null; });
@@ -478,16 +466,10 @@
   }
   function zmiana(e) {
     var t = e.target;
-    if (t.matches("[data-przyp]")) { S.przyp = t.checked; rysujListe(); }
-    else if (t.matches(".nt-kats")) { S.kat = t.value === "all" || t.value === "none" ? t.value : +t.value; rysuj(); }
+    if (t.matches(".nt-kats")) { S.kat = t.value === "all" || t.value === "none" ? t.value : +t.value; rysuj(); }
     else if (t.matches(".nt-wyb")) { if (t.value) wybierz(+t.value); }
     else if (t.matches(".nt-katn")) zmien(S.id, { kategoria: t.value ? +t.value : null });
-    else if (t.matches("[data-knaz]")) {
-      var id = +t.closest("[data-kid]").dataset.kid, n = t.value.trim();
-      if (!n) { t.value = kategoria(id).nazwa; return; }
-      api("PUT", "/kategorie/" + id, { nazwa: n }).then(function (k) { Object.assign(kategoria(id), k); rozeslij(); rysujKategorie(); rysujEdytor(); rysujKartki(); })
-        .catch(function (er) { alert(er.message); });
-    } else if (t.matches("[data-kedyt]")) { if (S.edKat === +t.dataset.kedyt) zmienNazwe(+t.dataset.kedyt, t.value); }
+    else if (t.matches("[data-kedyt]")) { /* zapis: Enter albo wyjście z wiersza (focusout) */ }
     else if (t.matches(".nt-nk input")) dodajKategorie(t.value);
   }
 
@@ -573,8 +555,7 @@
     if (e.key !== "Escape" || e.defaultPrevented || !okno || okno.hidden || !okno.contains(document.activeElement)) return;
     e.preventDefault(); e.stopPropagation();
     var ae = document.activeElement;
-    if (ae && ae.matches && ae.matches("[data-kedyt], .nt-nk input")) { S.edKat = null; S.nowaKat = false; rysujKategorie(); var t0 = okno.querySelector(".nt-t"); if (t0) t0.focus(); return; }
-    if (ae && ae.matches && ae.matches("[data-znowa]")) { S.zarzNowa = false; ae.value = ""; rysujZarzadzanie(); return; }
+    if (ae && ae.matches && ae.matches("[data-kedyt], .nt-nk input")) { S.edKat = null; S.edNazwa = null; S.usunKat = null; S.nowaKat = false; rysujKategorie(); var t0 = okno.querySelector(".nt-t"); if (t0) t0.focus(); return; }
     if (S.zarz) { S.zarz = false; S.kosz = null; var z = okno.querySelector(".nt-zarz"); if (z) z.remove(); rysuj(); return; }
     zamknij();
   }, true);
