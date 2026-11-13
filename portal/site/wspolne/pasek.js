@@ -599,7 +599,12 @@
     "#pp-zgl .pw-ed{background:var(--k);border-color:var(--l)}#pp-zgl .pw-ed:focus-within{border-color:var(--z);box-shadow:0 0 0 4px rgba(201,160,60,.15)}" +
     "#pp-zgl textarea.pw-ed-tx{min-height:110px;color:var(--t)}" +
     "#pp-zgl .zr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}" +
-    "#pp-zgl .zr img{max-height:70px;max-width:140px;border-radius:8px;border:1px solid var(--l)}" +
+    "#pp-zgl .zr img{display:block;max-height:70px;max-width:140px;border-radius:8px;border:1px solid var(--l)}" +
+    "#pp-zgl .zj{position:relative;display:inline-block}#pp-zgl .zx{all:unset;cursor:pointer;position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;" +
+    "background:var(--t);color:var(--k);font-size:11px;font-weight:900;display:grid;place-items:center}" +
+    "#pp-zgl .zh{font-size:12px;color:var(--m);margin-top:6px}" +
+    "#pp-zgl .sk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(201,160,60,.16);color:var(--zd);border-radius:12px;padding:8px 12px;font-weight:700;font-size:13.5px;margin:-6px 0 6px}" +
+    "#pp-zgl .sk .b{height:30px;padding:0 12px;font-size:12.5px;margin-left:auto}" +
     "#pp-zgl .b{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 16px;white-space:nowrap;border-radius:999px;border:1px solid var(--l);font-weight:700;font-size:14px}" +
     "#pp-zgl .b.p{background:var(--t);color:var(--k);border-color:var(--t)}#pp-zgl .b[disabled]{opacity:.5;pointer-events:none}" +
     "#pp-zgl .b.x{width:38px;padding:0;justify-content:center}" +
@@ -832,49 +837,70 @@
       st.textContent = CSS_ZGL + "@keyframes pkPoj{from{opacity:0}to{opacity:1}}"; document.head.appendChild(st);
     }
     var tu = OBSZARY_ZGL.filter(function (o) { return o.sciezka && location.pathname.indexOf(o.sciezka) === 0; })[0];
-    var stan = { obszary: [tu ? tu.id : "ogolne"], rodzaj: "blad", zrzut: null };
+    // 13.11 (zgłoszenie A. Sikorskiej): kilka zrzutów (do MAX_ZRZ) i SZKIC – zgłoszenie zapisuje się na bieżąco w przeglądarce
+    // (localStorage SZKIC_ZGL), więc zamknięcie okna, żeby zrobić kolejny zrzut, nic nie gubi; szkic znika po wysłaniu albo „Zacznij od nowa”
+    var stan = { obszary: [tu ? tu.id : "ogolne"], rodzaj: "blad", zrzuty: [], opis: "", adres: location.href, strona: document.title };
+    var szkic = szkicZgl(), przywrocony = false;
+    if (szkic) { przywrocony = true; ["obszary", "rodzaj", "zrzuty", "opis", "adres", "strona"].forEach(function (k) { if (szkic[k] != null) stan[k] = szkic[k]; }); }
+    var bezMiejsca = false;
+    function zapiszSzkic() {
+      var tx = tlo.querySelector("textarea"); if (tx) stan.opis = tx.value;
+      var pusty = !stan.opis.trim() && !stan.zrzuty.length;
+      try {
+        if (pusty) { localStorage.removeItem(SZKIC_ZGL); return; }
+        var d = { obszary: stan.obszary, rodzaj: stan.rodzaj, opis: stan.opis, adres: stan.adres, strona: stan.strona, czas: Date.now() };
+        try { localStorage.setItem(SZKIC_ZGL, JSON.stringify(Object.assign({ zrzuty: stan.zrzuty }, d))); bezMiejsca = false; }
+        catch (e) { localStorage.setItem(SZKIC_ZGL, JSON.stringify(Object.assign({ zrzuty: [] }, d))); bezMiejsca = true; }
+      } catch (e) { bezMiejsca = true; }
+      var u = tlo.querySelector(".zu"); if (u) u.hidden = !bezMiejsca || !stan.zrzuty.length;
+    }
     var tlo = document.createElement("div"); tlo.id = "pp-zgl";
     var poprzedni = document.activeElement;
     function zamknij() { tlo.remove(); window.removeEventListener("keydown", klaw, true); document.removeEventListener("paste", wklej); if (poprzedni && poprzedni.focus) poprzedni.focus(); }
     function klaw(e) { if (e.target && e.target.closest && e.target.closest(".pw-ed") && e.target.value) return; tylkoTo(e, zamknij); }
     function rysuj(dostepne) {
-      var tx = tlo.querySelector("textarea"), opis = tx ? tx.value : "";
+      var tx = tlo.querySelector("textarea"), opis = tx ? tx.value : stan.opis;
       tlo.innerHTML = '<div class="ok" role="dialog" aria-modal="true" aria-labelledby="pp-zgl-t">' +
         '<h2 id="pp-zgl-t">Zgłoś błąd albo uwagę<button type="button" class="b x" data-x title="Zamknij">✕</button></h2>' +
         '<p class="op">Trafi do administratora. Opisz, co nie działa – im dokładniej, tym szybciej to poprawimy.</p>' +
+        (przywrocony ? '<div class="sk">↺ Wróciło Twoje niewysłane zgłoszenie<button type="button" class="b" data-nowe>Zacznij od nowa</button></div>' : "") +
         '<div class="et">Czego dotyczy (możesz zaznaczyć kilka)</div><div class="cz">' +
         dostepne.map(function (o) { return '<button type="button" data-o="' + o.id + '" aria-pressed="' + (stan.obszary.indexOf(o.id) >= 0) + '"' + (o.opis ? ' title="' + o.opis + '"' : "") + ">" + o.nazwa + "</button>"; }).join("") +
         '</div><div class="et">Rodzaj</div><div class="sg">' +
         RODZAJE_ZGL.map(function (r) { return '<button type="button" data-r="' + r[0] + '" aria-pressed="' + (stan.rodzaj === r[0]) + '">' + r[1] + "</button>"; }).join("") +
         '</div><div class="et">Opis</div><div class="pw-ed"><textarea class="pw-ed-tx" aria-label="Opis" placeholder="Krok po kroku: co zostało zrobione, co się stało i co powinno się stać.">' + esc(opis) + "</textarea>" +
         '<div class="pw-ed-p" style="margin-top:4px"><span class="pw-ed-skr">Ctrl+Enter – wyślij · Esc – zamknij</span></div></div>' +
-        '<div class="et">Zrzut ekranu (opcjonalnie – możesz też wkleić Ctrl+V)</div><div class="zr">' +
-        (stan.zrzut ? '<img alt="zrzut ekranu" src="' + stan.zrzut + '"><button type="button" class="b" data-bez>Usuń zrzut</button>'
-          : '<label class="b">Dodaj obraz<input type="file" accept="image/png,image/jpeg,image/webp" hidden></label>') +
-        '</div><div class="bl" hidden></div>' +
+        '<div class="et">Zrzuty ekranu (opcjonalnie, do ' + MAX_ZRZ + ' – możesz też wkleić Ctrl+V)</div><div class="zr">' +
+        stan.zrzuty.map(function (z, i) { return '<span class="zj"><img alt="zrzut ekranu ' + (i + 1) + '" src="' + z + '"><button type="button" class="zx" data-bez="' + i + '" title="Usuń ten zrzut" aria-label="Usuń zrzut ' + (i + 1) + '">✕</button></span>'; }).join("") +
+        (stan.zrzuty.length < MAX_ZRZ ? '<label class="b">' + (stan.zrzuty.length ? "+ Kolejny obraz" : "Dodaj obraz") + '<input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>' : "") +
+        '</div><div class="zh">Możesz zamknąć to okno, żeby zrobić kolejny zrzut – opis i zrzuty zostaną do wysłania.</div>' +
+        '<div class="bl zu" hidden>Zrzuty nie mieszczą się w pamięci przeglądarki – nie zamykaj okna przed wysłaniem (opis zostanie).</div>' +
+        '<div class="bl" data-bl hidden></div>' +
         '<div class="st"><span class="in">Dołączymy adres tej strony i rodzaj przeglądarki.</span><button type="button" class="pw-ed-anul" data-x data-pw-anuluj>✕ Anuluj</button>' +
         '<button type="button" class="pw-ed-zap" data-wyslij data-pw-zapisz>✓ Wyślij zgłoszenie</button></div>' +
         '<details><summary>Twoje zgłoszenia</summary><div class="mzl">Wczytywanie…</div></details></div>';
-      var t2 = tlo.querySelector("textarea"); t2.focus(); t2.setSelectionRange(t2.value.length, t2.value.length);
+      var t2 = tlo.querySelector("textarea"); t2.addEventListener("input", zapiszSzkic); t2.focus(); t2.setSelectionRange(t2.value.length, t2.value.length);
       var plik = tlo.querySelector("input[type=file]");
-      if (plik) plik.addEventListener("change", function () { if (plik.files[0]) obraz(plik.files[0]); });
+      if (plik) plik.addEventListener("change", function () { [].slice.call(plik.files).forEach(obraz); });
+      var u = tlo.querySelector(".zu"); if (u) u.hidden = !bezMiejsca || !stan.zrzuty.length;
       tlo.querySelector("details").addEventListener("toggle", moje, { once: true });
     }
-    function obraz(f) {                // zmniejszenie do 1920 px (JPEG) – zrzuty z dużych ekranów są ciężkie
+    function obraz(f) {                // zmniejszenie do 1600 px (JPEG) – zrzuty z dużych ekranów są ciężkie, a szkic musi się zmieścić
       var r = new FileReader();
       r.onload = function () {
         var im = new Image();
         im.onload = function () {
-          var sk = Math.min(1, 1920 / im.width), c = document.createElement("canvas");
+          if (stan.zrzuty.length >= MAX_ZRZ) return;
+          var sk = Math.min(1, 1600 / im.width), c = document.createElement("canvas");
           c.width = Math.round(im.width * sk); c.height = Math.round(im.height * sk);
           c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-          stan.zrzut = c.toDataURL("image/jpeg", 0.85); rysuj(dostepneObszary);
+          stan.zrzuty.push(c.toDataURL("image/jpeg", 0.8)); zapiszSzkic(); rysuj(dostepneObszary);
         };
         im.src = r.result;
       };
       r.readAsDataURL(f);
     }
-    function wklej(e) { var it = [].slice.call((e.clipboardData || {}).items || []).filter(function (i) { return i.type.indexOf("image/") === 0; })[0]; if (it) { e.preventDefault(); obraz(it.getAsFile()); } }
+    function wklej(e) { var it = [].slice.call((e.clipboardData || {}).items || []).filter(function (i) { return i.type.indexOf("image/") === 0; }); if (it.length) { e.preventDefault(); it.forEach(function (i) { obraz(i.getAsFile()); }); } }
     function moje() {
       fetch("/administracja/api/zgloszenia/moje", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : []; }).then(function (l) {
         var el = tlo.querySelector(".mzl"); if (!el) return;
@@ -896,21 +922,30 @@
     tlo.addEventListener("click", function (e) {
       if (e.target === tlo || e.target.closest("[data-x]")) return zamknij();
       var o = e.target.closest("[data-o]"), r = e.target.closest("[data-r]");
-      if (o) { var i = stan.obszary.indexOf(o.dataset.o); if (i >= 0) stan.obszary.splice(i, 1); else stan.obszary.push(o.dataset.o); o.setAttribute("aria-pressed", String(i < 0)); return; }
-      if (r) { stan.rodzaj = r.dataset.r; tlo.querySelectorAll("[data-r]").forEach(function (b) { b.setAttribute("aria-pressed", String(b === r)); }); return; }
-      if (e.target.closest("[data-bez]")) { stan.zrzut = null; rysuj(dostepneObszary); return; }
+      if (o) { var i = stan.obszary.indexOf(o.dataset.o); if (i >= 0) stan.obszary.splice(i, 1); else stan.obszary.push(o.dataset.o); o.setAttribute("aria-pressed", String(i < 0)); zapiszSzkic(); return; }
+      if (r) { stan.rodzaj = r.dataset.r; tlo.querySelectorAll("[data-r]").forEach(function (b) { b.setAttribute("aria-pressed", String(b === r)); }); zapiszSzkic(); return; }
+      var bz = e.target.closest("[data-bez]");
+      if (bz) { zapiszSzkic(); stan.zrzuty.splice(+bz.dataset.bez, 1); zapiszSzkic(); rysuj(dostepneObszary); return; }
+      if (e.target.closest("[data-nowe]")) {
+        try { localStorage.removeItem(SZKIC_ZGL); } catch (er) { /* bez pamięci */ }
+        przywrocony = false; stan.zrzuty = []; stan.opis = ""; stan.adres = location.href; stan.strona = document.title; stan.rodzaj = "blad";
+        stan.obszary = [tu && dostepneObszary.some(function (x) { return x.id === tu.id; }) ? tu.id : "ogolne"];
+        var t0 = tlo.querySelector("textarea"); if (t0) t0.value = "";
+        rysuj(dostepneObszary); return;
+      }
       var w = e.target.closest("[data-wyslij]");
       if (!w) return;
-      var bl = tlo.querySelector(".bl"), opis = tlo.querySelector("textarea").value.trim();
+      var bl = tlo.querySelector("[data-bl]"), opis = tlo.querySelector("textarea").value.trim();
       function blad(t) { bl.textContent = t; bl.hidden = false; }
       if (!stan.obszary.length) return blad("Zaznacz, czego dotyczy zgłoszenie.");
       if (opis.length < 3) return blad("Opisz, co nie działa.");
       w.disabled = true; w.textContent = "Wysyłanie…";
       fetch("/administracja/api/zgloszenia", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ obszary: stan.obszary, rodzaj: stan.rodzaj, opis: opis, zrzut: stan.zrzut, adres: location.href,
-          strona: document.title, przegladarka: navigator.userAgent, ekran: innerWidth + "×" + innerHeight }) })
+        body: JSON.stringify({ obszary: stan.obszary, rodzaj: stan.rodzaj, opis: opis, zrzuty: stan.zrzuty, adres: stan.adres,
+          strona: stan.strona, przegladarka: navigator.userAgent, ekran: innerWidth + "×" + innerHeight }) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Błąd " + r.status); return j; }); })
         .then(function () {
+          try { localStorage.removeItem(SZKIC_ZGL); } catch (er) { /* bez pamięci */ }
           tlo.querySelector(".ok").innerHTML = '<h2>Dziękujemy!<button type="button" class="b x" data-x>✕</button></h2>' +
             '<p class="op" style="margin:8px 0 0">Zgłoszenie trafiło do administratora. Jego stan zobaczysz w tym oknie, w „Twoich zgłoszeniach”.</p>' +
             '<div class="st"><button type="button" class="b p" data-x>Zamknij</button></div>';
@@ -927,6 +962,14 @@
       if (!stan.obszary.length) stan.obszary = ["ogolne"];
       rysuj(dostepneObszary);
     });
+  }
+  var SZKIC_ZGL = "pracawre-zgloszenie-szkic", MAX_ZRZ = 5;
+  function szkicZgl() {              // niewysłane zgłoszenie (7 dni)
+    try {
+      var d = JSON.parse(localStorage.getItem(SZKIC_ZGL) || "null");
+      if (d && Date.now() - (d.czas || 0) < 7 * 864e5 && ((d.opis || "").trim() || (d.zrzuty || []).length)) return d;
+    } catch (e) { /* bez pamięci */ }
+    return null;
   }
 
 
