@@ -302,6 +302,8 @@ document.getElementById('spotkania').addEventListener('click', async e => {
 });
 
 PracawrePasek.konto().then(k => {
+  // 13.11 (decyzja użytkownika): pracownik DoneHome – głównym widokiem jest lejek DoneHome w Transakcjach
+  if (PracawrePasek.jakDoneHome && PracawrePasek.jakDoneHome(k)) { location.replace('/transakcje/'); return; }
   powitaj(k);
   const agent = PracawrePasek.widokAgenta && PracawrePasek.widokAgenta();   // widok agenta – bez Administracji
   DOSTEPNE = [...PracawrePasek.aplikacje(k), ...(k && k.admin && !agent ? [ADMINISTRACJA] : [])];

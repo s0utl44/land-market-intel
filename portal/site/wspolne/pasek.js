@@ -52,13 +52,25 @@
   var KLUCZ_AGENT = "pracawre-widok-agenta";
   function widokAgenta() { try { return localStorage.getItem(KLUCZ_AGENT) === "1"; } catch (e) { return false; } }
   function ustawWidokAgenta(v) {
-    try { localStorage.setItem(KLUCZ_AGENT, v ? "1" : "0"); } catch (e) {}
+    try { localStorage.setItem(KLUCZ_AGENT, v ? "1" : "0"); if (v) localStorage.setItem(KLUCZ_DH, "0"); } catch (e) {}
     zmianaWidoku();
   }
+  // 13.11 (decyzja użytkownika): „Widok DoneHome” – administrator ogląda witrynę oczami pracownika DoneHome (lejek DoneHome jako
+  // start, Zimne tylko grunty, lew z logo DoneHome). Tylko wygląd – serwer bez zmian; wyklucza się z „Widokiem agenta”.
+  var KLUCZ_DH = "pracawre-widok-donehome";
+  function widokDoneHome() { try { return localStorage.getItem(KLUCZ_DH) === "1"; } catch (e) { return false; } }
+  function ustawWidokDoneHome(v) {
+    try { localStorage.setItem(KLUCZ_DH, v ? "1" : "0"); if (v) localStorage.setItem(KLUCZ_AGENT, "0"); } catch (e) {}
+    zmianaWidoku();
+  }
+  // pracownik DoneHome albo administrator w „Widoku DoneHome” – aplikacje pytają o to jedną funkcją
+  function jakDoneHome(k) { return !!k && (k.rola === "donehome" || (!!k.admin && widokDoneHome())); }
   function zmianaWidoku() {
     html.classList.toggle("pw-agent", widokAgenta());
+    html.classList.toggle("pw-donehome", widokDoneHome());
     document.querySelectorAll("#pracawre-pasek").forEach(function (el) { var k = kontoZapamietane(); if (k) uprawnieniaWPasku(el, k); });
     try { window.dispatchEvent(new CustomEvent("pracawre-widok-agenta", { detail: { agent: widokAgenta() } })); } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent("pracawre-widok-donehome", { detail: { donehome: widokDoneHome() } })); } catch (e) {}
   }
 
   var CSS =
@@ -220,6 +232,7 @@
       '<a class="pp-dom" href="/" title="Strona główna"><img src="/wspolne/logo-wre.png" alt="WRE Nieruchomości"></a>' +
       (tu ? '<span class="pp-sep" aria-hidden="true"></span><span class="pp-tu">' + tu.nazwa + "</span>" : "") +
       '<div class="pp-r"><button type="button" class="pp-ag" data-agent-wyl hidden title="Wyłącz widok agenta">Widok agenta ✕</button>' +
+      '<button type="button" class="pp-ag" data-dh-wyl hidden title="Wyłącz widok DoneHome">Widok DoneHome ✕</button>' +
       '<button type="button" class="pp-konto" data-sz title="Konto"><span class="pp-av">?</span></button></div></nav>' +
       // wysuwana karta (position:fixed) – poza .pp, żeby przejścia stron (view-transition) jej nie ruszały
       '<div class="pp-sz-tlo" hidden></div>' +
@@ -245,6 +258,8 @@
       "<span>Zgłoś błąd albo uwagę</span></button>" +
       '<button type="button" class="pp-agent" data-agent hidden aria-pressed="false">' + svg('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>') +
       "<span>Widok agenta</span><b>wył.</b></button>" +
+      '<button type="button" class="pp-agent" data-dh hidden aria-pressed="false">' + svg('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>') +
+      "<span>Widok DoneHome</span><b>wył.</b></button>" +
       '<a href="/oauth2/sign_out?rd=%2F">' + svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>') + "<span>Wyloguj</span></a>" +
       "</div></aside>";
     var sz = el.querySelector(".pp-sz"), tlo = el.querySelector(".pp-sz-tlo");
@@ -257,6 +272,8 @@
     el.querySelector("[data-profil]").addEventListener("click", function () { zamknij(); profil(); });
     el.querySelector("[data-agent]").addEventListener("click", function () { ustawWidokAgenta(!widokAgenta()); });
     el.querySelector("[data-agent-wyl]").addEventListener("click", function () { ustawWidokAgenta(false); });
+    el.querySelector("[data-dh]").addEventListener("click", function () { ustawWidokDoneHome(!widokDoneHome()); location.href = widokDoneHome() ? "/transakcje/" : "/"; });
+    el.querySelector("[data-dh-wyl]").addEventListener("click", function () { ustawWidokDoneHome(false); location.href = "/"; });
     odswiezMotyw();
     if (znane) uprawnieniaWPasku(el, znane);
     konto().then(function (k) { uprawnieniaWPasku(el, k); oknoSpotkan(k); alarmAdmina(el, k); if (k) notatnik(k); });
@@ -390,6 +407,7 @@
   function widoczny(a, k) {
     var p = (k.obszary || {})[a.obszar];
     if (a.tylkoAdmin && k.admin && widokAgenta()) return false;   // widok agenta: bez zakładek tylko dla administratorów
+    if (k.admin && widokDoneHome() && ["transakcje", "leady", "radar"].indexOf(a.obszar) < 0) return false;   // 13.11: jak pracownik DoneHome
     if (a.obszar === "leady" && k.zimne && !k.zimne.length && !k.admin) return false;   // 7.11: dyrektor – dane tak, zimne nie
     return a.zastrzezony ? p === "dostep" || p === "admin" : p !== "brak";
   }
@@ -431,6 +449,11 @@
     przel.setAttribute("aria-pressed", String(ag));
     przel.querySelector("b").textContent = ag ? "wł." : "wył.";
     el.querySelector("[data-agent-wyl]").hidden = !ag;
+    var dhw = !!k.admin && widokDoneHome(), pdh = el.querySelector("[data-dh]");
+    pdh.hidden = !k.admin;
+    pdh.setAttribute("aria-pressed", String(dhw));
+    pdh.querySelector("b").textContent = dhw ? "wł." : "wył.";
+    el.querySelector("[data-dh-wyl]").hidden = !dhw;
   }
   function inicjaly(nazwa) {
     var cz = nazwa.split(/[\s.]+/).filter(Boolean);
@@ -991,6 +1014,8 @@
     '#dzwonPrz .lew::before,#dzwonPrz .lew::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #d9b55a;opacity:0;' +
     "  animation:dzFala 2.4s cubic-bezier(.2,.6,.3,1) infinite}" +
     "#dzwonPrz .lew::after{animation-delay:1.2s}" +
+    "#dzwonPrz .lew.dh img{width:42px;border-radius:8px}" +
+    "#dzwonPrz .lew .dhTxt{font:800 18px/1 system-ui,sans-serif;letter-spacing:.02em;color:#d9b55a;animation:dzOddech 2.4s ease-in-out infinite}" +
     "@keyframes dzOddech{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}" +
     "@keyframes dzFala{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.75);opacity:0}}" +
     "#dzwonPrz .tx{display:flex;flex-direction:column;line-height:1.15;min-width:0}" +
@@ -1010,21 +1035,26 @@
     dzOpcje = opcje || {};
     konto().then(function (k) {
       if (!k) return;
-      var agent = k.rola === "agent" || k.rola === "administracja" || (k.admin && widokAgenta());   // 6.11: administracja dzwoni do leadów z marketingu
-      if (agent) przyciskDzwonieniaPokaz(opcje);
+      // 6.11: administracja dzwoni do leadów z marketingu; 13.11: DoneHome – zimne telefony na grunty (lew z logo DoneHome)
+      var agent = k.rola === "agent" || k.rola === "administracja" || jakDoneHome(k) || (k.admin && widokAgenta());
+      if (agent) przyciskDzwonieniaPokaz(opcje, k);
       else { var b = document.getElementById("dzwonPrz"); if (b) b.remove(); }
     });
   }
-  function przyciskDzwonieniaPokaz(opcje) {
+  function przyciskDzwonieniaPokaz(opcje, k) {
     opcje = opcje || {};
+    var dh = jakDoneHome(k);
     var b = document.getElementById("dzwonPrz");
     if (!b) {
       if (!document.getElementById("pp-dz-styl")) { var st = document.createElement("style"); st.id = "pp-dz-styl"; st.textContent = CSS_DZ; document.head.appendChild(st); }
       b = document.createElement("a");
       b.id = "dzwonPrz"; b.href = "/leady/#dzwonie"; b.setAttribute("aria-label", "Zacznij dzwonić");
       b.title = "Zacznij dzwonić – przytrzymaj i przeciągnij, żeby przesunąć";
-      b.innerHTML = '<span class="lew"><img src="/wspolne/lew-wre.png" alt=""></span><span class="tx"><b>Zacznij dzwonić</b><small id="dzwonCel"></small>' +
+      // 13.11: pracownik DoneHome – logo DoneHome (/wspolne/logo-donehome.png; dopóki pliku nie ma – napis „DH”)
+      b.innerHTML = '<span class="lew' + (dh ? ' dh' : '') + '"><img src="/wspolne/' + (dh ? 'logo-donehome.png' : 'lew-wre.png') + '" alt="' + (dh ? 'DoneHome' : '') + '"></span>' +
+        '<span class="tx"><b>Zacznij dzwonić</b><small id="dzwonCel"></small>' +
         '<span class="pas" id="dzwonPas" hidden><i></i></span></span>';
+      if (dh) { var im = b.querySelector(".lew img"); im.onerror = function () { im.replaceWith(Object.assign(document.createElement("b"), { className: "dhTxt", textContent: "DH" })); }; }
       document.body.appendChild(b);
       var KL = "pracawre-dzwon-miejsce";
       var ustaw = function (x, y) {
@@ -1206,9 +1236,9 @@
     f.__sesja = true; window.fetch = f;
   })();
 
-  window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
+  window.PracawrePasek = { sciaga: sciaga, liczby: liczby, przyciskDzwonienia: przyciskDzwonienia, widokAgenta: widokAgenta, ustawWidokAgenta: ustawWidokAgenta, widokDoneHome: widokDoneHome, jakDoneHome: jakDoneHome, wypelnij: wypelnij, ustaw: ustaw, wybor: wybor, ciemny: ciemny, kartoteka: kartoteka, konto: konto, zglos: zglos, profil: profil, google: google, aplikacje: aplikacje, grupy: GRUPY };
   if (mq && mq.addEventListener) mq.addEventListener("change", zastosuj);
-  window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT) zmianaWidoku(); });
+  window.addEventListener("storage", function (e) { if (e.key === KLUCZ) zastosuj(); if (e.key === KLUCZ_AGENT || e.key === KLUCZ_DH) zmianaWidoku(); });
   html.classList.toggle("pw-agent", widokAgenta());
   styl();
   zastosuj();
